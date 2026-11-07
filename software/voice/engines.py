@@ -23,11 +23,14 @@ KOKORO_FILES = ("kokoro-v1.0.int8.onnx", "voices-v1.0.bin")  # int8 is 88 MB, th
 # moonshine/tiny returned nothing for the "help me" fixture; base got it.
 MOONSHINE_MODEL = "moonshine/base"
 # Moonshine returns nothing when an answer sits after ~2 s of quiet, so we cut the quiet off.
-# The gate is relative to the room: on this MacBook (input volume 27%), room noise averaged over
-# 150 ms peaked at 2.2x its median (fixture room_noise_real_mic.wav); a faint voice reached 3.5x.
+# The gate is relative to the room's floor, the 10th percentile of frame volume. Not the median:
+# when speech fills most of the window the median is speech, and a 3.2 s answer was cut to 0.51 s.
+# On this MacBook (input volume 27%), room noise averaged over 150 ms peaked at 4.5x the floor
+# (fixture room_noise_real_mic.wav); a faint voice reached about 7x (3.5x the room median).
 FRAME = 480  # 30 ms at 16 kHz
 SMOOTH_FRAMES = 5
-VOICE_OVER_FLOOR = 2.5
+FLOOR_PERCENTILE = 10
+VOICE_OVER_FLOOR = 5.5
 MIN_VOICE_RMS = 0.003  # above this Mac's room median (0.002), so near-silence never counts as voice
 PAD = SAMPLE_RATE * 3 // 10
 TOKENS_PER_SECOND = 6.5  # Moonshine's own default (core/moonshine-model.cpp); stops runaway repeats
@@ -87,7 +90,7 @@ def trim_to_voice(audio: np.ndarray) -> np.ndarray:
     frames = audio[: len(audio) // FRAME * FRAME].reshape(-1, FRAME)
     rms = np.sqrt((frames**2).mean(axis=1))
     smooth = np.convolve(rms, np.ones(SMOOTH_FRAMES) / SMOOTH_FRAMES, mode="same")
-    voiced = np.flatnonzero(smooth > max(VOICE_OVER_FLOOR * np.median(rms), MIN_VOICE_RMS))
+    voiced = np.flatnonzero(smooth > max(VOICE_OVER_FLOOR * np.percentile(rms, FLOOR_PERCENTILE), MIN_VOICE_RMS))
     if voiced.size == 0:
         return audio[:0]
     start = max(voiced[0] * FRAME - PAD, 0)

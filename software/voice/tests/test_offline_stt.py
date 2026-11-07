@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from software.voice.classify import classify
+from software.voice.engines import trim_to_voice
 
 os.environ["HF_HUB_OFFLINE"] = "1"
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -46,6 +47,13 @@ def test_speech_inside_a_long_quiet_recording(stt):
         audio = np.concatenate([quiet, load(name), quiet])
         audio += np.random.default_rng(0).normal(0, 0.003, audio.size).astype(np.float32)
         assert classify(stt.transcribe(audio)) == answer
+
+
+def test_speech_that_fills_the_window_survives_the_trim(stt):
+    """With speech in most of the window the median is speech, so a median gate kept 0.51 s of 3.2 s."""
+    audio = load("eleven_long_answer.wav")  # ElevenLabs: "I noticed you stop moving. Are you okay? please respond."
+    assert trim_to_voice(audio).size > 0.9 * audio.size
+    assert classify(stt.transcribe(audio)) == "ok"
 
 
 def test_real_mic_room_noise_is_silence(stt):
