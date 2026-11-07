@@ -18,6 +18,9 @@ const WASH_FADE_MS = 1500;
 const QUEUE_GAP_MS = 2000;
 const QUEUE_ROWS = 40;
 const TRACE_MAX = 200;
+// One coverage line per sweep instead of one per tick; the Agent doc's math
+// cadence is 10 s, half that keeps the stage demo moving.
+const COVERAGE_EVERY_MS = 5000;
 
 const EPICENTER = { lat: 32.962, lon: -96.788 };
 const KX = Math.cos((((BOUNDS.latMin + BOUNDS.latMax) / 2) * Math.PI) / 180);
@@ -48,6 +51,7 @@ let forced;
 let lastQueueJson;
 let lastQueueAt;
 let guardNote;
+let lastSweepAt;
 let eventHtml;
 let alertHtml;
 
@@ -75,6 +79,7 @@ function resetAll(now) {
   lastQueueJson = '';
   lastQueueAt = -Infinity;
   guardNote = null;
+  lastSweepAt = -Infinity;
   traceEntries.length = 0;
   $('trace-list').replaceChildren();
   $('queue-list').replaceChildren();
@@ -161,7 +166,10 @@ function rank(now) {
   math = rankHomes(inputs);
   const { queue, results } = applyRerank(math, activeMoves);
   shown = queue;
-  moveById = new Map(results.filter((r) => r.ok).map((r) => [r.move.id, r.move]));
+  const mathPlace = new Map(math.map((r, i) => [r.id, i]));
+  moveById = new Map(
+    results.filter((r) => r.ok && shown[mathPlace.get(r.move.id)]?.id !== r.move.id).map((r) => [r.move.id, r.move]),
+  );
 }
 
 function tick() {
@@ -176,16 +184,21 @@ function tick() {
     if (now >= quake.at + WAVE_MS) {
       for (const id of nextAttempts(math.map((r) => r.id), sim, PACE.attemptsPerTick)) attempt(sim.get(id), now, 1);
     }
-    const swept = coverageSweep(sim, now, PACE.coverageMs);
-    if (swept.length) {
-      for (const id of swept) attempt(sim.get(id), now, 1);
-      forced += swept.length;
-      const list = swept.slice(0, 6).join(', ') + (swept.length > 6 ? ` and ${swept.length - 6} more` : '');
-      addTrace('COVERAGE', `Forced recheck on ${swept.length} untouched ${swept.length === 1 ? 'home' : 'homes'}: ${list}.`, 'schedule_recheck', 'dashboard');
+    if (now - lastSweepAt >= COVERAGE_EVERY_MS) {
+      lastSweepAt = now;
+      forceRechecks(coverageSweep(sim, now, PACE.coverageMs), now);
     }
     maybeSendQueue(now);
   }
   renderAll();
+}
+
+function forceRechecks(ids, now) {
+  if (ids.length === 0) return;
+  for (const id of ids) attempt(sim.get(id), now, 1);
+  forced += ids.length;
+  const list = ids.slice(0, 6).join(', ') + (ids.length > 6 ? ` and ${ids.length - 6} more` : '');
+  addTrace('COVERAGE', `Forced recheck on ${ids.length} untouched ${ids.length === 1 ? 'home' : 'homes'}: ${list}.`, 'schedule_recheck', 'dashboard');
 }
 
 function maybeSendQueue(now) {
@@ -208,13 +221,13 @@ function onRerank(msg) {
       const dir = r.move.by < 0 ? 'up' : 'down';
       addTrace('GUARD', `Rerank accepted: ${r.move.id} ${dir} ${Math.abs(r.move.by)}, factor ${r.move.factor}.`, null, 'guardrail');
     } else {
-      addTrace('BLOCKED', `Override blocked: ${r.move.id ?? 'unknown home'}, ${r.reason}.`, null, 'guardrail');
+      addTrace('BLOCKED', `Override blocked: ${r.reason}.`, null, 'guardrail');
     }
   }
   const blocked = results.filter((r) => !r.ok);
   const why = typeof msg.reason === 'string' && msg.reason ? ` Agent reason: ${msg.reason}` : '';
   guardNote = blocked.length
-    ? { ok: false, text: `Override blocked: ${blocked.map((r) => `${r.move.id ?? '?'} ${r.reason}`).join('; ')}.${why}` }
+    ? { ok: false, text: `Override blocked: ${blocked.map((r) => r.reason).join('; ')}.${why}` }
     : { ok: true, text: `Agent moved ${results.length} ${results.length === 1 ? 'home' : 'homes'} within the guardrail.${why}` };
   rank(performance.now());
   renderAll();
@@ -301,13 +314,15 @@ function renderCounters() {
   setText('c-forced', forced);
 }
 
-const CHECKIN_LABEL = { asking: 'Asking', ok: 'Okay', help: 'Said help', no_answer: 'No answer', alarm: 'Alarm (demo only)', clear: 'Cleared' };
+const CHECKIN_LABEL = { asking: 'Asking', ok: 'Okay', help: 'Said help', no_answer: 'No answer', alarm: 'Alarm (demo)', clear: 'Cleared' };
+const ANSWER_LABEL = { ok: 'Okay', help: 'Help', no_answer: 'No answer' };
 const PRESENCE_LABEL = { moving: 'Moving', still: 'Still', none: 'Nobody detected' };
 
 function renderBox() {
   setText('b-presence', PRESENCE_LABEL[box.presence] ?? box.presence);
-  setText('b-checkin', box.checkin ? `${CHECKIN_LABEL[box.checkin] ?? box.checkin}${box.try ? `, try ${box.try}` : ''}` : 'None yet');
-  setText('b-heard', box.heard ? `${box.heard.answer}${box.heard.transcript ? `: "${box.heard.transcript}"` : ''}` : 'None yet');
+  const showTry = box.try && ['asking', 'no_answer', 'alarm'].includes(box.checkin);
+  setText('b-checkin', box.checkin ? `${CHECKIN_LABEL[box.checkin] ?? box.checkin}${showTry ? `, try ${box.try}` : ''}` : 'None yet');
+  setText('b-heard', box.heard ? `${ANSWER_LABEL[box.heard.answer] ?? box.heard.answer}${box.heard.transcript ? `: "${box.heard.transcript}"` : ''}` : 'None yet');
   setText('b-power', `${box.power === 'battery' ? 'Battery' : 'Mains'}${box.battery_pct != null ? `, ${box.battery_pct}%` : ''}`);
   const idx = shown.findIndex((r) => r.id === REAL_BOX_ID);
   setText('b-rank', idx < 0 ? 'Not hit' : `#${idx + 1} of ${shown.length}`);

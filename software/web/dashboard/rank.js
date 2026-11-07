@@ -70,7 +70,7 @@ export function queueMessage(ranked) {
 const isProtected = (r) => r.harm_min < PROTECTED_UNDER_MIN || r.factors.said_help;
 
 function protectionReason(r) {
-  return r.factors.said_help ? `${r.id} said help` : `${r.id} is under ${PROTECTED_UNDER_MIN} min`;
+  return r.factors.said_help ? 'it said help' : `it is under ${PROTECTED_UNDER_MIN} min`;
 }
 
 // Returns null when the move is allowed, else the reason it is rejected.
@@ -78,15 +78,15 @@ function protectionReason(r) {
 export function checkMove(queue, move) {
   const from = queue.findIndex((r) => r.id === move.id);
   if (from < 0) return `${move.id} is not in the queue`;
-  if (!Number.isInteger(move.by) || move.by === 0) return `move must be a whole number of places, got ${move.by}`;
-  if (Math.abs(move.by) > MAX_PLACES) return `moves ${Math.abs(move.by)} places, limit is ${MAX_PLACES} places`;
-  if (!FACTOR_KEYS.includes(move.factor)) return `no named factor (got ${move.factor ?? 'none'})`;
+  if (!Number.isInteger(move.by) || move.by === 0) return `${move.id}: a move must be a whole number of places, got ${move.by}`;
+  if (Math.abs(move.by) > MAX_PLACES) return `${move.id} moves ${Math.abs(move.by)} places, limit is ${MAX_PLACES} places`;
+  if (!FACTOR_KEYS.includes(move.factor)) return `${move.id}: no named factor (got ${move.factor ?? 'none'})`;
   const to = Math.min(queue.length - 1, Math.max(0, from + move.by));
   const mover = queue[from];
-  if (to > from && isProtected(mover)) return `cannot demote: ${protectionReason(mover)}`;
+  if (to > from && isProtected(mover)) return `cannot demote ${mover.id}, ${protectionReason(mover)}`;
   if (to < from) {
     const pushedDown = queue.slice(to, from).find(isProtected);
-    if (pushedDown) return `would push ${protectionReason(pushedDown)} down`;
+    if (pushedDown) return `${mover.id} would push ${pushedDown.id} down, ${protectionReason(pushedDown)}`;
   }
   return null;
 }
