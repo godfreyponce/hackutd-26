@@ -24,7 +24,7 @@ The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 | # | Exact part | What it does | MC # | ~Price |
 |---|---|---|---|---|
 | 1 | **SunFounder PiPower 5** (UPS / battery backup board for Raspberry Pi 5, 5 V 5 A output) | Keeps the Pi on when the power is cut (the core demo) | 708124 | $36 |
-| 2 | **2 × 18650 Li-ion batteries, protected, flat top**: only if the PiPower 5 box doesn't include them (read the box) | The backup battery | — | $10–20 |
+| 2 | **Battery pack for the PiPower 5**: SunFounder's own 7.4 V 2-cell 18650 pack (XH2.54 3-pin plug). Very likely in the PiPower 5 box (the PiPower 3 kit included one); **check the box. Loose 18650s won't plug in** | The backup battery | — | only if missing |
 | 3 | **USB-C (male) to USB-C (male) cable, rated 5 A / 100 W ("e-marked"), 1 ft (0.3 m) or shorter**; one 90° right-angle end if they have it | PiPower 5 output → Pi 5 power input. A normal 3 A cable makes the Pi brown out | — | $10 |
 | 4 | **Raspberry Pi Active Cooler for Raspberry Pi 5** (official clip-on heatsink + fan); skip if you own one | Stops the Pi overheating inside the closed case | 671930 | $5 |
 | 5 | **DFRobot SEN0395 24 GHz mmWave human presence sensor** | Detects a person even when they're lying still (drives the alarm rule) | 668867 | $29 |
