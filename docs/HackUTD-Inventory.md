@@ -29,6 +29,39 @@ Part of [HackUTD-2026](HackUTD-2026.md). Rafael's gear as of 2026-11-07. Godfrey
 - Keyboards ×2, mice ×2, USB microphone, headset
 - **Tablet-sized monitor** (added 2026-11-07). Planned role: on-device judge-facing UI (live overlay + metrics). To check: size, resolution, HDMI or USB-C, touch, power.
 
+## Kit modules (Rafael's Notion parts database, screenshot 2026-11-07)
+Exact chip models are not listed; "likely" = the usual part in Elegoo/Freenove-style kits. Check the board marking before wiring.
+
+| Module | Likely part | Use in idea v2 ([HackUTD-Idea-Home-Monitor](HackUTD-Idea-Home-Monitor.md)) |
+|---|---|---|
+| **Gyro and accelerometer** | MPU-6050 (I2C) | **Earthquake detection: decided** |
+| **Vibration/Shake detector** | SW-420 | Backup or wake-up trigger for shaking (on/off only) |
+| **PIR motion sensor** | HC-SR501 | Presence fallback if no radar (can't see a still person) |
+| **Temperature & humidity sensor** | DHT11 | Cold/heat clock |
+| **Temperature, humidity & pressure** | BME280 or BMP280 (I2C) | Better cold/heat clock; pressure = storm hint |
+| **Precise temperature sensor** | DS18B20 (1-Wire) | Cold/heat clock |
+| **MQ-2 gas module** | MQ-2 | Smoke / combustible gas (not CO). Runs hot, needs vents |
+| **Flame module** | IR flame sensor | Fire hint (short range) |
+| **Water level module** | Resistive strip | Flood |
+| **Raindrop detection module** | Rain board | Leak / roof water |
+| **Passive buzzer module** | Piezo | Local alarm sound |
+| **Small display screen** | Likely 0.96" or 0.91" OLED (I2C) | Status on the box |
+| **I2C LCD 1602** | 16×2 LCD + PCF8574 | Alternative status display |
+| **Real-Time Clock** | DS1307 or DS3231 | Timestamps during an outage with no network |
+| **Analog↔Digital Converter** | PCF8591 or ADS1115 | Pi has no analog inputs: needed for MQ-2, water, raindrop, light on the Pi |
+| **Light level sensor** | Photoresistor | Power-cut / lights-out hint |
+| **Button module, Touch module** | — | "I'm okay" button, cancel alarm |
+| **RGB LED module** | — | Status light (if no NeoPixel ring) |
+| **Heart rate sensor** | Pulse sensor | Not used (contact sensor) |
+| Ultrasonic distance (HC-SR04), Distance measurement sensor (likely VL53L0X or IR), IR obstacle sensor, Hall switch, Rotary encoder, Joystick, Potentiometer, Soil moisture | — | Spare |
+| Bluetooth module (likely HC-05/06), Wi-Fi module (likely ESP-01) | — | Spare (ESP32 already has both) |
+| Breadboard power supply module, 9 V battery cable | — | Bench power |
+| Dual motor driver (likely L298N), TT motor + encoder disk, pump + tube | — | Spare |
+
+**Motion and logic (same database):**
+- MG90S servo, MG996R servo, 9G servo; Nema 17; **TMC2209 (BigTreeTech)**, so the stepper driver model is answered.
+- Arduino Uno R3; 74LS00/02/04/08/32/74/86/257 logic chips; jumper wires F/M.
+
 ## Bench
 - Breadboards, jumpers, kit modules, capacitor and resistor sets, soldering station, hand tools
 

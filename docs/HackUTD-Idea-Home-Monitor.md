@@ -32,6 +32,12 @@ Rafael: "I haven't figured out everything yet." Below: **Decided** = his words; 
    - which broadcasts it is receiving, and when one carries an alert, where it applies
    - a **map: every home is a white dot; homes hit by a disaster turn red**
 
+9. **Hardware decisions** (2026-11-07 ~3 PM):
+   - **No camera.** Presence comes from the radar; privacy by design.
+   - **Outage: the Pi stays on** a battery backup (UPS board, issue #11). This replaces the "Pi shuts down, ESP32 on battery" proposal. "Low-power mode" now means the Pi stays up and sheds load (screen dim, fewer checks), not a shutdown.
+   - **Accelerometer for earthquakes:** use Rafael's own kit "Gyro and accelerometer" module (likely an MPU-6050; check the chip). Mount it rigidly to the case or wall.
+   - Full module list: [HackUTD-Inventory](HackUTD-Inventory.md) (kit modules).
+
 ## Alert receiver: how it works (from Rafael's decision 7)
 - **Inputs:** NOAA Weather Radio over the RTL-SDR (SAME header, works offline); NWS API (GeoJSON with CAP fields); CAP XML feeds (GDACS, later FEMA IPAWS); USGS/EMSC quake JSON; the node's own sensors.
 - **Format detection:** `<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">` → CAP parser; GeoJSON `FeatureCollection` → NWS/USGS parser; `ZCZC-` header from the radio decoder → SAME parser; EMSC websocket JSON → quake parser. Unknown → logged, never dropped silently.
