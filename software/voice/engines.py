@@ -16,7 +16,10 @@ import numpy as np
 
 SAMPLE_RATE = 16000
 MODEL_DIR = Path.home() / ".cache" / "hackutd-voice"
-PIPER_VOICE = "en_US-lessac-medium"
+# The offline voice, one setting: "piper:<voice>" or "kokoro:<voice>". Both run on a Pi 5.
+OFFLINE_VOICE = os.environ.get("OFFLINE_VOICE", "piper:en_US-lessac-medium")
+KOKORO_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+KOKORO_FILES = ("kokoro-v1.0.int8.onnx", "voices-v1.0.bin")  # int8 is 88 MB, the Pi-sized build
 # moonshine/tiny returned nothing for the "help me" fixture; base got it.
 MOONSHINE_MODEL = "moonshine/base"
 # Moonshine returns nothing when an answer sits after ~2 s of quiet, so we cut the quiet off.
@@ -30,7 +33,7 @@ PAD = SAMPLE_RATE * 3 // 10
 TOKENS_PER_SECOND = 6.5  # Moonshine's own default (core/moonshine-model.cpp); stops runaway repeats
 
 ELEVEN_URL = "https://api.elevenlabs.io/v1"
-ELEVEN_VOICE = "JBFqnCBsd6RMkjVDRZzb"  # "George", the voice in ElevenLabs' API examples
+ELEVEN_VOICE = os.environ.get("ELEVEN_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")  # "George", warm and calm
 ELEVEN_TTS_MODEL = "eleven_flash_v2_5"
 ELEVEN_STT_MODEL = "scribe_v2"
 ELEVEN_TIMEOUT_S = 10  # a guess: long enough for a short line, short enough to fall back fast
@@ -64,10 +67,19 @@ def play(audio: np.ndarray, rate: int):
 
 
 def download_models():
+    import urllib.request
+
     from piper.download_voices import download_voice
 
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    download_voice(PIPER_VOICE, MODEL_DIR)
+    backend, voice = parse_voice(OFFLINE_VOICE)
+    if backend == "piper":
+        MODEL_DIR.mkdir(parents=True, exist_ok=True)
+        download_voice(voice, MODEL_DIR)
+    else:
+        (MODEL_DIR / "kokoro").mkdir(parents=True, exist_ok=True)
+        for name in KOKORO_FILES:
+            if not (MODEL_DIR / "kokoro" / name).exists():
+                urllib.request.urlretrieve(f"{KOKORO_URL}/{name}", MODEL_DIR / "kokoro" / name)
     MoonshineSTT()
 
 
@@ -100,23 +112,60 @@ class MoonshineSTT:
         return self.tokenizer.decode_batch(tokens)[0].strip()
 
 
+def parse_voice(setting: str) -> tuple[str, str]:
+    backend, _, voice = setting.partition(":")
+    if backend not in ("piper", "kokoro") or not voice:
+        raise ValueError(f'voice setting must be "piper:<voice>" or "kokoro:<voice>", got {setting!r}')
+    return backend, voice
+
+
+def require(path: Path) -> Path:
+    if not path.exists():
+        raise FileNotFoundError(f"{path} is missing; run python -m software.voice --download")
+    return path
+
+
+def make_tts(setting: str):
+    backend, voice = parse_voice(setting)
+    return PiperTTS(voice) if backend == "piper" else KokoroTTS(voice)
+
+
 class PiperTTS:
-    def __init__(self):
+    def __init__(self, voice: str):
         from piper import PiperVoice
 
-        self.voice = PiperVoice.load(MODEL_DIR / f"{PIPER_VOICE}.onnx")
+        self.voice = PiperVoice.load(require(MODEL_DIR / f"{voice}.onnx"))
+
+    def synthesize(self, text: str) -> tuple[np.ndarray, int]:
+        chunks = list(self.voice.synthesize(text))
+        return np.concatenate([c.audio_float_array for c in chunks]), chunks[0].sample_rate
 
     def speak(self, text: str):
-        chunks = list(self.voice.synthesize(text))
-        play(np.concatenate([c.audio_float_array for c in chunks]), chunks[0].sample_rate)
+        play(*self.synthesize(text))
+
+
+class KokoroTTS:
+    def __init__(self, voice: str):
+        from kokoro_onnx import Kokoro
+
+        model, voices = (require(MODEL_DIR / "kokoro" / name) for name in KOKORO_FILES)
+        self.kokoro = Kokoro(str(model), str(voices))
+        self.voice = voice
+        self.lang = "en-gb" if voice.startswith("b") else "en-us"  # Kokoro names British voices b*
+
+    def synthesize(self, text: str) -> tuple[np.ndarray, int]:
+        return self.kokoro.create(text, voice=self.voice, lang=self.lang)
+
+    def speak(self, text: str):
+        play(*self.synthesize(text))
 
 
 class OfflineEngine:
-    """Piper speaks, Moonshine listens. No network."""
+    """Piper or Kokoro speaks, Moonshine listens. No network."""
 
     def __init__(self, log=print):
         self.log = log
-        self.tts = PiperTTS()
+        self.tts = make_tts(OFFLINE_VOICE)
         self.stt = MoonshineSTT()
 
     def speak(self, text: str):

@@ -9,7 +9,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -r software/voice/requirements
 .venv/bin/python -m software.voice --download
 ```
 
-`--download` saves the Piper voice to `~/.cache/hackutd-voice/` and Moonshine to the Hugging Face cache. After that the offline mode runs with Wi-Fi off.
+`--download` saves the offline voice to `~/.cache/hackutd-voice/` and Moonshine to the Hugging Face cache. After that the offline mode runs with Wi-Fi off.
 
 ## Run
 
@@ -24,7 +24,14 @@ python3.12 -m venv .venv && .venv/bin/pip install -r software/voice/requirements
 ## Modes
 
 - **Online:** ElevenLabs text-to-speech (`eleven_flash_v2_5`) and speech-to-text (`scribe_v2`). If a request fails, that line falls back to Piper or Moonshine, so cutting the Wi-Fi mid-demo keeps working. With no `ELEVENLABS_API_KEY` it logs `MOCK/OFFLINE: no ELEVENLABS_API_KEY` and runs offline.
-- **Offline:** Piper (`en_US-lessac-medium`) and Moonshine (`moonshine/base`). `moonshine/tiny` missed the "help me" fixture.
+- **Offline:** Piper or Kokoro speaks, Moonshine (`moonshine/base`) listens. `moonshine/tiny` missed the "help me" fixture.
+
+## Voice
+
+One setting each. Set the env var, or change the default in `engines.py`.
+
+- `OFFLINE_VOICE`: `piper:<voice>` or `kokoro:<voice>`, for example `kokoro:af_heart` or `piper:en_US-ryan-high`. Default `piper:en_US-lessac-medium`. Run `--download` after a change.
+- `ELEVEN_VOICE_ID`: an ElevenLabs voice id. Default George (`JBFqnCBsd6RMkjVDRZzb`).
 - **Text:** no audio. A timeout counts as silence.
 
 Why not Eleven Realtime v1 Mini: it is a speech-to-speech agent. Its docs don't promise that it says a fixed line word for word, and they list no event that hands us a transcript of the answer. The box must say the agent's exact line, and the agent must get a transcript.
