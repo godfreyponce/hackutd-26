@@ -150,6 +150,63 @@ kbd {
 .dot.halo { background: var(--red); box-shadow: 0 0 0 3px rgba(255, 69, 58, 0.35); }
 .dot.real { background: transparent; border: 2px solid var(--real); }
 
+.stage {
+  position: absolute;
+  left: 16px;
+  top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 10px;
+  border-radius: 999px;
+  background: rgba(10, 13, 18, 0.8);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.stage-steps { display: flex; gap: 4px; }
+.stage-steps i { width: 18px; height: 4px; border-radius: 2px; background: var(--line); transition: background 0.3s; }
+.stage[data-stage="world"] [data-s="world"],
+.stage[data-stage="city"] [data-s="world"],
+.stage[data-stage="city"] [data-s="city"],
+.stage[data-stage="home"] i { background: var(--real); }
+.attrib {
+  position: absolute;
+  right: 16px;
+  top: 14px;
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(10, 13, 18, 0.7);
+  color: var(--muted);
+  font-size: 11px;
+}
+.callout {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(16, 21, 28, 0.94);
+  border: 1px solid var(--real);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+  color: var(--muted);
+  pointer-events: none;
+  animation: callout-in 0.35s cubic-bezier(.2, .8, .2, 1);
+}
+.callout[hidden] { display: none; }
+.callout b { color: var(--text); font-size: 15px; }
+.callout.alarm { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft), 0 8px 30px rgba(0, 0, 0, 0.5); }
+.callout.alarm b { color: #ffb4ae; }
+.callout.alarm span { color: var(--text); }
+@keyframes callout-in { from { opacity: 0; } }
+
 /* Right column */
 .right {
   border-left: 1px solid var(--line);
@@ -268,4 +325,6 @@ kbd {
 
 @media (prefers-reduced-motion: reduce) {
   .row.real.lit { animation: none; }
+  .callout { animation: none; }
+  .stage-steps i { transition: none; }
 }
