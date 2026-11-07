@@ -17,25 +17,38 @@ Part of [HackUTD-2026](HackUTD-2026.md). Merged 2026-11-07 ~3:50 PM from:
 **Stock and prices are unverified** (Micro Center blocks bots). Call or check the app before driving. Micro Center Dallas, 13929 N Central Expy, open until 9 PM.
 The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 
-## Must buy
-| # | Part | Why | Where | ~Price |
-|---|---|---|---|---|
-| 1 | **SunFounder PiPower 5** (Pi 5 UPS, 5 V/5 A) | Keeps the Pi on when the power is cut (decided) and tells it "mains lost". 3 A boards brown out | MC #708124 | $35.99 |
-| 2 | **2 × 18650 cells** (only if not included with #1); flat or button top to fit the holder | UPS battery | MC | ~$10–20 |
-| 3 | **Short USB-C ↔ USB-C cable, 5 A e-marked** (right-angle if possible) | UPS → Pi; a 3 A cable causes brownouts | MC | ~$10 |
-| 4 | **Raspberry Pi 5 Active Cooler** (skip if owned) | The Pi overheats in a closed case | MC #671930 | ~$5 |
-| 5 | **mmWave presence radar**: DFRobot SEN0395 (24 GHz) or HLK-LD2410C | Sees a still person. Drives the alarm rule and "goes still after a fall" | MC #668867 (LD2410C is not at MC) | ~$29 |
-| 6 | **MAX98357A I2S amp** | Voice output (the Pi 5 has no headphone jack) | MC #613583 | $5.95 |
-| 7 | **Speaker, 40 mm, 4 Ω, 3 W** | Speaks "Are you okay?" | MC #612826 (in store only) | $5.95 |
-| 8 | **NeoPixel ring, 16 LED, RGB not RGBW** | Status light (green / amber on battery / red alarm); the case is designed around it | MC #655358 | $9.95 |
-| 9 | **Switched power strip** (skip if owned) | The "power cut" demo: flip the switch | MC | ~$10 |
-| 10 | **Adafruit Software Defined Radio USB stick (RTL2832U + R820T, Adafruit #1497)** | Rafael's decision 7: hear NOAA Weather Radio (162.4–162.55 MHz, inside its 24–1850 MHz range) with no internet. Only RTL-SDR found at Micro Center. It's the cheaper generic-style stick the alert session warned can drift and run hot, so set a ppm correction in `rtl_fm` and give it airflow. Its small antenna likely uses an **MCX** plug, not SMA [u] | MC product 656639 (SKU 495903 / 025270) | ~$25 [u] |
-| 11 | **Short USB-A extension** (right-angle if the shelf has one) | Lets the stick sit inside the case away from the Pi | MC (Inland) | ~$5 |
-| 12 | **2 × I2S MEMS mic** (SPH0645 or INMP441) | The case has 17.5 × 14.5 mm pockets for them. Fallback: the owned USB mic (tell the case session) | MC #613585 | $6.95 each |
-| 13 | **Black PLA ~300 g + white/clear PLA ~8 g** (skip whatever you own) | Whole case + faceplate; the white goes in the status-light diffuser and the radar window | MC | ~$20 per roll |
-| 14 | **Mounting:** 4 × #8 wood screws + drywall anchors, OR VHB / Command strips for the demo table | Wall/ceiling twist-lock plate | MC | ~$5 |
+## Buy list, by priority (Micro Center only; exact names to look for)
+**Micro Center only** (Rafael can't order from Amazon, 2026-11-07). MC numbers come from research and are unverified, so match the name on the box.
 
-**Micro Center only (Rafael can't order from Amazon, 2026-11-07).** Must-buy total ≈ $175–200.
+### Priority 1: the demo doesn't work without these
+| # | Exact part | What it does | MC # | ~Price |
+|---|---|---|---|---|
+| 1 | **SunFounder PiPower 5** (UPS / battery backup board for Raspberry Pi 5, 5 V 5 A output) | Keeps the Pi on when the power is cut (the core demo) | 708124 | $36 |
+| 2 | **2 × 18650 Li-ion batteries, protected, flat top**: only if the PiPower 5 box doesn't include them (read the box) | The backup battery | — | $10–20 |
+| 3 | **USB-C (male) to USB-C (male) cable, rated 5 A / 100 W ("e-marked"), 1 ft (0.3 m) or shorter**; one 90° right-angle end if they have it | PiPower 5 output → Pi 5 power input. A normal 3 A cable makes the Pi brown out | — | $10 |
+| 4 | **Raspberry Pi Active Cooler for Raspberry Pi 5** (official clip-on heatsink + fan); skip if you own one | Stops the Pi overheating inside the closed case | 671930 | $5 |
+| 5 | **DFRobot SEN0395 24 GHz mmWave human presence sensor** | Detects a person even when they're lying still (drives the alarm rule) | 668867 | $29 |
+| 6 | **Adafruit I2S 3 W Class D amplifier breakout, MAX98357A** | Drives the speaker (the Pi 5 has no headphone jack) | 613583 | $6 |
+| 7 | **Adafruit mono enclosed speaker, 3 W 4 Ω, 40 mm** (or any 40 mm 4 Ω 3 W speaker) | Says "Are you okay?" | 612826 | $6 |
+| 8 | **Power strip / surge protector with a lighted on/off rocker switch**; skip if you own one | The judge flips it to cut the power | — | $10 |
+
+### Priority 2: needed for the case as designed and the decided features
+| # | Exact part | What it does | MC # | ~Price |
+|---|---|---|---|---|
+| 9 | **2 × Adafruit I2S MEMS microphone breakout, SPH0645LM4H** (or **INMP441 I2S microphone module**, same pocket) | Hears the answer; two mics handle a noisy room. **Fallback:** your USB mic | 613585 | $7 each |
+| 10 | **Adafruit NeoPixel ring, 16 × 5050 RGB LED** (must say **RGB**, not RGBW) | Status light: green OK, amber on battery, red alarm | 655358 | $10 |
+| 11 | **1.75 mm PLA filament, black, 1 kg** + **1.75 mm PLA, white or clear (natural)**; plain PLA, **not** PLA-CF; skip what you own | The case (~300 g black, ~8 g white for the light diffuser + radar window) | — | $20 a roll |
+| 12 | **Adafruit Software Defined Radio receiver USB stick, RTL2832 with R820T** (Adafruit #1497) | Hears NOAA Weather Radio alerts with no internet (decision 7) | 656639 | ~$25 |
+| 13 | **USB-A (male) to USB-A (female) extension cable, USB 2.0 or 3.0, 6–12 in (15–30 cm)** | Male end into the Pi's black USB 2.0 port; the radio stick plugs into the female end, away from the Pi's noise | — | $5 |
+
+### Priority 3: only if needed (check first)
+| # | Exact part | Buy it when… | MC # | ~Price |
+|---|---|---|---|---|
+| 14 | **USB-C PD wall charger, 45 W or higher** + **USB-C (male) to USB-C (male) cable, 60 W or higher** | The PiPower 5 box says it needs more than 27 W input (your laptop's USB-C charger also works) | — | $25–35 |
+| 15 | **Adafruit black nylon screw and stand-off set, M2.5** | You have **no M2.5 screws** at home. The case holds the Pi 5 and the PiPower 5 with 8 × M2.5x6 screws + 8 M2.5 nuts | 503925 | ~$15 |
+| 16 | **3M Command strips or VHB double-sided mounting tape** | You want the box stuck to the table or a wall for the demo | — | $5 |
+
+**Priority 1 + 2 total ≈ $175–200.**
 
 ## Check first (may change the list)
 - **UPS input power:** the PiPower 5 may need ≥ 32 W USB-C PD input for a Pi 5 [unverified]. If the box says so, **a ≥ 45 W USB-C PD charger becomes a must** (use your laptop charger if it's USB-C PD).
