@@ -33,7 +33,7 @@ PAD = SAMPLE_RATE * 3 // 10
 TOKENS_PER_SECOND = 6.5  # Moonshine's own default (core/moonshine-model.cpp); stops runaway repeats
 
 ELEVEN_URL = "https://api.elevenlabs.io/v1"
-ELEVEN_VOICE = os.environ.get("ELEVEN_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")  # "George", warm and calm
+ELEVEN_VOICE = os.environ.get("ELEVEN_VOICE_ID", "ljX1ZrXuDIIRVcmiVSyR")  # picked by Godfrey from the Voice Library
 ELEVEN_TTS_MODEL = "eleven_flash_v2_5"
 ELEVEN_STT_MODEL = "scribe_v2"
 ELEVEN_TIMEOUT_S = 10  # a guess: long enough for a short line, short enough to fall back fast

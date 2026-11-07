@@ -31,7 +31,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -r software/voice/requirements
 One setting each. Set the env var, or change the default in `engines.py`.
 
 - `OFFLINE_VOICE`: `piper:<voice>` or `kokoro:<voice>`, for example `kokoro:af_heart` or `piper:en_US-ryan-high`. Default `piper:en_US-lessac-medium`. Run `--download` after a change.
-- `ELEVEN_VOICE_ID`: an ElevenLabs voice id. Default George (`JBFqnCBsd6RMkjVDRZzb`).
+- `ELEVEN_VOICE_ID`: an ElevenLabs voice id. Default `ljX1ZrXuDIIRVcmiVSyR`, picked by Godfrey from the Voice Library. It must be in the account's My Voices.
 - **Text:** no audio. A timeout counts as silence.
 
 Why not Eleven Realtime v1 Mini: it is a speech-to-speech agent. Its docs don't promise that it says a fixed line word for word, and they list no event that hands us a transcript of the answer. The box must say the agent's exact line, and the agent must get a transcript.
