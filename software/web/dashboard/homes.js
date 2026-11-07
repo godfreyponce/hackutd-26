@@ -48,7 +48,7 @@ function pick(rand, table) {
 }
 
 const between = (rand, lo, hi) => lo + rand() * (hi - lo);
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const inside = (lat, lon) => lat >= BOUNDS.latMin && lat <= BOUNDS.latMax && lon >= BOUNDS.lonMin && lon <= BOUNDS.lonMax;
 
 function gaussian(rand) {
   const u = 1 - rand();
@@ -84,8 +84,10 @@ export function generateHomes(seed = 16) {
     let lon;
     if (rand() < CLUSTERED_SHARE) {
       const c = centers[Math.floor(rand() * CLUSTERS)];
-      lat = clamp(c.lat + gaussian(rand) * CLUSTER_SD_DEG, BOUNDS.latMin, BOUNDS.latMax);
-      lon = clamp(c.lon + gaussian(rand) * CLUSTER_SD_DEG, BOUNDS.lonMin, BOUNDS.lonMax);
+      do {
+        lat = c.lat + gaussian(rand) * CLUSTER_SD_DEG;
+        lon = c.lon + gaussian(rand) * CLUSTER_SD_DEG;
+      } while (!inside(lat, lon));
     } else {
       lat = between(rand, BOUNDS.latMin, BOUNDS.latMax);
       lon = between(rand, BOUNDS.lonMin, BOUNDS.lonMax);

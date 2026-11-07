@@ -3,7 +3,7 @@
 
 export const FACTOR_KEYS = ['battery_min', 'indoor_f', 'unresponsive', 'still', 'stale', 'said_help'];
 
-const DEVICE_WEIGHT = { o2: 1, dialysis: 1.5, cpap: 1.5, insulin: 1.5, wheelchair: 3 };
+export const DEVICE_WEIGHT = { o2: 1, dialysis: 1.5, cpap: 1.5, insulin: 1.5, wheelchair: 3 };
 const EXPOSURE_MIN = 720;
 const EXPOSURE_MIN_VULNERABLE = 240;
 // WHO minimum indoor temperature (18 C). Below it the exposure clock shrinks
