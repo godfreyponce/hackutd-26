@@ -37,6 +37,11 @@ The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 
 **Micro Center only (Rafael can't order from Amazon, 2026-11-07).** Must-buy total ≈ $175–200.
 
+## Probably needed: M2.5 screws (confirming with the case session)
+- The Pi 5 and the PiPower 5 have **2.7 mm mounting holes (M2.5)**. M3 doesn't fit, and with the AI HAT+ dropped there's no HAT kit to borrow M2.5 hardware from. Rafael owns only M3.
+- Buy a small **M2.5 screw + nut (+ standoff) assortment** (Micro Center sells Pi standoff kits, ~$8–12).
+- **Camera M2 screws: not needed** (camera out).
+
 ## Check first (may change the list)
 - **UPS input power:** the PiPower 5 may need ≥ 32 W USB-C PD input for a Pi 5 [unverified]. If the box says so, **a ≥ 45 W USB-C PD charger becomes a must** (use your laptop charger if it's USB-C PD).
 - **I2S mics:** the SPH0645 may be ship-only. If it isn't on the shelf, the INMP441 fits the same pocket; otherwise use the USB mic.
