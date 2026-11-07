@@ -1,7 +1,7 @@
 import { initialState, reduce, statusText, TRACE_WINDOW_MS } from './state.js';
 
 // The product name is not settled. Change it here only.
-export const PRODUCT_NAME = 'Lifeline';
+export const PRODUCT_NAME = 'LAND';
 
 const DEFAULT_HUB = 'ws://localhost:8765';
 const RETRY_MS = 1000; // guess: fast enough to catch a hub restart during the demo
