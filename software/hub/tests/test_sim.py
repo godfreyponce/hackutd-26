@@ -72,3 +72,15 @@ def test_heartbeat_drains_battery_only_on_battery_power():
     event, drained = heartbeat(on_battery)
     assert event["battery_pct"] == on_battery["battery_pct"]
     assert drained["battery_pct"] == on_battery["battery_pct"] - 1
+
+
+def test_reset_from_any_bus_client_resets_simulator_state():
+    from software.hub.bus import Hub
+    from software.hub.sim import Simulator
+
+    hub = Hub()
+    sim = Simulator(hub)
+    sim.on_key("m")
+    sim.on_key("p")
+    hub.publish({"type": "reset"})
+    assert sim.state == START_STATE

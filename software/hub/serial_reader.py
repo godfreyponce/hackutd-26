@@ -22,9 +22,13 @@ def forward_line(hub, line: bytes) -> None:
     log.info("serial -> %s", msg)
 
 
-async def run_serial(hub, port: str):
-    ser = serial.Serial(port, BAUD, timeout=0.5)
-    log.info("reading JSON lines from %s at %d baud", port, BAUD)
+def open_port(port: str) -> serial.Serial:
+    """Opening flushes the input buffer, so lines sent before this returns are lost."""
+    return serial.Serial(port, BAUD, timeout=0.5)
+
+
+async def run_serial(hub, ser: serial.Serial):
+    log.info("reading JSON lines from %s at %d baud", ser.port, BAUD)
     try:
         while True:
             line = await asyncio.to_thread(ser.readline)

@@ -12,9 +12,9 @@ async def main(args):
 
             await run_sim(hub)
         else:
-            from software.hub.serial_reader import run_serial
+            from software.hub.serial_reader import open_port, run_serial
 
-            await run_serial(hub, args.serial)
+            await run_serial(hub, open_port(args.serial))
 
 
 def cli():
