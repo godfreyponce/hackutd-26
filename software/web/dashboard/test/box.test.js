@@ -1,0 +1,63 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { initialBox, applyBoxEvent, boxRankInput, STALE_MS } from '../box.js';
+import { generateHomes } from '../homes.js';
+import { rankHomes } from '../rank.js';
+
+const run = (msgs, t = 0) => msgs.reduce((s, m) => applyBoxEvent(s, m, t), initialBox(t));
+
+function rankOfBox(box, now = 0) {
+  const [, ...sims] = generateHomes();
+  const homes = [boxRankInput(box, now), ...sims.map((h) => ({ ...h, no_answer: 0, said_help: false, answered_ok: false, alarm: false }))];
+  return rankHomes(homes).findIndex((r) => r.id === 'H000') + 1;
+}
+
+test('presence moves the real box between moving, still and none', () => {
+  assert.equal(run([{ type: 'presence', state: 'still' }]).presence, 'still');
+  assert.equal(run([{ type: 'presence', state: 'still' }, { type: 'presence', state: 'moving' }]).presence, 'moving');
+});
+
+test('no answer counts tries once, even when checkin and heard both report it', () => {
+  const s = run([
+    { type: 'checkin', state: 'asking', try: 1 },
+    { type: 'heard', answer: 'no_answer', transcript: '' },
+    { type: 'checkin', state: 'no_answer', try: 1 },
+    { type: 'checkin', state: 'asking', try: 2 },
+    { type: 'heard', answer: 'no_answer', transcript: '' },
+  ]);
+  assert.equal(s.no_answer, 2);
+});
+
+test('help and alarm put the real box at clock 0; ok and clear bring it back', () => {
+  assert.equal(run([{ type: 'heard', answer: 'help', transcript: 'help me' }]).said_help, true);
+  assert.equal(run([{ type: 'checkin', state: 'alarm', try: 4 }]).alarm, true);
+  const cleared = run([
+    { type: 'checkin', state: 'no_answer', try: 3 },
+    { type: 'checkin', state: 'alarm', try: 4 },
+    { type: 'heard', answer: 'ok', transcript: "I'm okay" },
+    { type: 'checkin', state: 'clear' },
+  ]);
+  assert.deepEqual([cleared.alarm, cleared.no_answer, cleared.said_help, cleared.answered_ok], [false, 0, false, true]);
+});
+
+test('the real box goes stale after 5 minutes without a sensor message', () => {
+  const s = initialBox(0);
+  assert.equal(boxRankInput(s, STALE_MS).stale, false);
+  assert.equal(boxRankInput(s, STALE_MS + 1).stale, true);
+  assert.equal(boxRankInput(applyBoxEvent(s, { type: 'heartbeat', battery_pct: 80 }, STALE_MS), STALE_MS + 1).stale, false);
+});
+
+test('when Rafael lies still and does not answer, his row climbs to the top', () => {
+  const start = rankOfBox(initialBox(0));
+  const still = run([{ type: 'presence', state: 'still' }]);
+  const quiet = run([{ type: 'presence', state: 'still' }, { type: 'checkin', state: 'no_answer', try: 2 }]);
+  const alarm = applyBoxEvent(quiet, { type: 'checkin', state: 'alarm', try: 4 }, 0);
+  const ranks = [start, rankOfBox(still), rankOfBox(quiet), rankOfBox(alarm)];
+  assert.ok(ranks[0] > ranks[1] && ranks[1] > ranks[2] && ranks[2] > ranks[3], ranks.join(' > '));
+  assert.equal(ranks[3], 1);
+});
+
+test('reset returns the real box to its start state', () => {
+  const s = run([{ type: 'presence', state: 'still' }, { type: 'checkin', state: 'alarm', try: 4 }]);
+  assert.deepEqual(applyBoxEvent(s, { type: 'reset' }, 7), initialBox(7));
+});
