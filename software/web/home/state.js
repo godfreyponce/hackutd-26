@@ -25,6 +25,7 @@ export function initialState() {
     batteryPct: null,
     indoorF: null,
     quakes: [],
+    areaHit: false, // neighborhood dots turn red after a quake
     home: 'idle', // node map dot: idle (white), hit (red), ok (green)
   };
 }
@@ -33,7 +34,7 @@ export function sourceLabel(source) {
   return SOURCE_LABELS[source] ?? String(source ?? '').toUpperCase();
 }
 
-export function statusText(status) {
+export function statusText(status, { alert = false } = {}) {
   switch (status) {
     case 'CHECKING_IN':
       return { word: 'CHECKING IN', detail: 'Event detected. Asking if you are okay.' };
@@ -46,7 +47,7 @@ export function statusText(status) {
         note: 'Demo alarm. No emergency number is called.',
       };
     default:
-      return { word: 'PROTECTED', detail: 'No active events' };
+      return { word: 'PROTECTED', detail: alert ? 'All okay at home. Official alert active.' : 'No active events' };
   }
 }
 
@@ -73,7 +74,7 @@ export function reduce(state, msg, now) {
   switch (msg.type) {
     case 'quake': {
       const quakes = [...state.quakes, { at: now, g: Number(msg.peak_g) || 0 }].filter((q) => now - q.at <= TRACE_WINDOW_MS);
-      return onEvent(state, { quakes });
+      return onEvent(state, { quakes, areaHit: true });
     }
     case 'fall_hint':
       return onEvent(state);

@@ -25,10 +25,13 @@ test('quake goes to CHECKING_IN, records the peak and marks the home hit', () =>
   assert.equal(s.status, 'CHECKING_IN');
   assert.deepEqual(s.quakes, [{ at: NOW, g: 0.82 }]);
   assert.equal(s.home, 'hit');
+  assert.equal(s.areaHit, true);
 });
 
-test('fall_hint goes to CHECKING_IN', () => {
-  assert.equal(run({ type: 'fall_hint' }).status, 'CHECKING_IN');
+test('fall_hint goes to CHECKING_IN without marking the neighborhood hit', () => {
+  const s = run({ type: 'fall_hint' });
+  assert.equal(s.status, 'CHECKING_IN');
+  assert.equal(s.areaHit, false);
 });
 
 test('checkin asking goes to CHECKING_IN with the try number', () => {
@@ -144,4 +147,9 @@ test('status text never says "fall" and the alarm note says no emergency number 
   assert.equal(statusText('NO_RESPONSE').detail, 'No response after an event');
   assert.match(statusText('CONTACTING_HELP').note, /demo/i);
   assert.match(statusText('CONTACTING_HELP').note, /no emergency number is called/i);
+});
+
+test('PROTECTED with an official alert says the alert is active', () => {
+  assert.equal(statusText('PROTECTED', { alert: true }).detail, 'All okay at home. Official alert active.');
+  assert.equal(statusText('PROTECTED').detail, 'No active events');
 });
