@@ -36,7 +36,18 @@ button:hover{color:var(--fg);border-color:#d4d4d4}
 /* Needs you */
 .task input{margin:3px 0 0;accent-color:var(--fg);width:15px;height:15px;flex:none}
 .task.done .title{color:var(--faint);text-decoration:line-through}
-.task.done .sub,.task.done details{display:none}
+.task.done .steps,.task.done .cmd,.task.done .note{opacity:.45}
+.est{color:var(--faint);font-size:12px}
+.steps{margin:4px 0 2px;padding-left:20px;font-size:13px;color:#404040}
+.steps li{margin:2px 0}
+.steps a,.after a{text-decoration:underline;text-decoration-color:#d4d4d4;text-underline-offset:2px}
+.steps code,.note code,.after code{background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.note{font-size:12.5px;color:var(--muted);margin:4px 0 0}
+.intro{font-size:12.5px;color:var(--muted);margin:-4px 0 6px}
+.after{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.after h3{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.after ol{margin:0;padding-left:20px;font-size:13px;color:#404040}
+.after li{margin:2px 0}
 .title{font-weight:500}
 .due{color:var(--amber);font-size:12px;font-weight:500}
 .due.late{color:var(--red)}
@@ -106,9 +117,19 @@ details ol{margin:4px 0;padding-left:18px}
 
   <section id="needs">
     <h2>Needs you <span class="count" id="needs-count"></span></h2>
+    <p class="intro">Step 1, only you can do these. Button names can differ a little.</p>
     <div id="tasks"></div>
     <div id="pushes"></div>
     <div id="owner-threads"></div>
+    <div class="after">
+      <h3>After step 1</h3>
+      <ol>
+        <li>The build coordinator runs #19 first, then #15, #14, #16 and #20 in parallel, each in its own worktree.</li>
+        <li>The logo thread brings 15 names and 4 logo variants. You pick one.</li>
+        <li>The ScrabbleBot thread needs a working bot before 10:45 PM.</li>
+        <li>When Rafael is back: plug in the ESP32, run the hub with <code>--serial</code>, test the full demo.</li>
+      </ol>
+    </div>
   </section>
 
   <section>
@@ -144,19 +165,47 @@ details ol{margin:4px 0;padding-left:18px}
 
 <script>
 const TZ = "America/Chicago";
+const L = (href, text) => `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
 const TASKS = [
-  {id:"nvidia-form", title:"NVIDIA feedback form", due:"2026-11-07T19:00:00-06:00",
-   sub:'<a href="https://forms.gle/ruwZj6LSDmwxuVGT7" target="_blank">Open the form</a>. Paste the answers from the thread. Add your building and room.'},
-  {id:"nvidia-key", title:"NVIDIA API key and smoke test",
-   sub:'<a href="https://build.nvidia.com" target="_blank">build.nvidia.com</a>, search nemotron-3-nano-30b-a3b, Get API Key. It shows once. Tell Rafael to make his own.',
-   more:`<details><summary>Smoke test</summary><ol><li>In a terminal: <code>export NVIDIA_API_KEY=nvapi-...</code></li><li>Run this. It should return a <code>tool_calls</code> entry.</li></ol>
-<div class="cmd"><pre>curl -s https://integrate.api.nvidia.com/v1/chat/completions -H "Authorization: Bearer $NVIDIA_API_KEY" -H "Content-Type: application/json" -d '{"model":"nvidia/nemotron-3-nano-30b-a3b","messages":[{"role":"user","content":"Check the radar."}],"tools":[{"type":"function","function":{"name":"get_presence","description":"Read the radar","parameters":{"type":"object","properties":{}}}}],"tool_choice":"auto"}'</pre><button data-copy>Copy</button></div></details>`},
-  {id:"elevenlabs", title:"ElevenLabs API key",
-   sub:'<a href="https://elevenlabs.io/app/sign-up" target="_blank">Sign up</a>, then Developers, API Keys, Create. Paste it only into a secret card.'},
-  {id:"twilio", title:"Twilio trial, verify Rafael's phone",
-   sub:'<a href="https://www.twilio.com/try-twilio" target="_blank">Sign up</a>, get a phone number, then Phone Numbers, Manage, Verified Caller IDs, Add. Rafael reads you the code.'},
-  {id:"devpost", title:"Devpost draft, add Rafael", due:"2026-11-07T23:00:00-06:00",
-   sub:'<a href="https://hackutd-zeroday.devpost.com/" target="_blank">Join the hackathon</a>, start a project draft, add Rafael as a teammate, save.'},
+  {id:"nvidia-form", title:"1. NVIDIA form", due:"2026-11-07T19:00:00-06:00", steps:[
+    `Open ${L("https://forms.gle/ruwZj6LSDmwxuVGT7", "the Nemotron feedback form")}.`,
+    "Paste the answers from the thread. Add your building and room."]},
+  {id:"nvidia-key", title:"2. NVIDIA API key", est:"about 5 min", steps:[
+    `Go to ${L("https://build.nvidia.com", "build.nvidia.com")} and sign in or create an NVIDIA account.`,
+    "Search <code>nemotron-3-nano-30b-a3b</code> and open the model page.",
+    "Click <b>Get API Key</b>, then <b>Generate Key</b>. It starts with <code>nvapi-</code>. Copy it now; it shows once.",
+    "Tell Rafael to make his own key too (about 40 requests a minute each).",
+    "Smoke test, it should return a <code>tool_calls</code> entry:"],
+   cmd:String.raw`curl -s https://integrate.api.nvidia.com/v1/chat/completions -H "Authorization: Bearer $NVIDIA_API_KEY" -H "Content-Type: application/json" -d '{"model":"nvidia/nemotron-3-nano-30b-a3b","messages":[{"role":"user","content":"Check the radar."}],"tools":[{"type":"function","function":{"name":"get_presence","description":"Read the radar","parameters":{"type":"object","properties":{}}}}],"tool_choice":"auto"}'`,
+   notes:["Set the key first with <code>export NVIDIA_API_KEY=nvapi-...</code> in that terminal.",
+     "The build.nvidia.com API is free for prototyping, with rate limits (about 40 requests a minute). No credit card. Confirm this when you sign up."]},
+  {id:"elevenlabs", title:"3. ElevenLabs key", est:"about 3 min", steps:[
+    `Go to ${L("https://elevenlabs.io/app/sign-up", "elevenlabs.io")} and sign up.`,
+    "Open <b>Developers</b> (or your profile menu), then <b>API Keys</b>, then <b>Create</b>. Give it full access for now.",
+    "The voice thread tests whether your account has Realtime v1 Mini. If not, it uses ElevenLabs Agents (15 free minutes)."]},
+  {id:"twilio", title:"4. Twilio trial", est:"about 10 min", steps:[
+    `Go to ${L("https://www.twilio.com/try-twilio", "twilio.com/try-twilio")}, sign up, verify your email and your phone.`,
+    "In the Console, click <b>Get a phone number</b> (free on trial).",
+    "Go to <b>Phone Numbers</b>, <b>Manage</b>, <b>Verified Caller IDs</b>, then <b>Add</b>. Add Rafael's phone. He reads you the code.",
+    "Copy the <b>Account SID</b>, <b>Auth Token</b> and your Twilio number from the Console home."],
+   notes:["Trial calls only reach verified numbers and play a short trial message first. That is fine for the fake alarm."]},
+  {id:"devpost", title:"5. Devpost", due:"2026-11-07T23:00:00-06:00", steps:[
+    `Go to ${L("https://hackutd-zeroday.devpost.com/", "hackutd-zeroday.devpost.com")} and join the hackathon.`,
+    "Start a project draft, add Rafael as a teammate, save. You can edit it until noon Sunday."]},
+  {id:"keys-safe", title:"6. Hand over the keys safely", steps:[
+    "When a build thread shows a secret card, paste the key there. Never paste keys in chat or in GitHub."]},
+  {id:"devpost-tracks", title:"7. Tick the tracks on Devpost", due:"2026-11-08T12:00:00-06:00", steps:[
+    `Open your project draft on ${L("https://hackutd-zeroday.devpost.com/", "hackutd-zeroday.devpost.com")}.`,
+    "Tick <b>State Farm</b>, <b>NVIDIA</b> and <b>Photon</b>.",
+    "Tick <b>HackUTD Best Hardware</b>. Save."]},
+  {id:"issue-11", title:"8. Reply on issue #11 about the AI HAT+", steps:[
+    `Open ${L("https://github.com/godfreyponce/hackutd-26/issues/11", "issue #11")}.`,
+    "Reply yes or no on skipping the AI HAT+. Rafael waits on this for the hardware run."]},
+  {id:"repo-public", title:"9. Make the repo public", due:"2026-11-08T12:00:00-06:00", steps:[
+    "Check that no keys or tokens are in the repo first.",
+    `Open ${L("https://github.com/godfreyponce/hackutd-26/settings", "the repo settings")}. In <b>Danger Zone</b>, click <b>Change visibility</b>, then <b>Make public</b>.`,
+    "Or run this in a terminal:"],
+   cmd:"gh repo edit godfreyponce/hackutd-26 --visibility public --accept-visibility-change-consequences"},
 ];
 const CLOCKS = [
   {lbl:"NVIDIA form", at:"2026-11-07T19:00:00-06:00"},
@@ -203,24 +252,28 @@ function renderTasks(){
   const ordered = [...TASKS].sort((a, b) => !!done[a.id] - !!done[b.id]);
   $("tasks").innerHTML = ordered.map(t => {
     const due = t.due ? `<span class="due" data-due="${t.due}"></span>` : "";
+    const est = t.est && !done[t.id] ? ` <span class="est">${t.est}</span>` : "";
+    const cmd = t.cmd ? `<div class="cmd"><pre>${esc(t.cmd)}</pre><button data-copy>Copy</button></div>` : "";
+    const notes = (t.notes || []).map(n => `<p class="note">${n}</p>`).join("");
     return `<div class="row task ${done[t.id] ? "done" : ""}">
       <input type="checkbox" data-task="${t.id}" ${done[t.id] ? "checked" : ""} aria-label="${esc(t.title)}">
-      <div class="body"><span class="title">${esc(t.title)}</span> ${done[t.id] ? "" : due}
-        <div class="sub">${t.sub}</div>${t.more || ""}</div></div>`;
+      <div class="body"><span class="title">${esc(t.title)}</span>${est} ${done[t.id] ? "" : due}
+        <ol class="steps">${t.steps.map(x => `<li>${x}</li>`).join("")}</ol>${cmd}${notes}</div></div>`;
   }).join("");
   tickDue();
-  return TASKS.filter(t => !done[t.id]).length;
 }
+const openTasks = () => { const done = store.get("tasks", {}); return TASKS.filter(t => !done[t.id]).length; };
 function tickDue(){
   document.querySelectorAll("[data-due]").forEach(el => {
     const at = el.dataset.due, l = left(at);
-    el.textContent = l ? `due ${clock(at)}, ${l} left` : `was due ${clock(at)}`;
+    const when = (day(at) === day(new Date().toISOString()) ? "" : day(at) + " ") + clock(at);
+    el.textContent = l ? `due ${when}, ${l} left` : `was due ${when}`;
     el.classList.toggle("late", !l);
   });
 }
 
 function renderNeeds(){
-  let open = renderTasks();
+  let open = openTasks();
   const pushes = data ? data.unpushed : [];
   const behind = data ? data.main.behind : 0;
   let html = pushes.map(p => `<div class="row"><span class="dot" style="background:var(--violet)"></span><div class="body">
@@ -319,7 +372,7 @@ document.addEventListener("change", e => {
   const done = store.get("tasks", {});
   done[id] = e.target.checked;
   store.set("tasks", done);
-  renderNeeds(); renderFeed();
+  renderTasks(); renderNeeds(); renderFeed();
 });
 document.addEventListener("click", e => {
   if (!e.target.matches("[data-copy]")) return;
@@ -327,7 +380,7 @@ document.addEventListener("click", e => {
   navigator.clipboard.writeText(text).then(() => { e.target.textContent = "Copied"; setTimeout(() => e.target.textContent = "Copy", 1500); }, () => {});
 });
 
-renderNeeds(); renderClocks();
+renderTasks(); renderNeeds(); renderClocks();
 poll();
 setInterval(poll, 10000);
 setInterval(() => { renderClocks(); tickDue(); renderFresh(); }, 1000);
