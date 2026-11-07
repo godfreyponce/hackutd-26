@@ -50,6 +50,9 @@ Rafael: "I haven't figured out everything yet." Below: **Decided** = his words; 
 - **Receiving:** live list of sources and their state (weather radio station + signal, NWS, USGS, EMSC, GDACS, local sensors), last message time each.
 - **Map:** homes as white dots; a home inside an active alert area, or one that reported a local event, turns red. Alert area drawn as its polygon.
 - Open: which tablet (old tablet/phone in kiosk mode vs Pi touchscreen); does it read from the node over Wi-Fi only (outage behaviour); how many homes on the map are real vs simulated.
+- **Visual reference (Rafael, 2026-11-07):** ![Wall tablet reference](ui/wall-tablet-reference.png)
+  - Keep: dark navy, glowing blue, landscape wall display, left nav (Overview / Alerts / Disasters / Security / System), one big status word ("PROTECTED · No active threats"), two cards (Disaster Monitor, Security Monitor), globe/map on the right, footer with the node ID.
+  - Don't copy: the DHS seal and name, "Secure Gov Network", "Top Secret". It's a student project, not a government system; showing a federal seal would mislead judges and isn't ours to use. Put our own name and logo there.
 
 ## Proposed: what is easiest to detect with cheap sensors
 | Event | Sensor | Cost / source | Difficulty (1 easy–5 hard) | Notes |
