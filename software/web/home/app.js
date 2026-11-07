@@ -58,19 +58,22 @@ map.innerHTML = `
       <stop offset="0" stop-color="#4da3ff" stop-opacity="0"/>
       <stop offset="1" stop-color="#4da3ff" stop-opacity="0.32"/>
     </linearGradient>
-    <pattern id="grid" width="15" height="15" patternUnits="userSpaceOnUse">
-      <path d="M15 0H0V15" fill="none" stroke="rgba(77,163,255,0.08)" stroke-width="0.6"/>
-    </pattern>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="65%">
+      <stop offset="0.45" stop-color="#030a16" stop-opacity="0"/>
+      <stop offset="1" stop-color="#030a16" stop-opacity="0.85"/>
+    </radialGradient>
     <clipPath id="scope"><circle cx="${HOME.x}" cy="${HOME.y}" r="124"/></clipPath>
   </defs>`;
 
-svgEl('rect', { width: 300, height: 260, fill: 'url(#grid)' }, map);
-
-// Street blocks, drawn faint under everything.
-const streets = svgEl('g', { class: 'streets' }, map);
-for (const d of ['M0 58 L300 70', 'M0 150 L300 140', 'M0 222 L300 230', 'M64 0 L74 260', 'M196 0 L184 260', 'M252 0 L262 260', 'M0 100 Q150 92 300 108']) {
-  svgEl('path', { d }, streets);
+// OpenStreetMap tiles of Richardson, TX (zoom 16), saved in map/ so the page works offline.
+const TILE = 160;
+const basemap = svgEl('g', { class: 'basemap' }, map);
+for (const [col, x] of [[0, 15158], [1, 15159]]) {
+  for (const [row, y] of [[0, 26408], [1, 26409]]) {
+    svgEl('image', { href: `map/16-${x}-${y}.png`, x: -10 + col * TILE, y: -30 + row * TILE, width: TILE, height: TILE }, basemap);
+  }
 }
+svgEl('rect', { width: 300, height: 260, fill: 'url(#vignette)' }, map);
 
 const scope = svgEl('g', {}, map);
 for (const r of [40, 82, 124]) svgEl('circle', { cx: HOME.x, cy: HOME.y, r, class: 'range' }, scope);

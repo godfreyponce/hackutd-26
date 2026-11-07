@@ -159,7 +159,8 @@
   .map .legend { display: flex; gap: 1em; color: var(--muted); font-size: calc(var(--u) * 0.85); flex-wrap: wrap; }
   .map .legend i { display: inline-block; width: 0.75em; height: 0.75em; border-radius: 50%; margin-right: 0.35em; vertical-align: -0.05em; }
   #map { background: radial-gradient(circle at 50% 50%, rgba(20, 60, 110, 0.35), rgba(3, 10, 22, 0.6) 70%); border-radius: 8px; border: 1px solid rgba(77, 163, 255, 0.18); }
-  .streets path { fill: none; stroke: rgba(120, 170, 235, 0.13); stroke-width: 2.2; }
+  .basemap { filter: invert(1) hue-rotate(185deg) brightness(0.75) contrast(1.15) saturate(0.55); opacity: 0.85; }
+  .map .credit { margin-left: auto; opacity: 0.7; }
   .range { fill: none; stroke: rgba(77, 163, 255, 0.28); stroke-width: 0.8; }
   .range:last-of-type { stroke-dasharray: 2 3; }
   .cross { stroke: rgba(77, 163, 255, 0.16); stroke-width: 0.6; }
@@ -260,7 +261,7 @@
         <div><div class="card-title">Neighborhood</div><div class="card-sub" id="map-sub">All homes quiet</div></div>
       </div>
       <svg id="map" viewBox="0 0 300 260" aria-label="Neighborhood node map"></svg>
-      <div class="legend"><span><i style="background:#f2f6fc"></i>Quiet</span><span><i style="background:var(--danger)"></i>Hit</span><span><i style="background:var(--ok)"></i>Okay</span><span><i style="border:2px solid #8fc4ff;border-radius:2px"></i>This home</span></div>
+      <div class="legend"><span><i style="background:#f2f6fc"></i>Quiet</span><span><i style="background:var(--danger)"></i>Hit</span><span><i style="background:var(--ok)"></i>Okay</span><span><i style="border:2px solid #8fc4ff;border-radius:2px"></i>This home</span><span class="credit">Map &copy; OpenStreetMap contributors</span></div>
     </section>
 
     <div class="cards">
