@@ -62,8 +62,9 @@ The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 Pi 5 + 27 W supply · 2× ESP32 · USB mic · **gyro/accelerometer (MPU-6050, earthquake)** · SW-420 vibration · PIR · DHT11 / BME280-class / DS18B20 temperature · MQ-2 · flame · water level · raindrop · passive buzzer · 0.91" 128×32 I2C OLED (Hosyond) · M3 heat-set inserts (19 used; keep 30) · M3 screws (4× M3x12, 3× M3x10, 6× M3x8, 4× M3x6–8, 2× M3x10 + nuts: check lengths) · I2C LCD 1602 · RTC · ADC · buttons · resistors · jumpers · PETG filament. Full list: [HackUTD-Inventory](HackUTD-Inventory.md).
 
 ## Not buying (dropped)
-- **M2 / M2.5 screws:** Rafael says not needed (camera out; 2026-11-07).
-- **Amazon-only parts:** RTL-SDR Blog V4 (replaced by the Adafruit stick at MC), SMA bulkhead pigtail (the MC stick likely has an MCX antenna; MC only has a 3 m bulkhead 2-pack), SCD41, consumer CO alarm (Walmart/Home Depot; ask whether MC carries one).
+- **M2 camera screws:** not needed (camera out).
+- **M2.5:** Rafael says not needed. **Caveat:** the case session now mounts the Pi 5 and the PiPower 5 with 8 × M2.5x6 screws + 8 × M2.5 hex nuts in printed nut traps, because their holes are 2.7 mm and M3 won't pass. If Rafael has no M2.5 screws at home, buy the Adafruit nylon M2.5 set (MC 503925).
+- **Amazon-only parts:** RTL-SDR Blog V4 (replaced by the Adafruit stick at MC), SMA bulkhead pigtail (the case now uses a plain 7 mm cable hole for the stick's MCX antenna), SCD41, consumer CO alarm (Walmart/Home Depot; ask whether MC carries one).
 AI HAT+ (no camera vision; #18 dropped it), camera + long cable, servos/pan-tilt parts, 12 V supply, GT2 belt, magnets, light pipes, metal standoffs (the case uses printed bosses + inserts), SHT41 / BME680 (temperature and gas already owned), MQ-7 (not life-safety grade).
 
 ## Open (Rafael's call, not a purchase yet)
