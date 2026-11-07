@@ -1,0 +1,113 @@
+// Event-to-state logic for the home screen. Pure: no DOM, no clock (the caller passes `now`).
+
+export const TRACE_WINDOW_MS = 60_000;
+
+// Higher rank wins until checkin ok/clear or reset, so a re-ask never hides an alarm.
+const RANK = { PROTECTED: 0, CHECKING_IN: 1, NO_RESPONSE: 2, CONTACTING_HELP: 3 };
+
+const CHECKIN_STATUS = {
+  asking: 'CHECKING_IN',
+  no_answer: 'NO_RESPONSE',
+  alarm: 'CONTACTING_HELP',
+  help: 'CONTACTING_HELP',
+};
+
+const SOURCE_LABELS = { noaa: 'NOAA', nws: 'NWS', usgs: 'USGS', gdacs: 'GDACS', sensor: 'Sensor' };
+
+export function initialState() {
+  return {
+    status: 'PROTECTED',
+    tryNum: null,
+    say: null,
+    heard: null,
+    alert: null,
+    onBattery: false,
+    batteryPct: null,
+    indoorF: null,
+    quakes: [],
+    areaHit: false, // neighborhood dots turn red after a quake
+    home: 'idle', // node map dot: idle (white), hit (red), ok (green)
+  };
+}
+
+export function sourceLabel(source) {
+  return SOURCE_LABELS[source] ?? String(source ?? '').toUpperCase();
+}
+
+export function statusText(status, { alert = false } = {}) {
+  switch (status) {
+    case 'CHECKING_IN':
+      return { word: 'CHECKING IN', detail: 'Event detected. Asking if you are okay.' };
+    case 'NO_RESPONSE':
+      return { word: 'NO RESPONSE', detail: 'No response after an event' };
+    case 'CONTACTING_HELP':
+      return {
+        word: 'CONTACTING HELP',
+        detail: 'Contacting your emergency contact',
+        note: 'Demo alarm. No emergency number is called.',
+      };
+    default:
+      return { word: 'PROTECTED', detail: alert ? 'All okay at home. Official alert active.' : 'No active events' };
+  }
+}
+
+function raise(state, status) {
+  return RANK[status] > RANK[state.status] ? status : state.status;
+}
+
+function onEvent(state, extra = {}) {
+  return { ...state, status: raise(state, 'CHECKING_IN'), home: 'hit', ...extra };
+}
+
+function onCheckin(state, msg) {
+  const tryNum = msg.try ?? state.tryNum;
+  if (msg.state === 'ok' || msg.state === 'clear') {
+    return { ...state, status: 'PROTECTED', tryNum: null, home: state.home === 'hit' ? 'ok' : state.home };
+  }
+  const status = CHECKIN_STATUS[msg.state];
+  if (!status) return state;
+  return { ...state, status: raise(state, status), tryNum, home: 'hit' };
+}
+
+export function reduce(state, msg, now) {
+  if (!msg || typeof msg !== 'object') return state;
+  switch (msg.type) {
+    case 'quake': {
+      const quakes = [...state.quakes, { at: now, g: Number(msg.peak_g) || 0 }].filter((q) => now - q.at <= TRACE_WINDOW_MS);
+      return onEvent(state, { quakes, areaHit: true });
+    }
+    case 'fall_hint':
+      return onEvent(state);
+    case 'checkin':
+      return onCheckin(state, msg);
+    case 'say':
+      return { ...state, say: { text: String(msg.text ?? ''), tryNum: state.tryNum } };
+    case 'heard':
+      return { ...state, heard: { answer: msg.answer, transcript: String(msg.transcript ?? ''), tryNum: state.tryNum } };
+    case 'alert':
+      return {
+        ...state,
+        alert: {
+          source: sourceLabel(msg.source),
+          event: msg.event ?? 'Alert',
+          severity: msg.severity ?? '',
+          area: msg.area ?? '',
+          headline: msg.headline ?? '',
+        },
+      };
+    case 'power':
+      if (msg.state !== 'battery' && msg.state !== 'mains') return state;
+      return { ...state, onBattery: msg.state === 'battery' };
+    case 'heartbeat':
+      return typeof msg.battery_pct === 'number' ? { ...state, batteryPct: msg.battery_pct } : state;
+    case 'queue': {
+      const home = Array.isArray(msg.homes) && msg.homes.find((h) => h && h.id === 'H000');
+      const f = home?.factors?.indoor_f;
+      return typeof f === 'number' ? { ...state, indoorF: f } : state;
+    }
+    case 'reset':
+      return initialState();
+    default:
+      return state;
+  }
+}

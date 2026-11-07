@@ -1,0 +1,270 @@
+import { initialState, reduce, statusText, TRACE_WINDOW_MS } from './state.js';
+
+// The product name is not settled. Change it here only.
+export const PRODUCT_NAME = 'LAND';
+
+const DEFAULT_HUB = 'ws://localhost:8765';
+const RETRY_MS = 1000; // guess: fast enough to catch a hub restart during the demo
+const HOME = { x: 150, y: 130 };
+
+const hubUrl = new URLSearchParams(location.search).get('hub') || DEFAULT_HUB;
+const $ = (id) => document.getElementById(id);
+
+let state = initialState();
+let connected = false;
+let lastWaveAt = null;
+
+document.title = `${PRODUCT_NAME} Home`;
+$('product-name').textContent = PRODUCT_NAME;
+$('hub-url').textContent = `Hub ${hubUrl}`;
+
+// ---------- neighborhood map (tactical display) ----------
+
+function neighbors() {
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const dots = [];
+  for (let row = 0; row < 6; row++) {
+    for (let col = 0; col < 7; col++) {
+      const x = 22 + col * 43 + (rand() - 0.5) * 22;
+      const y = 22 + row * 44 + (rand() - 0.5) * 22;
+      if (Math.hypot(x - HOME.x, y - HOME.y) > 24 && rand() > 0.2) dots.push({ x, y });
+    }
+  }
+  return dots;
+}
+
+const SVG = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent) {
+  const el = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  if (parent) parent.append(el);
+  return el;
+}
+function hudText(parent, x, y, text, attrs = {}) {
+  const el = svgEl('text', { x, y, class: 'hud', ...attrs }, parent);
+  el.textContent = text;
+  return el;
+}
+
+const map = $('map');
+map.innerHTML = `
+  <defs>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="sweep-fill" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#bfe0ff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#bfe0ff" stop-opacity="0.16"/>
+    </linearGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="65%">
+      <stop offset="0.6" stop-color="#030a16" stop-opacity="0"/>
+      <stop offset="1" stop-color="#030a16" stop-opacity="0.5"/>
+    </radialGradient>
+    <clipPath id="scope"><circle cx="${HOME.x}" cy="${HOME.y}" r="124"/></clipPath>
+  </defs>`;
+
+// USGS The National Map imagery of Richardson, TX (zoom 15, public domain), saved in map/ so the page works offline.
+// Offsets put lat 32.9483, lon -96.7299 on HOME.
+const TILE = 256;
+for (const [col, x] of [[0, 7578], [1, 7579], [2, 7580]]) {
+  for (const [row, y] of [[0, 13204], [1, 13205]]) {
+    svgEl('image', { href: `map/15-${x}-${y}.jpg`, x: -216 + col * TILE, y: -11 + row * TILE, width: TILE, height: TILE }, map);
+  }
+}
+svgEl('rect', { width: 300, height: 260, fill: 'url(#vignette)' }, map);
+
+const scope = svgEl('g', {}, map);
+for (const r of [40, 82, 124]) svgEl('circle', { cx: HOME.x, cy: HOME.y, r, class: 'range' }, scope);
+svgEl('path', { d: `M${HOME.x - 124} ${HOME.y}H${HOME.x + 124}M${HOME.x} ${HOME.y - 124}V${HOME.y + 124}`, class: 'cross' }, scope);
+for (let deg = 0; deg < 360; deg += 10) {
+  const a = (deg * Math.PI) / 180;
+  const inner = deg % 30 === 0 ? 116 : 120;
+  svgEl('line', {
+    x1: HOME.x + Math.sin(a) * inner, y1: HOME.y - Math.cos(a) * inner,
+    x2: HOME.x + Math.sin(a) * 124, y2: HOME.y - Math.cos(a) * 124, class: 'tick',
+  }, scope);
+}
+hudText(scope, HOME.x + 5, HOME.y - 106, 'N');
+
+const sweepGroup = svgEl('g', { 'clip-path': 'url(#scope)' }, map);
+const sweep = svgEl('g', { class: 'sweep' }, sweepGroup);
+svgEl('path', { d: `M${HOME.x} ${HOME.y}L${HOME.x + 124} ${HOME.y}A124 124 0 0 0 ${HOME.x + 124 * Math.cos(-0.7)} ${HOME.y + 124 * Math.sin(-0.7)}Z`, fill: 'url(#sweep-fill)' }, sweep);
+svgEl('line', { x1: HOME.x, y1: HOME.y, x2: HOME.x + 124, y2: HOME.y, class: 'sweep-edge' }, sweep);
+
+const wave = svgEl('circle', { class: 'wave', cx: HOME.x, cy: HOME.y, r: 4 }, map);
+
+const neighborDots = neighbors().map(({ x, y }) => {
+  const el = svgEl('circle', { class: 'node', cx: x, cy: y, r: 3, filter: 'url(#glow)' }, map);
+  el.style.transitionDelay = `${Math.round(Math.hypot(x - HOME.x, y - HOME.y) * 8)}ms`;
+  return el;
+});
+
+// Reticle on this home: four corner brackets.
+const b = 13, l = 5;
+svgEl('path', {
+  class: 'reticle',
+  d: [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) =>
+    `M${HOME.x + sx * b} ${HOME.y + sy * (b - l)}V${HOME.y + sy * b}H${HOME.x + sx * (b - l)}`).join(''),
+}, map);
+const homeDot = svgEl('circle', { class: 'node home', cx: HOME.x, cy: HOME.y, r: 4.5, filter: 'url(#glow)' }, map);
+hudText(map, HOME.x + 18, HOME.y - 5, 'H000');
+hudText(map, HOME.x + 18, HOME.y + 6, 'THIS HOME', { class: 'hud dim' });
+
+const hudNodes = hudText(map, 6, 254, '');
+const hudHit = hudText(map, 294, 254, '', { 'text-anchor': 'end' });
+hudText(map, 6, 14, 'GRID H000');
+const hudLive = hudText(map, 294, 14, '', { 'text-anchor': 'end' });
+
+function renderMap() {
+  for (const el of neighborDots) el.classList.toggle('hit', state.areaHit);
+  homeDot.classList.toggle('hit', state.home === 'hit');
+  homeDot.classList.toggle('ok', state.home === 'ok');
+  const last = state.quakes.at(-1)?.at ?? null;
+  if (last !== null && last !== lastWaveAt) {
+    wave.classList.remove('go');
+    void wave.getBoundingClientRect();
+    wave.classList.add('go');
+  }
+  lastWaveAt = last;
+  const total = neighborDots.length + 1;
+  const hit = (state.areaHit ? neighborDots.length : 0) + (state.home === 'hit' ? 1 : 0);
+  hudNodes.textContent = `NODES ${total}`;
+  hudHit.textContent = `HIT ${hit}`;
+  hudHit.classList.toggle('alarm', hit > 0);
+  hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
+  hudLive.classList.toggle('alarm', !connected);
+  const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
+  $('map-sub').textContent = state.areaHit ? `Quake hit the neighborhood. ${homeNote}.` : homeNote ? `${homeNote}.` : 'All homes quiet';
+}
+
+// ---------- seismic trace ----------
+
+const canvas = $('trace');
+const ctx = canvas.getContext('2d');
+
+function sizeCanvas() {
+  const r = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.round(r.width * devicePixelRatio));
+  canvas.height = Math.max(1, Math.round(r.height * devicePixelRatio));
+}
+new ResizeObserver(sizeCanvas).observe(canvas);
+
+// Each quake event carries only its peak, so the trace draws a damped wiggle that peaks at that value.
+function signal(t) {
+  let g = 0;
+  for (const q of state.quakes) {
+    const dt = (t - q.at) / 1000;
+    if (dt >= 0 && dt < 6) g += q.g * Math.exp(-dt * 1.1) * Math.sin(dt * 2 * Math.PI * 2.2 + 0.4);
+  }
+  return g;
+}
+
+function drawTrace() {
+  const now = Date.now();
+  const { width: w, height: h } = canvas;
+  const dpr = devicePixelRatio;
+  ctx.clearRect(0, 0, w, h);
+  const maxG = Math.max(1, ...state.quakes.map((q) => q.g)) * 1.15;
+  const mid = h / 2;
+  const scale = (h / 2 - 4 * dpr) / maxG;
+
+  ctx.strokeStyle = 'rgba(120,170,235,0.18)';
+  ctx.lineWidth = dpr;
+  ctx.beginPath();
+  for (const g of [-1, 0, 1]) { ctx.moveTo(0, mid - g * scale); ctx.lineTo(w, mid - g * scale); }
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(143,166,198,0.9)';
+  ctx.font = `${12 * dpr}px system-ui, sans-serif`;
+  ctx.fillText('+1 g', 4 * dpr, mid - scale + 14 * dpr);
+  ctx.fillText('-1 g', 4 * dpr, mid + scale - 4 * dpr);
+  ctx.fillText('60 s', w - 34 * dpr, h - 4 * dpr);
+
+  ctx.strokeStyle = state.quakes.length ? '#ff6b5a' : '#4da3ff';
+  ctx.lineWidth = 2 * dpr;
+  ctx.beginPath();
+  const steps = Math.min(w, 1200);
+  for (let i = 0; i <= steps; i++) {
+    const x = (i / steps) * w;
+    const t = now - TRACE_WINDOW_MS + (i / steps) * TRACE_WINDOW_MS;
+    const y = mid - signal(t) * scale;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.stroke();
+  requestAnimationFrame(drawTrace);
+}
+requestAnimationFrame(drawTrace);
+
+function renderQuake() {
+  const recent = state.quakes.filter((q) => Date.now() - q.at <= TRACE_WINDOW_MS);
+  const last = recent.at(-1);
+  $('quake-peak').textContent = last ? `${last.g.toFixed(2)} g` : '';
+  $('quake-sub').textContent = last ? `Last peak, ${recent.length} event${recent.length > 1 ? 's' : ''} in the last minute` : 'No shaking in the last minute';
+}
+
+// ---------- the rest ----------
+
+const ANSWERS = { ok: 'I\'m okay', help: 'Help', no_answer: 'No answer' };
+
+function render() {
+  const { word, detail, note } = statusText(state.status, { alert: Boolean(state.alert) });
+  document.body.dataset.status = state.status;
+  $('word').textContent = word;
+  $('detail').textContent = detail;
+  $('note').hidden = !note;
+  $('note').textContent = note ?? '';
+
+  $('say').textContent = state.say ? `"${state.say.text}"` : 'Nothing yet';
+  $('say-try').textContent = state.say?.tryNum ? `try ${state.say.tryNum}` : '';
+  const heard = state.heard;
+  $('heard').textContent = heard ? (heard.transcript ? `"${heard.transcript}" (${ANSWERS[heard.answer] ?? heard.answer})` : ANSWERS[heard.answer] ?? heard.answer) : 'Nothing yet';
+  $('heard-try').textContent = heard?.tryNum ? `try ${heard.tryNum}` : '';
+
+  const a = state.alert;
+  $('banner').hidden = !a;
+  $('alert-count').hidden = !a;
+  if (a) {
+    $('alert-source').textContent = a.source;
+    $('alert-event').textContent = [a.event, a.severity].filter(Boolean).join(', ');
+    $('alert-headline').textContent = a.headline;
+    $('alert-area').textContent = a.area;
+  }
+
+  $('battery').hidden = !state.onBattery;
+  $('battery-text').textContent = state.batteryPct == null ? 'On battery' : `On battery, ${state.batteryPct}%`;
+
+  $('temp').innerHTML = state.indoorF == null ? '<small>No reading yet</small>' : `${Math.round(state.indoorF)}<small> &deg;F</small>`;
+  $('heat-sub').textContent = a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : 'No heat alerts';
+
+  $('hub').classList.toggle('bad', !connected);
+  $('hub-text').textContent = connected ? 'Hub connected' : 'Hub disconnected';
+
+  renderQuake();
+  renderMap();
+}
+
+function connect() {
+  const ws = new WebSocket(hubUrl);
+  ws.onopen = () => { connected = true; render(); };
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    state = reduce(state, msg, Date.now());
+    render();
+  };
+  ws.onclose = () => {
+    connected = false;
+    render();
+    setTimeout(connect, RETRY_MS);
+  };
+}
+
+function tick() {
+  $('clock').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  renderQuake();
+}
+setInterval(tick, 1000);
+tick();
+render();
+connect();
