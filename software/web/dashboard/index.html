@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lifeline Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span>Lifeline<span class="sub">Richardson, TX, 500 homes</span></div>
+    <div class="event" id="event">No event yet. Waiting for the box.</div>
+    <div class="hub" id="hub" data-status="connecting"><span class="led" aria-hidden="true"></span><span id="hub-text">Connecting</span></div>
+  </header>
+
+  <main class="layout">
+    <aside class="side">
+      <section class="counters" aria-label="Counters">
+        <div class="counter hit"><span class="label">Homes hit</span><span class="num" id="c-hit">0</span><span class="of">of 500</span></div>
+        <div class="counter checked"><span class="label">Checked in</span><span class="num" id="c-checked">0</span></div>
+        <div class="counter noanswer"><span class="label">No answer</span><span class="num" id="c-noanswer">0</span></div>
+        <div class="counter escalated"><span class="label">Escalated</span><span class="num" id="c-escalated">0</span></div>
+        <dl class="minor">
+          <div><dt>Contact attempts</dt><dd id="c-attempts">0</dd></div>
+          <div><dt>Forced rechecks</dt><dd id="c-forced">0</dd></div>
+        </dl>
+      </section>
+
+      <section class="box-card" id="box-card" aria-label="Real box">
+        <h2><span class="ring" aria-hidden="true"></span>Real box <b>H000</b></h2>
+        <dl>
+          <div><dt>Presence</dt><dd id="b-presence">Moving</dd></div>
+          <div><dt>Check-in</dt><dd id="b-checkin">None yet</dd></div>
+          <div><dt>Last answer</dt><dd id="b-heard">None yet</dd></div>
+          <div><dt>Power</dt><dd id="b-power">Mains</dd></div>
+          <div><dt>Rank</dt><dd id="b-rank">Not hit</dd></div>
+          <div><dt>Time to harm</dt><dd id="b-harm">None yet</dd></div>
+        </dl>
+        <p class="box-note" id="box-note" hidden></p>
+      </section>
+
+      <p class="keys"><kbd>q</kbd> quake on this page only <kbd>r</kbd> reset this page <kbd>v</kbd> world, city, home</p>
+    </aside>
+
+    <section class="map-wrap" aria-label="Map of 500 homes">
+      <canvas id="map"></canvas>
+      <div class="stage" id="stage" data-stage="world">
+        <span class="stage-steps" aria-hidden="true"><i data-s="world"></i><i data-s="city"></i><i data-s="home"></i></span>
+        <span id="stage-now">World</span>
+      </div>
+      <p class="attrib" id="attrib"></p>
+      <div class="callout" id="callout" hidden>
+        <b id="callout-title"></b>
+        <span id="callout-text"></span>
+      </div>
+      <ul class="legend">
+        <li><span class="dot white"></span>Not hit</li>
+        <li><span class="dot red"></span>Hit, no answer</li>
+        <li><span class="dot green"></span>Okay</li>
+        <li><span class="dot halo"></span>Escalated</li>
+        <li><span class="dot real"></span>Real box</li>
+      </ul>
+    </section>
+
+    <aside class="right">
+      <section class="queue" aria-label="Ranked queue">
+        <header>
+          <h2>Time to harm</h2>
+          <span class="hint">minutes, lower is more urgent</span>
+        </header>
+        <div class="guard" id="guard" hidden></div>
+        <p class="empty" id="queue-empty">No event yet. The queue ranks every home the quake hits.</p>
+        <ol class="rows" id="queue-list"></ol>
+        <div class="pinned" id="pinned"></div>
+      </section>
+
+      <section class="trace" aria-label="Agent trace">
+        <header>
+          <h2>Agent trace</h2>
+          <span class="hint" id="trace-counts">0 agent steps, 0 tool calls</span>
+        </header>
+        <ol class="trace-list" id="trace-list"></ol>
+      </section>
+    </aside>
+  </main>
+
+  <script src="vendor/d3-array-3.2.4.min.js"></script>
+  <script src="vendor/d3-geo-3.1.1.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

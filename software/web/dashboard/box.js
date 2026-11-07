@@ -1,0 +1,70 @@
+// The real box, H000, driven by bus events. Pure, no DOM.
+import { generateHomes, REAL_BOX_ID } from './homes.js';
+
+// Agent doc section 3: a node silent for more than 5 min is stale.
+export const STALE_MS = 5 * 60 * 1000;
+const SENSOR_TYPES = new Set(['quake', 'presence', 'fall_hint', 'power', 'heartbeat']);
+const PROFILE = generateHomes().find((h) => h.id === REAL_BOX_ID);
+
+export function initialBox(now) {
+  return {
+    presence: PROFILE.presence,
+    no_answer: 0,
+    said_help: false,
+    answered_ok: false,
+    alarm: false,
+    checkin: null,
+    try: 0,
+    heard: null,
+    event: false,
+    power: 'mains',
+    battery_pct: null,
+    lastSeen: now,
+  };
+}
+
+function answered(s, answer) {
+  if (answer === 'ok') return { ...s, answered_ok: true, no_answer: 0, said_help: false };
+  if (answer === 'help') return { ...s, said_help: true };
+  if (answer === 'no_answer') return { ...s, no_answer: Math.max(s.no_answer, s.try || s.no_answer + 1) };
+  return s;
+}
+
+export function applyBoxEvent(state, msg, now) {
+  if (msg.type === 'reset') return initialBox(now);
+  let s = SENSOR_TYPES.has(msg.type) ? { ...state, lastSeen: now } : state;
+  switch (msg.type) {
+    case 'presence':
+      return { ...s, presence: msg.state };
+    case 'fall_hint':
+    case 'quake':
+      return { ...s, event: true };
+    case 'power':
+      return { ...s, power: msg.state };
+    case 'heartbeat':
+      return { ...s, battery_pct: msg.battery_pct };
+    case 'heard':
+      return answered({ ...s, heard: { answer: msg.answer, transcript: msg.transcript } }, msg.answer);
+    case 'checkin': {
+      s = { ...s, checkin: msg.state, try: msg.try ?? s.try };
+      if (msg.state === 'ok' || msg.state === 'help' || msg.state === 'no_answer') return answered(s, msg.state);
+      if (msg.state === 'alarm') return { ...s, alarm: true };
+      if (msg.state === 'clear') return { ...s, alarm: false, said_help: false, no_answer: 0 };
+      return s;
+    }
+    default:
+      return s;
+  }
+}
+
+export function boxRankInput(s, now) {
+  return {
+    ...PROFILE,
+    presence: s.presence,
+    stale: now - s.lastSeen > STALE_MS,
+    no_answer: s.no_answer,
+    said_help: s.said_help,
+    answered_ok: s.answered_ok,
+    alarm: s.alarm,
+  };
+}
