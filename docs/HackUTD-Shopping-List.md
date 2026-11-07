@@ -28,14 +28,14 @@ The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 | 6 | **MAX98357A I2S amp** | Voice output (the Pi 5 has no headphone jack) | MC #613583 | $5.95 |
 | 7 | **Speaker, 40 mm, 4 Ω, 3 W** | Speaks "Are you okay?" | MC #612826 (in store only) | $5.95 |
 | 8 | **NeoPixel ring, 16 LED, RGB not RGBW** | Status light (green / amber on battery / red alarm); the case is designed around it | MC #655358 | $9.95 |
-| 9 | **Switched power strip** (skip if owned) | The "power cut" demo: flip the switch | MC or anywhere | ~$10 |
-| 10 | **RTL-SDR Blog V4 (or V3) + dipole antenna kit** | Rafael's decision 7: hear NOAA Weather Radio alerts with no internet. Not a generic TV-tuner stick | Amazon / rtl-sdr.com (likely not at MC) | ~$30–40 |
-| 11 | **Right-angle USB-A extension 15–30 cm + ~10 cm SMA female bulkhead pigtail** | The case mounts the SDR inside, with the antenna through a 6.6 mm hole in the back wall (skip the pigtail if the SDR kit has one) | Amazon / MC | ~$10–15 |
+| 9 | **Switched power strip** (skip if owned) | The "power cut" demo: flip the switch | MC | ~$10 |
+| 10 | **Adafruit Software Defined Radio USB stick (RTL2832U + R820T, Adafruit #1497)** | Rafael's decision 7: hear NOAA Weather Radio (162.4–162.55 MHz, inside its 24–1850 MHz range) with no internet. Only RTL-SDR found at Micro Center. It's the cheaper generic-style stick the alert session warned can drift and run hot, so set a ppm correction in `rtl_fm` and give it airflow. Its small antenna likely uses an **MCX** plug, not SMA [u] | MC product 656639 (SKU 495903 / 025270) | ~$25 [u] |
+| 11 | **Short USB-A extension** (right-angle if the shelf has one) | Lets the stick sit inside the case away from the Pi | MC (Inland) | ~$5 |
 | 12 | **2 × I2S MEMS mic** (SPH0645 or INMP441) | The case has 17.5 × 14.5 mm pockets for them. Fallback: the owned USB mic (tell the case session) | MC #613585 | $6.95 each |
 | 13 | **Black PLA ~300 g + white/clear PLA ~8 g** (skip whatever you own) | Whole case + faceplate; the white goes in the status-light diffuser and the radar window | MC | ~$20 per roll |
-| 14 | **Mounting:** 4 × #8 wood screws + drywall anchors, OR VHB / Command strips for the demo table | Wall/ceiling twist-lock plate | MC / hardware store | ~$5 |
+| 14 | **Mounting:** 4 × #8 wood screws + drywall anchors, OR VHB / Command strips for the demo table | Wall/ceiling twist-lock plate | MC | ~$5 |
 
-**Must-buy total ≈ $185–215** (most of it at Micro Center, plus the RTL-SDR online).
+**Micro Center only (Rafael can't order from Amazon, 2026-11-07).** Must-buy total ≈ $175–200.
 
 ## Check first (may change the list)
 - **UPS input power:** the PiPower 5 may need ≥ 32 W USB-C PD input for a Pi 5 [unverified]. If the box says so, **a ≥ 45 W USB-C PD charger becomes a must** (use your laptop charger if it's USB-C PD).
@@ -54,9 +54,6 @@ The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 |---|---|---|---|
 | LILYGO LoRa32 915 MHz ×2 | Alerts still get out when Wi-Fi/cell is down | MC #699324 | ~$27 each |
 | INA219 power monitor | Shows power draw in each mode (low-power story) | MC / online | ~$10 |
-| Consumer CO alarm (Kidde/First Alert) | Godfrey's CO plan: the mic hears its beep (use its test button) | Walmart / Home Depot | ~$23–40 |
-| Sensirion SCD41 (CO2 + temp + RH) | Safe live "breathe on it" gas demo | Amazon / Adafruit | ~$15–80 |
-| Right-angle USB-A extension 15–30 cm + SMA bulkhead pigtail ~10 cm | Mount the RTL-SDR and antenna inside/through the case (skip the pigtail if the SDR kit has one) | Amazon / MC | ~$10 |
 | **52Pi 4010 5 V fan** (case session: strongly recommended) | Pushes room air onto the Pi in the closed box; the case already has its socket + grille. Run it on 5 V | MC SKU 605634 | ~$10 |
 | Thin double-sided foam tape, zip ties/velcro | Mic gaskets; hold the SDR. Hot glue is free at the venue | MC | ~$5 |
 | Spare microSD 64 GB+, small Ethernet switch | Clone the working card; wired network at the venue | MC | — |
@@ -65,6 +62,7 @@ The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 Pi 5 + 27 W supply · 2× ESP32 · USB mic · **gyro/accelerometer (MPU-6050, earthquake)** · SW-420 vibration · PIR · DHT11 / BME280-class / DS18B20 temperature · MQ-2 · flame · water level · raindrop · passive buzzer · 0.91" 128×32 I2C OLED (Hosyond) · M3 heat-set inserts (19 used; keep 30) · M3 screws (4× M3x12, 3× M3x10, 6× M3x8, 4× M3x6–8, 2× M3x10 + nuts: check lengths) · I2C LCD 1602 · RTC · ADC · buttons · resistors · jumpers · PETG filament. Full list: [HackUTD-Inventory](HackUTD-Inventory.md).
 
 ## Not buying (dropped)
+- **Amazon-only parts:** RTL-SDR Blog V4 (replaced by the Adafruit stick at MC), SMA bulkhead pigtail (the MC stick likely has an MCX antenna; MC only has a 3 m bulkhead 2-pack), SCD41, consumer CO alarm (Walmart/Home Depot; ask whether MC carries one).
 AI HAT+ (no camera vision; #18 dropped it), camera + long cable, servos/pan-tilt parts, 12 V supply, GT2 belt, magnets, light pipes, metal standoffs (the case uses printed bosses + inserts), SHT41 / BME680 (temperature and gas already owned), MQ-7 (not life-safety grade).
 
 ## Open (Rafael's call, not a purchase yet)
