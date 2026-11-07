@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Home Safety Box</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+    a { display: block; font-size: 1.25rem; margin: 0.75rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Home Safety Box</h1>
+  <a id="dashboard" href="/dashboard/">Dashboard: 500 homes, ranked by time to harm</a>
+  <a id="home" href="/home/">Home screen: the box</a>
+  <script>
+    // Carry ?hub=ws://host:port through to the pages so they talk to the same bus.
+    const hub = new URLSearchParams(location.search).get("hub");
+    if (hub) for (const a of document.querySelectorAll("a")) a.href += "?hub=" + encodeURIComponent(hub);
+  </script>
+</body>
+</html>
