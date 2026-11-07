@@ -18,7 +18,7 @@ document.title = `${PRODUCT_NAME} Home`;
 $('product-name').textContent = PRODUCT_NAME;
 $('hub-url').textContent = `Hub ${hubUrl}`;
 
-// ---------- neighborhood map ----------
+// ---------- neighborhood map (tactical display) ----------
 
 function neighbors() {
   let seed = 7;
@@ -35,27 +35,84 @@ function neighbors() {
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
-function svgEl(tag, attrs) {
+function svgEl(tag, attrs, parent) {
   const el = document.createElementNS(SVG, tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  if (parent) parent.append(el);
+  return el;
+}
+function hudText(parent, x, y, text, attrs = {}) {
+  const el = svgEl('text', { x, y, class: 'hud', ...attrs }, parent);
+  el.textContent = text;
   return el;
 }
 
 const map = $('map');
-const wave = svgEl('circle', { class: 'wave', cx: HOME.x, cy: HOME.y, r: 4 });
-map.append(wave);
+map.innerHTML = `
+  <defs>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="sweep-fill" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4da3ff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#4da3ff" stop-opacity="0.32"/>
+    </linearGradient>
+    <pattern id="grid" width="15" height="15" patternUnits="userSpaceOnUse">
+      <path d="M15 0H0V15" fill="none" stroke="rgba(77,163,255,0.08)" stroke-width="0.6"/>
+    </pattern>
+    <clipPath id="scope"><circle cx="${HOME.x}" cy="${HOME.y}" r="124"/></clipPath>
+  </defs>`;
+
+svgEl('rect', { width: 300, height: 260, fill: 'url(#grid)' }, map);
+
+// Street blocks, drawn faint under everything.
+const streets = svgEl('g', { class: 'streets' }, map);
+for (const d of ['M0 58 L300 70', 'M0 150 L300 140', 'M0 222 L300 230', 'M64 0 L74 260', 'M196 0 L184 260', 'M252 0 L262 260', 'M0 100 Q150 92 300 108']) {
+  svgEl('path', { d }, streets);
+}
+
+const scope = svgEl('g', {}, map);
+for (const r of [40, 82, 124]) svgEl('circle', { cx: HOME.x, cy: HOME.y, r, class: 'range' }, scope);
+svgEl('path', { d: `M${HOME.x - 124} ${HOME.y}H${HOME.x + 124}M${HOME.x} ${HOME.y - 124}V${HOME.y + 124}`, class: 'cross' }, scope);
+for (let deg = 0; deg < 360; deg += 10) {
+  const a = (deg * Math.PI) / 180;
+  const inner = deg % 30 === 0 ? 116 : 120;
+  svgEl('line', {
+    x1: HOME.x + Math.sin(a) * inner, y1: HOME.y - Math.cos(a) * inner,
+    x2: HOME.x + Math.sin(a) * 124, y2: HOME.y - Math.cos(a) * 124, class: 'tick',
+  }, scope);
+}
+hudText(scope, HOME.x + 5, HOME.y - 106, 'N');
+
+const sweepGroup = svgEl('g', { 'clip-path': 'url(#scope)' }, map);
+const sweep = svgEl('g', { class: 'sweep' }, sweepGroup);
+svgEl('path', { d: `M${HOME.x} ${HOME.y}L${HOME.x + 124} ${HOME.y}A124 124 0 0 0 ${HOME.x + 124 * Math.cos(-0.7)} ${HOME.y + 124 * Math.sin(-0.7)}Z`, fill: 'url(#sweep-fill)' }, sweep);
+svgEl('line', { x1: HOME.x, y1: HOME.y, x2: HOME.x + 124, y2: HOME.y, class: 'sweep-edge' }, sweep);
+
+const wave = svgEl('circle', { class: 'wave', cx: HOME.x, cy: HOME.y, r: 4 }, map);
+
 const neighborDots = neighbors().map(({ x, y }) => {
-  const el = svgEl('circle', { class: 'node', cx: x, cy: y, r: 5 });
+  const el = svgEl('circle', { class: 'node', cx: x, cy: y, r: 3, filter: 'url(#glow)' }, map);
   el.style.transitionDelay = `${Math.round(Math.hypot(x - HOME.x, y - HOME.y) * 8)}ms`;
-  map.append(el);
   return el;
 });
-map.append(svgEl('circle', { class: 'ring', cx: HOME.x, cy: HOME.y, r: 13 }));
-const homeDot = svgEl('circle', { class: 'node', cx: HOME.x, cy: HOME.y, r: 7 });
-map.append(homeDot);
-const homeLabel = svgEl('text', { x: HOME.x, y: HOME.y + 30, 'text-anchor': 'middle', fill: '#8fa6c6', 'font-size': 13 });
-homeLabel.textContent = 'H000';
-map.append(homeLabel);
+
+// Reticle on this home: four corner brackets.
+const b = 13, l = 5;
+svgEl('path', {
+  class: 'reticle',
+  d: [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) =>
+    `M${HOME.x + sx * b} ${HOME.y + sy * (b - l)}V${HOME.y + sy * b}H${HOME.x + sx * (b - l)}`).join(''),
+}, map);
+const homeDot = svgEl('circle', { class: 'node home', cx: HOME.x, cy: HOME.y, r: 4.5, filter: 'url(#glow)' }, map);
+hudText(map, HOME.x + 18, HOME.y - 5, 'H000');
+hudText(map, HOME.x + 18, HOME.y + 6, 'THIS HOME', { class: 'hud dim' });
+
+const hudNodes = hudText(map, 6, 254, '');
+const hudHit = hudText(map, 294, 254, '', { 'text-anchor': 'end' });
+hudText(map, 6, 14, 'GRID H000');
+const hudLive = hudText(map, 294, 14, '', { 'text-anchor': 'end' });
 
 function renderMap() {
   for (const el of neighborDots) el.classList.toggle('hit', state.areaHit);
@@ -68,6 +125,13 @@ function renderMap() {
     wave.classList.add('go');
   }
   lastWaveAt = last;
+  const total = neighborDots.length + 1;
+  const hit = (state.areaHit ? neighborDots.length : 0) + (state.home === 'hit' ? 1 : 0);
+  hudNodes.textContent = `NODES ${total}`;
+  hudHit.textContent = `HIT ${hit}`;
+  hudHit.classList.toggle('alarm', hit > 0);
+  hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
+  hudLive.classList.toggle('alarm', !connected);
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
   $('map-sub').textContent = state.areaHit ? `Quake hit the neighborhood. ${homeNote}.` : homeNote ? `${homeNote}.` : 'All homes quiet';
 }
