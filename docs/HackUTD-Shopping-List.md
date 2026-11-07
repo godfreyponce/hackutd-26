@@ -37,11 +37,6 @@ The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 
 **Micro Center only (Rafael can't order from Amazon, 2026-11-07).** Must-buy total ≈ $175–200.
 
-## Probably needed: M2.5 screws (confirming with the case session)
-- The Pi 5 and the PiPower 5 have **2.7 mm mounting holes (M2.5)**. M3 doesn't fit, and with the AI HAT+ dropped there's no HAT kit to borrow M2.5 hardware from. Rafael owns only M3.
-- Buy a small **M2.5 screw + nut (+ standoff) assortment** (Micro Center sells Pi standoff kits, ~$8–12).
-- **Camera M2 screws: not needed** (camera out).
-
 ## Check first (may change the list)
 - **UPS input power:** the PiPower 5 may need ≥ 32 W USB-C PD input for a Pi 5 [unverified]. If the box says so, **a ≥ 45 W USB-C PD charger becomes a must** (use your laptop charger if it's USB-C PD).
 - **I2S mics:** the SPH0645 may be ship-only. If it isn't on the shelf, the INMP441 fits the same pocket; otherwise use the USB mic.
@@ -67,6 +62,7 @@ The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 Pi 5 + 27 W supply · 2× ESP32 · USB mic · **gyro/accelerometer (MPU-6050, earthquake)** · SW-420 vibration · PIR · DHT11 / BME280-class / DS18B20 temperature · MQ-2 · flame · water level · raindrop · passive buzzer · 0.91" 128×32 I2C OLED (Hosyond) · M3 heat-set inserts (19 used; keep 30) · M3 screws (4× M3x12, 3× M3x10, 6× M3x8, 4× M3x6–8, 2× M3x10 + nuts: check lengths) · I2C LCD 1602 · RTC · ADC · buttons · resistors · jumpers · PETG filament. Full list: [HackUTD-Inventory](HackUTD-Inventory.md).
 
 ## Not buying (dropped)
+- **M2 / M2.5 screws:** Rafael says not needed (camera out; 2026-11-07).
 - **Amazon-only parts:** RTL-SDR Blog V4 (replaced by the Adafruit stick at MC), SMA bulkhead pigtail (the MC stick likely has an MCX antenna; MC only has a 3 m bulkhead 2-pack), SCD41, consumer CO alarm (Walmart/Home Depot; ask whether MC carries one).
 AI HAT+ (no camera vision; #18 dropped it), camera + long cable, servos/pan-tilt parts, 12 V supply, GT2 belt, magnets, light pipes, metal standoffs (the case uses printed bosses + inserts), SHT41 / BME680 (temperature and gas already owned), MQ-7 (not life-safety grade).
 
