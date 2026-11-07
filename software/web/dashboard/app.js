@@ -213,7 +213,13 @@ function maybeSendQueue(now) {
 
 // ---------- Agent rerank ----------
 function onRerank(msg) {
-  const moves = Array.isArray(msg.moves) ? msg.moves.filter((m) => m && typeof m === 'object') : [];
+  if (!Array.isArray(msg.moves)) {
+    addTrace('BLOCKED', 'Override blocked: the rerank message has no moves list.', null, 'guardrail');
+    guardNote = { ok: false, text: 'Override blocked: the rerank message has no moves list.' };
+    renderAll();
+    return;
+  }
+  const moves = msg.moves.filter((m) => m && typeof m === 'object');
   const { results } = applyRerank(math, moves);
   activeMoves = results.filter((r) => r.ok).map((r) => r.move);
   for (const r of results) {
