@@ -26,6 +26,25 @@ Rafael: "I haven't figured out everything yet." Below: **Decided** = his words; 
    | Yes or No | "Help" / distress | Alarm (proposed; Rafael said "stuff like that") |
    | Yes or No | "I'm okay" | Log it, no alarm (proposed) |
 
+7. **Official alert receiver on the Pi** (2026-11-07 evening): an RTL-SDR radio module on the Pi plus internet feeds. The receiver **detects which format an alert arrives in and reads it**, CAP above all ([HackUTD-Research-Disaster-Alert-Feeds](research/HackUTD-Research-Disaster-Alert-Feeds.md)).
+8. **Wall tablet home UI**, mounted like a modern smart thermostat. It shows:
+   - whether any alert is detected, and its details
+   - which broadcasts it is receiving, and when one carries an alert, where it applies
+   - a **map: every home is a white dot; homes hit by a disaster turn red**
+
+## Alert receiver: how it works (from Rafael's decision 7)
+- **Inputs:** NOAA Weather Radio over the RTL-SDR (SAME header, works offline); NWS API (GeoJSON with CAP fields); CAP XML feeds (GDACS, later FEMA IPAWS); USGS/EMSC quake JSON; the node's own sensors.
+- **Format detection:** `<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">` → CAP parser; GeoJSON `FeatureCollection` → NWS/USGS parser; `ZCZC-` header from the radio decoder → SAME parser; EMSC websocket JSON → quake parser. Unknown → logged, never dropped silently.
+- **One internal format:** every input becomes one CAP-shaped object (`event, severity, urgency, certainty, area, expires, instruction, source`). One alarm rule and one voice script handle all of them.
+- **Filter:** drop tests and expired alerts, keep only alerts whose area covers the home, use the ID to skip duplicates, apply Update/Cancel.
+- **Hardware:** RTL-SDR Blog V3/V4 (~$30–40) on a Pi USB port + antenna. Needs the Pi on, so it is not part of the ESP32 battery mode.
+
+## Wall tablet UI (from Rafael's decision 8)
+- **Status:** all clear / active alert (event, severity, instruction, expires).
+- **Receiving:** live list of sources and their state (weather radio station + signal, NWS, USGS, EMSC, GDACS, local sensors), last message time each.
+- **Map:** homes as white dots; a home inside an active alert area, or one that reported a local event, turns red. Alert area drawn as its polygon.
+- Open: which tablet (old tablet/phone in kiosk mode vs Pi touchscreen); does it read from the node over Wi-Fi only (outage behaviour); how many homes on the map are real vs simulated.
+
 ## Proposed: what is easiest to detect with cheap sensors
 | Event | Sensor | Cost / source | Difficulty (1 easy–5 hard) | Notes |
 |---|---|---|---|---|
@@ -83,3 +102,6 @@ Proposed minimum set for the demo: **accelerometer + mic + radar + power-cut det
 - Radar (LD2410C), INA219 power measurement, the LoRa fallback, the power-cut detection rig, Twilio calling.
 - The temperature/CO clocks and the Uri story.
 - See [HackUTD-Lifeline-Hardware](lifeline/HackUTD-Lifeline-Hardware.md) for wiring and the parts list.
+
+## Official alert feeds
+See [HackUTD-Research-Disaster-Alert-Feeds](research/HackUTD-Research-Disaster-Alert-Feeds.md): CAP feeds (NWS, FEMA IPAWS, GDACS), USGS/EMSC quake feeds, and NOAA Weather Radio SAME over an RTL-SDR (works offline).
