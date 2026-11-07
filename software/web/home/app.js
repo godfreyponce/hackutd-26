@@ -51,26 +51,26 @@ const map = $('map');
 map.innerHTML = `
   <defs>
     <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
-      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
     <linearGradient id="sweep-fill" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#4da3ff" stop-opacity="0"/>
-      <stop offset="1" stop-color="#4da3ff" stop-opacity="0.32"/>
+      <stop offset="0" stop-color="#bfe0ff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#bfe0ff" stop-opacity="0.16"/>
     </linearGradient>
     <radialGradient id="vignette" cx="50%" cy="50%" r="65%">
-      <stop offset="0.45" stop-color="#030a16" stop-opacity="0"/>
-      <stop offset="1" stop-color="#030a16" stop-opacity="0.85"/>
+      <stop offset="0.6" stop-color="#030a16" stop-opacity="0"/>
+      <stop offset="1" stop-color="#030a16" stop-opacity="0.5"/>
     </radialGradient>
     <clipPath id="scope"><circle cx="${HOME.x}" cy="${HOME.y}" r="124"/></clipPath>
   </defs>`;
 
-// OpenStreetMap tiles of Richardson, TX (zoom 16), saved in map/ so the page works offline.
-const TILE = 160;
-const basemap = svgEl('g', { class: 'basemap' }, map);
-for (const [col, x] of [[0, 15158], [1, 15159]]) {
-  for (const [row, y] of [[0, 26408], [1, 26409]]) {
-    svgEl('image', { href: `map/16-${x}-${y}.png`, x: -10 + col * TILE, y: -30 + row * TILE, width: TILE, height: TILE }, basemap);
+// USGS The National Map imagery of Richardson, TX (zoom 15, public domain), saved in map/ so the page works offline.
+// Offsets put lat 32.9483, lon -96.7299 on HOME.
+const TILE = 256;
+for (const [col, x] of [[0, 7578], [1, 7579], [2, 7580]]) {
+  for (const [row, y] of [[0, 13204], [1, 13205]]) {
+    svgEl('image', { href: `map/15-${x}-${y}.jpg`, x: -216 + col * TILE, y: -11 + row * TILE, width: TILE, height: TILE }, map);
   }
 }
 svgEl('rect', { width: 300, height: 260, fill: 'url(#vignette)' }, map);

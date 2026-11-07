@@ -158,27 +158,32 @@
   #map { flex: 1; width: 100%; min-height: 0; margin-top: 0.4em; }
   .map .legend { display: flex; gap: 1em; color: var(--muted); font-size: calc(var(--u) * 0.85); flex-wrap: wrap; }
   .map .legend i { display: inline-block; width: 0.75em; height: 0.75em; border-radius: 50%; margin-right: 0.35em; vertical-align: -0.05em; }
-  #map { background: radial-gradient(circle at 50% 50%, rgba(20, 60, 110, 0.35), rgba(3, 10, 22, 0.6) 70%); border-radius: 8px; border: 1px solid rgba(77, 163, 255, 0.18); }
-  .basemap { filter: invert(1) hue-rotate(185deg) brightness(0.75) contrast(1.15) saturate(0.55); opacity: 0.85; }
+  #map { background: #0b1a2e; border-radius: 8px; border: 1px solid rgba(77, 163, 255, 0.18); }
   .map .credit { margin-left: auto; opacity: 0.7; }
-  .range { fill: none; stroke: rgba(77, 163, 255, 0.28); stroke-width: 0.8; }
+  .range { fill: none; stroke: rgba(255, 255, 255, 0.6); stroke-width: 0.8; filter: drop-shadow(0 0 0.6px rgba(3, 10, 22, 0.9)); }
   .range:last-of-type { stroke-dasharray: 2 3; }
-  .cross { stroke: rgba(77, 163, 255, 0.16); stroke-width: 0.6; }
-  .tick { stroke: rgba(77, 163, 255, 0.45); stroke-width: 0.8; }
-  .sweep { transform-origin: 150px 130px; animation: spin 5s linear infinite; }
-  .sweep-edge { stroke: rgba(140, 200, 255, 0.7); stroke-width: 1; }
+  .cross { stroke: rgba(255, 255, 255, 0.25); stroke-width: 0.5; }
+  .tick { stroke: rgba(255, 255, 255, 0.7); stroke-width: 0.7; }
+  .sweep { transform-origin: 150px 130px; animation: spin 6s linear infinite; }
+  .sweep-edge { stroke: rgba(225, 240, 255, 0.5); stroke-width: 0.7; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .hud { fill: #8fc4ff; font: 600 8px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.1em; font-size: 11px; }
-  .hud.dim { fill: rgba(143, 196, 255, 0.6); font-size: 8.5px; }
+  .hud { fill: #d6ebff; font: 600 8px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.1em; font-size: 11px; paint-order: stroke; stroke: rgba(3, 10, 22, 0.75); stroke-width: 2.5px; stroke-linejoin: round; }
+  .hud.dim { fill: rgba(214, 235, 255, 0.85); font-size: 8.5px; }
   .hud.alarm { fill: var(--danger); }
-  .reticle { fill: none; stroke: #8fc4ff; stroke-width: 1.3; }
-  .node { fill: #f2f6fc; transition: fill 0.25s; }
+  .reticle { fill: none; stroke: #8fc4ff; stroke-width: 1.3; filter: drop-shadow(0 0 1px #030a16) drop-shadow(0 0 1px #030a16); }
+  .node { fill: #f2f6fc; stroke: rgba(3, 10, 22, 0.85); stroke-width: 1.1; transition: fill 0.25s; }
   .node.hit { fill: var(--danger); }
   .node.ok { fill: var(--ok); }
   .wave { fill: none; stroke: var(--danger); stroke-width: 2; opacity: 0; }
   .wave.go { animation: wave 1.6s ease-out forwards; }
   @keyframes wave { from { r: 4; opacity: 0.9; } to { r: 160; opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .wave.go, .sweep { animation: none; } .node { transition: none; } }
+
+  /* NASA Blue Marble, pinned on Richardson, TX */
+  .earth { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+  .earth image { opacity: 0.4; filter: blur(2px) brightness(1.2) saturate(1.1); }
+  .earth .pin { fill: #7cc4ff; filter: drop-shadow(0 0 4px #4da3ff) drop-shadow(0 0 10px #4da3ff); }
+  .earth .pin-halo { fill: rgba(77, 163, 255, 0.18); stroke: rgba(124, 196, 255, 0.6); stroke-width: 1; }
 
   footer {
     grid-column: 1 / -1; display: flex; gap: calc(var(--u) * 1.5); align-items: center;
@@ -189,6 +194,12 @@
 </style>
 </head>
 <body data-status="PROTECTED">
+<!-- GIBS BlueMarble_NextGeneration zoom 4, tiles x 1-5, y 4-7, cropped 150 px from the top. The pin is lat 32.9483, lon -96.7299 in that image. -->
+<svg class="earth" viewBox="0 0 1280 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <image href="map/blue-marble-north-america.jpg" width="1280" height="800"/>
+  <circle class="pin-halo" cx="691.4" cy="476.6" r="9"/>
+  <circle class="pin" cx="691.4" cy="476.6" r="3.5"/>
+</svg>
 <div class="app">
   <header>
     <div class="brand">
@@ -261,7 +272,7 @@
         <div><div class="card-title">Neighborhood</div><div class="card-sub" id="map-sub">All homes quiet</div></div>
       </div>
       <svg id="map" viewBox="0 0 300 260" aria-label="Neighborhood node map"></svg>
-      <div class="legend"><span><i style="background:#f2f6fc"></i>Quiet</span><span><i style="background:var(--danger)"></i>Hit</span><span><i style="background:var(--ok)"></i>Okay</span><span><i style="border:2px solid #8fc4ff;border-radius:2px"></i>This home</span><span class="credit">Map &copy; OpenStreetMap contributors</span></div>
+      <div class="legend"><span><i style="background:#f2f6fc"></i>Quiet</span><span><i style="background:var(--danger)"></i>Hit</span><span><i style="background:var(--ok)"></i>Okay</span><span><i style="border:2px solid #8fc4ff;border-radius:2px"></i>This home</span><span class="credit">Imagery: USGS The National Map</span></div>
     </section>
 
     <div class="cards">
@@ -290,6 +301,7 @@
     <span>Node H000</span><span id="hub-url"></span>
     <span class="spacer"></span>
     <span>Demo build. Alarms are simulated.</span>
+    <span>Background: NASA Blue Marble</span>
   </footer>
 </div>
 <script type="module" src="./app.js"></script>
