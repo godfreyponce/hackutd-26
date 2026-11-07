@@ -41,6 +41,8 @@ TABLE = [
     ("the weather is nice today", "no_answer"),
     ("I know", "no_answer"),  # "know" is not "no"
     ("token", "no_answer"),  # "token" is not "ok"
+    ("Good boy", "no_answer"),  # a real mishearing of room chatter; "good" is not an answer
+    ("I'm good", "no_answer"),
 ]
 
 

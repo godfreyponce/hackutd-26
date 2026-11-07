@@ -41,7 +41,7 @@ Why not Eleven Realtime v1 Mini: it is a speech-to-speech agent. Its docs don't 
 `classify.py` is a keyword match, no LLM. In order:
 1. A help word (help, hurt, emergency, can't get up) is `help`.
 2. Any negation (no, nope, not, never, -n't) is `help`, so "I'm not okay" and "no" never become `ok`.
-3. yes, yeah, okay, ok, fine, alright, good is `ok`.
+3. yes, yeah, yep, okay, ok, fine, alright is `ok`. "Good" is not: room chatter misheard as "Good boy" became `ok` in a live test.
 4. Anything else, silence included, is `no_answer`.
 
 ## Microphone

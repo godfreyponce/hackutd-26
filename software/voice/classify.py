@@ -8,7 +8,7 @@ import re
 
 HELP = re.compile(r"\b(help|hurt|emergency|can ?not get up|can't get up|cant get up)")
 NEGATION = re.compile(r"\b(no|nope|nah|not|never)\b|n't\b")
-OK = re.compile(r"\b(yes|yeah|yep|yup|okay|ok|fine|alright|all right|good)\b")
+OK = re.compile(r"\b(yes|yeah|yep|yup|okay|ok|fine|alright|all right)\b")
 
 
 def classify(transcript: str | None) -> str:
