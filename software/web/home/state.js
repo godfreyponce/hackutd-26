@@ -34,7 +34,7 @@ export function sourceLabel(source) {
   return SOURCE_LABELS[source] ?? String(source ?? '').toUpperCase();
 }
 
-export function statusText(status, { alert = false } = {}) {
+export function statusText(status, { alert = false, linked = true } = {}) {
   switch (status) {
     case 'CHECKING_IN':
       return { word: 'CHECKING IN', detail: 'Event detected. Asking if you are okay.' };
@@ -43,10 +43,11 @@ export function statusText(status, { alert = false } = {}) {
     case 'CONTACTING_HELP':
       return {
         word: 'CONTACTING HELP',
-        detail: 'Contacting your emergency contact',
+        detail: 'Alerting your emergency contact',
         note: 'Demo alarm. No emergency number is called.',
       };
     default:
+      if (!linked) return { word: 'HUB OFFLINE', detail: 'Live status unavailable. Showing last known.' };
       return { word: 'PROTECTED', detail: alert ? 'All okay at home. Official alert active.' : 'No active events' };
   }
 }

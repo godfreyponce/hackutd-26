@@ -153,3 +153,15 @@ test('PROTECTED with an official alert says the alert is active', () => {
   assert.equal(statusText('PROTECTED', { alert: true }).detail, 'All okay at home. Official alert active.');
   assert.equal(statusText('PROTECTED').detail, 'No active events');
 });
+
+test('with the hub link down, a quiet home shows HUB OFFLINE instead of a live-looking PROTECTED', () => {
+  const t = statusText('PROTECTED', { linked: false });
+  assert.equal(t.word, 'HUB OFFLINE');
+  assert.match(t.detail, /last known/i);
+  assert.equal(statusText('PROTECTED').word, 'PROTECTED');
+});
+
+test('with the hub link down, an escalation keeps its word', () => {
+  assert.equal(statusText('CONTACTING_HELP', { linked: false }).word, 'CONTACTING HELP');
+  assert.equal(statusText('NO_RESPONSE', { linked: false }).word, 'NO RESPONSE');
+});

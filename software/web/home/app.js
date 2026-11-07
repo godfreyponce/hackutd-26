@@ -73,7 +73,7 @@ for (const [col, x] of [[0, 7578], [1, 7579], [2, 7580]]) {
     svgEl('image', { href: `map/15-${x}-${y}.jpg`, x: -216 + col * TILE, y: -11 + row * TILE, width: TILE, height: TILE }, map);
   }
 }
-svgEl('rect', { width: 300, height: 260, fill: 'url(#vignette)' }, map);
+const vignette = svgEl('rect', { width: 300, height: 260, fill: 'url(#vignette)' }, map);
 
 const scope = svgEl('g', {}, map);
 for (const r of [40, 82, 124]) svgEl('circle', { cx: HOME.x, cy: HOME.y, r, class: 'range' }, scope);
@@ -114,8 +114,24 @@ hudText(map, HOME.x + 18, HOME.y + 6, 'THIS HOME', { class: 'hud dim' });
 
 const hudNodes = hudText(map, 6, 254, '');
 const hudHit = hudText(map, 294, 254, '', { 'text-anchor': 'end' });
-hudText(map, 6, 14, 'GRID H000');
+const hudGrid = hudText(map, 6, 14, 'GRID H000');
 const hudLive = hudText(map, 294, 14, '', { 'text-anchor': 'end' });
+const corners = [[hudGrid, false, false], [hudLive, true, false], [hudNodes, false, true], [hudHit, true, true]];
+
+// Grow the 300x260 scope view to the card's shape so the imagery fills it with no letterbox.
+function fitMap() {
+  const { width, height } = map.getBoundingClientRect();
+  if (!width || !height) return;
+  const k = Math.max(300 / width, 260 / height);
+  const w = width * k, h = height * k, x = HOME.x - w / 2, y = HOME.y - h / 2;
+  map.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+  for (const [k2, v] of Object.entries({ x, y, width: w, height: h })) vignette.setAttribute(k2, v);
+  for (const [el, right, bottom] of corners) {
+    el.setAttribute('x', right ? x + w - 6 : x + 6);
+    el.setAttribute('y', bottom ? y + h - 6 : y + 14);
+  }
+}
+new ResizeObserver(fitMap).observe(map);
 
 function renderMap() {
   for (const el of neighborDots) el.classList.toggle('hit', state.areaHit);
@@ -136,7 +152,8 @@ function renderMap() {
   hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
   hudLive.classList.toggle('alarm', !connected);
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
-  $('map-sub').textContent = state.areaHit ? `Quake hit the neighborhood. ${homeNote}.` : homeNote ? `${homeNote}.` : 'All homes quiet';
+  $('map-sub').textContent = !connected ? 'No live data'
+    : state.areaHit ? `Quake hit ${hit} of ${total} homes` : homeNote ? `${homeNote}.` : 'All homes quiet';
 }
 
 // ---------- seismic trace ----------
@@ -144,19 +161,23 @@ function renderMap() {
 const canvas = $('trace');
 const ctx = canvas.getContext('2d');
 
+let labelPx = 12;
 function sizeCanvas() {
   const r = canvas.getBoundingClientRect();
+  labelPx = parseFloat(getComputedStyle(document.body).fontSize) * 0.85;
   canvas.width = Math.max(1, Math.round(r.width * devicePixelRatio));
   canvas.height = Math.max(1, Math.round(r.height * devicePixelRatio));
 }
 new ResizeObserver(sizeCanvas).observe(canvas);
+
+const RING_S = 6; // how long one quake's wiggle lasts on the trace
 
 // Each quake event carries only its peak, so the trace draws a damped wiggle that peaks at that value.
 function signal(t) {
   let g = 0;
   for (const q of state.quakes) {
     const dt = (t - q.at) / 1000;
-    if (dt >= 0 && dt < 6) g += q.g * Math.exp(-dt * 1.1) * Math.sin(dt * 2 * Math.PI * 2.2 + 0.4);
+    if (dt >= 0 && dt < RING_S) g += q.g * Math.exp(-dt * 1.1) * Math.sin(dt * 2 * Math.PI * 2.2 + 0.4);
   }
   return g;
 }
@@ -176,22 +197,38 @@ function drawTrace() {
   for (const g of [-1, 0, 1]) { ctx.moveTo(0, mid - g * scale); ctx.lineTo(w, mid - g * scale); }
   ctx.stroke();
   ctx.fillStyle = 'rgba(143,166,198,0.9)';
-  ctx.font = `${12 * dpr}px system-ui, sans-serif`;
-  ctx.fillText('+1 g', 4 * dpr, mid - scale + 14 * dpr);
-  ctx.fillText('-1 g', 4 * dpr, mid + scale - 4 * dpr);
-  ctx.fillText('60 s', w - 34 * dpr, h - 4 * dpr);
+  const fs = labelPx * dpr;
+  ctx.font = `${fs}px system-ui, sans-serif`;
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('+1 g', 4 * dpr, mid - scale + fs * 1.1);
+  ctx.fillText('-1 g', 4 * dpr, mid + scale - fs * 0.35);
+  ctx.fillText('60 s ago', 4 * dpr, h - fs * 0.25);
+  ctx.textAlign = 'right';
+  ctx.fillText('now', w - 4 * dpr, h - fs * 0.25);
+  ctx.textAlign = 'left';
 
-  ctx.strokeStyle = state.quakes.length ? '#ff6b5a' : '#4da3ff';
-  ctx.lineWidth = 2 * dpr;
-  ctx.beginPath();
+  const start = now - TRACE_WINDOW_MS;
+  const trace = new Path2D();
   const steps = Math.min(w, 1200);
   for (let i = 0; i <= steps; i++) {
     const x = (i / steps) * w;
-    const t = now - TRACE_WINDOW_MS + (i / steps) * TRACE_WINDOW_MS;
-    const y = mid - signal(t) * scale;
-    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    const y = mid - signal(start + (i / steps) * TRACE_WINDOW_MS) * scale;
+    i ? trace.lineTo(x, y) : trace.moveTo(x, y);
   }
-  ctx.stroke();
+  ctx.lineWidth = 2 * dpr;
+  ctx.strokeStyle = 'rgba(77,163,255,0.7)';
+  ctx.stroke(trace);
+  // Only the shaking itself turns red, so the eye goes to the event.
+  ctx.strokeStyle = '#ff5a4e';
+  for (const q of state.quakes) {
+    const x0 = ((q.at - start) / TRACE_WINDOW_MS) * w;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, 0, ((RING_S * 1000) / TRACE_WINDOW_MS) * w, h);
+    ctx.clip();
+    ctx.stroke(trace);
+    ctx.restore();
+  }
   requestAnimationFrame(drawTrace);
 }
 requestAnimationFrame(drawTrace);
@@ -208,8 +245,9 @@ function renderQuake() {
 const ANSWERS = { ok: 'I\'m okay', help: 'Help', no_answer: 'No answer' };
 
 function render() {
-  const { word, detail, note } = statusText(state.status, { alert: Boolean(state.alert) });
+  const { word, detail, note } = statusText(state.status, { alert: Boolean(state.alert), linked: connected });
   document.body.dataset.status = state.status;
+  document.body.dataset.link = connected ? 'up' : 'down';
   $('word').textContent = word;
   $('detail').textContent = detail;
   $('note').hidden = !note;
@@ -218,7 +256,10 @@ function render() {
   $('say').textContent = state.say ? `"${state.say.text}"` : 'Nothing yet';
   $('say-try').textContent = state.say?.tryNum ? `try ${state.say.tryNum}` : '';
   const heard = state.heard;
-  $('heard').textContent = heard ? (heard.transcript ? `"${heard.transcript}" (${ANSWERS[heard.answer] ?? heard.answer})` : ANSWERS[heard.answer] ?? heard.answer) : 'Nothing yet';
+  $('heard').textContent = heard ? (heard.transcript ? `"${heard.transcript}"` : '') : 'Nothing yet';
+  $('heard-chip').hidden = !heard;
+  $('heard-chip').className = `chip ${heard?.answer ?? ''}`;
+  $('heard-chip').textContent = heard ? ANSWERS[heard.answer] ?? heard.answer : '';
   $('heard-try').textContent = heard?.tryNum ? `try ${heard.tryNum}` : '';
 
   const a = state.alert;
