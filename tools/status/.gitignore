@@ -1,0 +1,4 @@
+status.json
+status.json.tmp
+threads/
+__pycache__/
