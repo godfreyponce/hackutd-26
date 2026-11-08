@@ -110,3 +110,14 @@ test('the stand-up re-ask after an alarm keeps the alarm up', () => {
   ]);
   assert.deepEqual([s.alarm, s.no_answer], [true, 3]);
 });
+
+test('the alarm after 3 asks is not counted as a 4th try', () => {
+  const asks = [1, 2, 3].flatMap((n) => [
+    { type: 'checkin', state: 'asking', try: n },
+    { type: 'checkin', state: 'no_answer', try: n },
+  ]);
+  const s = run([...asks, { type: 'checkin', state: 'alarm', try: 4 }]);
+  assert.equal(s.try, 3, 'the box panel prints this as "Alarm, try N"');
+  const late = applyBoxEvent(s, { type: 'heard', answer: 'no_answer', transcript: '' }, 0);
+  assert.equal(late.no_answer, 3);
+});

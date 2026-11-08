@@ -53,7 +53,8 @@ export function applyBoxEvent(state, msg, now) {
     case 'heard':
       return answered({ ...s, heard: { answer: msg.answer, transcript: msg.transcript } }, msg.answer);
     case 'checkin': {
-      s = { ...s, checkin: msg.state, try: msg.try ?? s.try };
+      // The agent sends alarm with try = tries + 1 and the home screen relies on that. Keep the last ask's try here.
+      s = { ...s, checkin: msg.state, try: msg.state === 'alarm' ? s.try : msg.try ?? s.try };
       if (msg.state === 'ok' || msg.state === 'help' || msg.state === 'no_answer') return answered(s, msg.state);
       if (msg.state === 'alarm') return { ...s, alarm: true };
       // Try 1 opens a new check-in. Under an alarm it is the stand-up re-ask, which keeps the alarm's state.
