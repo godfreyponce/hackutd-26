@@ -29,9 +29,10 @@ Rafael: "everything else on the buy list we won't have."
 | Adafruit I2S MEMS microphone | 837724 | $8.99 | **1 bought** (the plan had 2) |
 | Adafruit NeoPixel ring (LED count: check the bag) | 466599 | $8.99 | As planned |
 | Raspberry Pi Active Cooler | 620310 | $9.99 | As planned |
-| Raspberry Pi 4 case | 188631 | $4.99 | Not on the plan. A Pi 4 case does not fit a Pi 5 |
+| Fan (receipt reads "Raspberry Pi 4 case"; Rafael: it's the fan) | 188631 | $4.99 | Case cooling |
 
-**NOT bought (won't have):** PiPower 5 UPS, 5 A USB-C cable, DFRobot SEN0395 radar, MAX98357A amp, 40 mm speaker, power strip, PLA filament, M2.5 screws, Command strips.
+**Owned / later (Rafael):** filament (owned), M2.5 screws (getting later), Camera Module 3 (owned, **back in**).
+**NOT bought (won't have):** PiPower 5 UPS, 5 A USB-C cable, DFRobot SEN0395 radar, MAX98357A amp, 40 mm speaker, power strip, Command strips.
 
 ## Buy list, by priority (plan before the purchase) (Micro Center only; exact names to look for)
 **Micro Center only** (Rafael can't order from Amazon, 2026-11-07). MC numbers come from research and are unverified, so match the name on the box.
