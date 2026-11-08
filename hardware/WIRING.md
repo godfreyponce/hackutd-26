@@ -1,5 +1,12 @@
 # Wiring: Pi 5 + AI HAT+ box (Sat Nov 7 2026)
 
+**Visual, documentation-checked version:** https://claude.ai/artifact/BrVk7vX6qb3tnTa6rCHAR3 (private; ask Rafael to share it)
+
+**Corrections after checking the docs:**
+- The PIR output pin is labelled **DO**, and its voltage isn't documented. **Measure it (≤3.3 V) before connecting it to the Pi.**
+- The Pi 5 NeoPixel GPIO isn't documented, and Adafruit requires a level shifter for 3.3 V logic. **Wire the ring last; treat it as provisional.**
+- The Argon 30 mm fan is made for the Pi 5 FAN header, which the Active Cooler already uses, and its wire colours aren't documented. **Leave it off the breadboard.**
+
 Physical pin numbers are on the 40-pin header, reached through the AI HAT+ stacking header.
 - **Pin 1** (3.3V) is the header end **farthest from the USB/Ethernet ports**.
 - **Odd pins** are in the row toward the middle of the board; **even pins** are along the board edge.
