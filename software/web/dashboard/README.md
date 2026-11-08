@@ -13,12 +13,12 @@ http://localhost:8080/dashboard/
 To use another hub, add `?hub=ws://host:port`. The default is `ws://localhost:8765`. The page reconnects every second if the hub restarts. It loads nothing from the internet.
 
 Keys on the page. The hint line is hidden so it stays off camera; press `?` to show or hide it.
-- `q`: start the wave on this page only. Nothing is sent to the bus.
+- `q`: start the wave on this page only. No `quake` is sent to the bus. After it, the page sends `queue` messages to the bus until `reset`, the same as after a real quake.
 - `r`: reset this page only.
 - `v`: step the map through world, city and home by hand.
 - `?`: show or hide the key hints.
 
-The main trigger is a `quake` message on the bus. Quakes that come in while a wave is already running are ignored until `reset`.
+The main trigger is a `quake` message on the bus. After the first quake, a later quake does not start a new wave until `reset`.
 
 ## Map
 

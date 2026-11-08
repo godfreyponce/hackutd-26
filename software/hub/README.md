@@ -53,13 +53,13 @@ This list copies #19 and its "Contract addendum v1". The issue wins on any doubt
 
 `fall_hint` means presence went from moving to still. It is a hint, not a diagnosis. Say "no response after an event".
 
-**Camera events.** Sent by the camera on the Pi (`hardware/vision/posture.py`, #46).
+**Camera events.** Meant for the camera on the Pi (`hardware/vision/posture.py`, #46). The camera part is on the pi-integration branch, not on main yet. On main, the simulator key `h` sends `help_gesture`.
 
 ```json
 {"type":"help_gesture","source":"camera"}
 ```
 
-`help_gesture` means the camera saw the HELP sign. The agent asks at once; the alarm rule decides. The camera sends it again while the sign is held, after a cooldown.
+`help_gesture` means the camera saw the HELP sign. The agent asks at once; the alarm rule decides. On the pi-integration branch, the camera sends it again while the sign is held, after a cooldown.
 
 **Check-in.** The agent (#15) sends `checkin` and `say`. The voice service (#14) sends `heard`.
 
@@ -71,7 +71,7 @@ This list copies #19 and its "Contract addendum v1". The issue wins on any doubt
 
 `listen_s` is optional. With it, the voice service speaks the text, listens that many seconds, then sends one `heard`. Without it, the voice service only speaks.
 
-`tone` is optional (#64, not in #19 yet). The agent sets `"tone":"warning"` only on the first `say` of an EQW alert check-in. The voice service plays a short warning tone, then speaks the text. A voice service without this field ignores it and still speaks the line.
+`tone` is optional (#64). The agent sets `"tone":"warning"` only on the first `say` of an EQW alert check-in. The voice service plays a short warning tone, then speaks the text. A voice service without this field ignores it and still speaks the line.
 
 **Agent trace.** Sent by the agent.
 
@@ -79,7 +79,7 @@ This list copies #19 and its "Contract addendum v1". The issue wins on any doubt
 {"type":"agent","step":"PLAN|ACT|VERIFY|FALLBACK","text":"...","tool":"get_presence"}
 ```
 
-**Hand-off.** Sent by the agent once, after an alarm. Not in #19 yet.
+**Hand-off.** Sent by the agent once, after an alarm.
 
 ```json
 {"type":"handoff","home":"H000","note":"...","contact":{"id":"godfrey","name":"Godfrey","role":"family contact, demo"},"by":"nemotron|template","why":["..."],"why_by":"nemotron|template"}
@@ -131,7 +131,7 @@ The dashboard enforces the guardrail. A move goes at most 3 places and names a f
 
 **Who owns what.**
 
-- Agent (#15): the alarm rule, the 3 tries, the stand-up re-ask, the script text by id. Sends `checkin`, `say`, `agent`, `handoff`, `rerank`.
+- Agent (#15): the alarm rule, the 3 tries, the stand-up re-ask, the script text by id. Sends `checkin`, `say`, `agent`, `handoff`. It does not send `rerank` yet: `build_agent` passes no ranker.
 - Voice (#14): speaks, listens, classifies the answer. Sends `heard`.
 - Home screen (#20): only listens.
 - Dashboard (#16): listens and sends `queue`.

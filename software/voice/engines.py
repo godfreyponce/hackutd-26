@@ -282,7 +282,7 @@ class ElevenLabsEngine:
             )
             r.raise_for_status()
         except requests.RequestException as e:
-            self.log(f"FALLBACK: ElevenLabs text-to-speech failed ({e}); Piper speaks this line")
+            self.log(f"FALLBACK: ElevenLabs text-to-speech failed ({e}); the offline voice speaks this line")
             return self.offline.speak(text)
         play(np.frombuffer(r.content, dtype=np.int16).astype(np.float32) / 32768, SAMPLE_RATE)
 

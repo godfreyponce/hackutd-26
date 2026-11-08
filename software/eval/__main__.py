@@ -38,7 +38,7 @@ def headline(summaries, key, listen_s):
     gaps = [s["heard_to_rule_median_s"] for s in summaries if s["heard_to_rule_median_s"] is not None]
     if gaps:
         lines.append(f"A spoken reply reaches the rule {min(gaps):g} to {max(gaps):g} s after the voice service sends it "
-                     "(per-case medians). That wait is mostly the Safety Guard check, which runs before the rule.")
+                     "(per-case medians). That wait includes the Safety Guard check, which runs before the rule.")
     asks = [s["first_ask_median_s"] for s in summaries if s["first_ask_median_s"] is not None]
     if asks:
         lines.append(f"First question sent {min(asks):g} to {max(asks):g} s after the event (per-case medians).")

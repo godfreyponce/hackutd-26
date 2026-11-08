@@ -1,4 +1,4 @@
-"""Offline speech-to-text on fixtures made with macOS `say`. Needs the Moonshine model in the
+"""Offline speech-to-text on fixtures made with macOS `say`, plus one ElevenLabs recording. Needs the Moonshine model in the
 local cache (see software/voice/README.md); runs with no network."""
 
 import os
