@@ -45,7 +45,10 @@ def parse_json_calls(text: str) -> list:
             name = item.get("tool") or item.get("name")
             args = item.get("args", item.get("arguments", {}))
             if isinstance(args, str):
-                args = json.loads(args or "{}")
+                try:
+                    args = json.loads(args or "{}")
+                except ValueError:
+                    break
             if not isinstance(name, str) or not isinstance(args, dict):
                 break
             calls.append(ToolCall(name, args))
@@ -86,13 +89,15 @@ class LLMPlanner:
                 **({"extra_body": self.extra_body} if self.extra_body else {}),
             )
             msg = resp.choices[0].message
-        except Exception as e:  # any failure means: hand over to the next planner
+            text = (msg.content or "").strip()
+            if msg.tool_calls:
+                calls = [ToolCall(tc.function.name, _args(tc.function.arguments), tc.id) for tc in msg.tool_calls]
+                if not all(isinstance(c.name, str) for c in calls):
+                    raise ValueError("a tool call has no name")
+                return Plan(calls, text, native=True)
+            return Plan(parse_json_calls(text), text, native=False)
+        except Exception as e:  # any failure, a reply it cannot read included, means: hand over to the next planner
             raise PlannerUnavailable(f"{type(e).__name__}: {e}") from e
-        text = (msg.content or "").strip()
-        if msg.tool_calls:
-            calls = [ToolCall(tc.function.name, _args(tc.function.arguments), tc.id) for tc in msg.tool_calls]
-            return Plan(calls, text, native=True)
-        return Plan(parse_json_calls(text), text, native=False)
 
 
 def _args(raw):
