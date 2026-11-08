@@ -20,22 +20,16 @@ $('hub').title = `Hub ${hubUrl}`;
 
 // ---------- neighborhood map (tactical display) ----------
 
-function neighbors() {
-  let seed = 7;
-  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const dots = [];
-  // Rows run from about 190 units above this home to 190 below, so the dots fill the tall map view.
-  for (let row = -2; row < 8; row++) {
-    for (let col = 0; col < 7; col++) {
-      const x = 22 + col * 43 + (rand() - 0.5) * 22;
-      const y = 22 + row * 42 + (rand() - 0.5) * 22;
-      // Keep clear of this home and of its H000 labels on its left.
-      const clear = Math.hypot(x - HOME.x, y - HOME.y) > 24 && !(x < HOME.x && Math.abs(y - HOME.y) < 26);
-      if (clear && rand() > 0.2) dots.push({ x, y });
-    }
-  }
-  return dots;
-}
+// Roof centers read off the map/ tiles in view units, off streets and bare canopy, so each dot sits on a house.
+const ROOFS = [
+  [122, -84], [33, -83], [183, -82], [236, -82], [33, -57], [208, -57], [88, -56], [275, -55],
+  [112, -37], [48, -35], [156, -33], [242, -33], [268, -20], [103, -15], [182, -8], [225, -7], [32, -5],
+  [156, 23], [65, 28], [117, 42], [213, 47], [270, 47], [46, 65], [122, 73], [198, 73], [272, 73],
+  [14, 75], [36, 87], [95, 97], [167, 97], [45, 123], [288, 124], [195, 125], [47, 137], [75, 138],
+  [116, 149], [212, 150], [258, 150], [167, 177], [238, 177], [125, 183], [197, 200], [275, 201], [68, 206],
+  [38, 223], [133, 228], [182, 228], [258, 228], [22, 263], [117, 278], [213, 280], [157, 283], [65, 285],
+  [77, 302], [227, 302], [25, 332], [108, 332], [215, 333], [275, 334],
+];
 
 const SVG = 'http://www.w3.org/2000/svg';
 function svgEl(tag, attrs, parent) {
@@ -82,6 +76,9 @@ const vignette = svgEl('rect', { width: 300, height: 260, fill: 'url(#vignette)'
 
 const scope = svgEl('g', {}, map);
 for (const r of [40, 82, 124]) svgEl('circle', { cx: HOME.x, cy: HOME.y, r, class: 'range' }, scope);
+// One view unit is about 2 m, so the rings sit at about 80, 160 and 250 m.
+const ringLabels = [[40, '80 m'], [82, '160 m'], [124, '250 m']].map(([r, text]) =>
+  hudText(scope, HOME.x + r * 0.71 + 3, HOME.y - r * 0.71 - 2, text, { class: 'hud dim ring-label' }));
 svgEl('path', { d: `M${HOME.x - 124} ${HOME.y}H${HOME.x + 124}M${HOME.x} ${HOME.y - 124}V${HOME.y + 124}`, class: 'cross' }, scope);
 for (let deg = 0; deg < 360; deg += 10) {
   const a = (deg * Math.PI) / 180;
@@ -100,8 +97,8 @@ svgEl('line', { x1: HOME.x, y1: HOME.y, x2: HOME.x + 124, y2: HOME.y, class: 'sw
 
 const wave = svgEl('circle', { class: 'wave', cx: HOME.x, cy: HOME.y, r: 4 }, map);
 
-const neighborDots = neighbors().map(({ x, y }) => {
-  const el = svgEl('circle', { class: 'node', cx: x, cy: y, r: 3, filter: 'url(#glow)' }, map);
+const neighborDots = ROOFS.map(([x, y]) => {
+  const el = svgEl('circle', { class: 'node', cx: x, cy: y, r: 3.6, filter: 'url(#glow)' }, map);
   el.style.transitionDelay = `${Math.round(Math.hypot(x - HOME.x, y - HOME.y) * 6)}ms`;
   return el;
 });
@@ -118,8 +115,7 @@ svgEl('circle', { class: 'ring escalated', cx: HOME.x, cy: HOME.y, r: 8 }, map);
 svgEl('circle', { class: 'ring real', cx: HOME.x, cy: HOME.y, r: 11 }, map);
 const homeDot = svgEl('circle', { class: 'node home', cx: HOME.x, cy: HOME.y, r: 4.5, filter: 'url(#glow)' }, map);
 const homeLabelBg = svgEl('rect', { class: 'hud-bg' }, map);
-const hudHome = hudText(map, 0, 0, 'H000', { 'text-anchor': 'end' });
-const hudThisHome = hudText(map, 0, 0, 'THIS HOME', { class: 'hud dim', 'text-anchor': 'end' });
+const hudThisHome = hudText(map, 0, 0, 'THIS HOME', { 'text-anchor': 'middle' });
 
 const hudNodes = hudText(map, 6, 254, '');
 const hudHit = hudText(map, 294, 254, '', { 'text-anchor': 'end' });
@@ -133,6 +129,7 @@ const backing = (el) => {
 const corners = [[hudGrid, false, false], [hudLive, true, false], [hudNodes, false, true], [hudHit, true, true]]
   .map(([el, right, bottom]) => ({ el, bg: backing(el), right, bottom }));
 const northBg = backing(hudNorth);
+const ringLabelBgs = ringLabels.map(backing);
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
@@ -149,9 +146,9 @@ function fitMap() {
   // HUD text is 1u on screen, never under 18 px so it reads from 2 m at 1280x800.
   const f = Math.max(18, parseFloat(getComputedStyle(document.body).fontSize)) * k;
   map.style.setProperty('--hud', `${f}px`);
-  for (const el of [hudHome, hudThisHome]) el.setAttribute('x', HOME.x - b - 0.6 * f);
-  hudHome.setAttribute('y', HOME.y - 0.36 * f);
-  hudThisHome.setAttribute('y', HOME.y + 0.82 * f);
+  // Just under the reticle's lower brackets, so it never covers the rings at this home's center.
+  hudThisHome.setAttribute('x', HOME.x);
+  hudThisHome.setAttribute('y', HOME.y + b + 3 + 0.8 * f);
   view = { x, y, w, h, f };
   placeHud();
 }
@@ -171,7 +168,8 @@ function fitBacking(bg, ...els) {
 // A dot under a backing box is hidden, so no dot sits under or touches the HUD text.
 function placeHud() {
   const { x, y, w, h, f } = view;
-  const boxes = [fitBacking(homeLabelBg, hudHome, hudThisHome), fitBacking(northBg, hudNorth)];
+  const boxes = [fitBacking(homeLabelBg, hudThisHome), fitBacking(northBg, hudNorth),
+    ...ringLabels.map((el, i) => fitBacking(ringLabelBgs[i], el))];
   for (const { el, bg, right, bottom } of corners) {
     el.setAttribute('x', right ? x + w - 2 * HUD_PAD : x + 2 * HUD_PAD);
     el.setAttribute('y', bottom ? y + h - HUD_PAD - 0.45 * f : y + HUD_PAD + 1.05 * f);
@@ -181,7 +179,9 @@ function placeHud() {
     const cx = dot.cx.baseVal.value, cy = dot.cy.baseVal.value;
     const covered = boxes.some((bb) => cx > bb.x - DOT_CLEAR && cx < bb.x + bb.width + DOT_CLEAR
       && cy > bb.y - DOT_CLEAR && cy < bb.y + bb.height + DOT_CLEAR);
-    dot.style.visibility = covered ? 'hidden' : '';
+    // A dot cut by the map's edge reads as a glitch, so it is hidden too.
+    const cut = cy < y + DOT_CLEAR || cy > y + h - DOT_CLEAR;
+    dot.style.visibility = covered || cut ? 'hidden' : '';
   }
 }
 new ResizeObserver(fitMap).observe(map);
@@ -201,16 +201,18 @@ function renderMap() {
   // A home that answered okay was still hit, so check-in answers never lower the quake count.
   const hit = state.areaHit ? neighborDots.length + (state.home === 'idle' ? 0 : 1) : state.home === 'hit' ? 1 : 0;
   hudNodes.textContent = `NODES ${total}`;
-  hudHit.textContent = connected ? `HIT ${hit}` : 'HIT --';
-  hudHit.classList.toggle('alarm', connected && hit > 0);
+  const escalated = connected && state.status === 'CONTACTING_HELP';
+  hudHit.textContent = escalated ? 'ESC 1' : connected ? `HIT ${hit}` : 'HIT --';
+  hudHit.classList.toggle('alarm', escalated || (connected && hit > 0));
   hudHit.classList.toggle('warn', !connected);
   hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
   hudLive.classList.toggle('warn', !connected);
   $('legend-not-hit').textContent = connected ? 'Not hit' : 'Unknown';
   placeHud();
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
+  // One line in every state, so the map below never moves when the text changes.
   $('map-sub').textContent = !connected ? 'No live data'
-    : state.areaHit ? `Quake hit ${hit} of ${total} homes${state.home === 'ok' ? '. This home answered okay' : ''}` : homeNote ? `${homeNote}.` : 'All homes quiet';
+    : state.areaHit ? `Quake hit ${hit} of ${total} nearby` : homeNote ? `${homeNote}.` : 'All homes quiet';
 }
 
 // ---------- seismic trace ----------
@@ -234,7 +236,7 @@ function signal(t) {
   let g = 0;
   for (const q of state.quakes) {
     const dt = (t - q.at) / 1000;
-    if (dt >= 0 && dt < RING_S) g += q.g * Math.exp(-dt * 1.1) * Math.sin(dt * 2 * Math.PI * 2.2 + 0.4);
+    if (dt >= 0 && dt < RING_S) g += q.g * Math.exp(-dt * 1.1) * Math.cos(dt * 2 * Math.PI * 2.2);
   }
   return g;
 }
@@ -284,7 +286,7 @@ function drawTrace() {
 
   // Offline there is no live signal, so draw no line rather than a flat one that reads as calm.
   if (!connected) {
-    ctx.font = `${Math.max(18, labelPx) * dpr}px system-ui, sans-serif`;
+    ctx.font = `${Math.max(22, labelPx * 1.25) * dpr}px system-ui, sans-serif`;
     ctx.fillStyle = '#8fa6c6';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -294,9 +296,11 @@ function drawTrace() {
     requestAnimationFrame(drawTrace);
     return;
   }
-  const start = now - TRACE_WINDOW_MS;
-  const trace = new Path2D();
   const steps = Math.min(w, 1200);
+  // Samples sit on a fixed time grid, so they do not slide between frames and the burst does not shimmer.
+  const stepMs = TRACE_WINDOW_MS / steps;
+  const start = Math.floor((now - TRACE_WINDOW_MS) / stepMs) * stepMs;
+  const trace = new Path2D();
   for (let i = 0; i <= steps; i++) {
     const x = gutter + (i / steps) * plotW;
     const y = mid - signal(start + (i / steps) * TRACE_WINDOW_MS) * scale;
@@ -309,6 +313,13 @@ function drawTrace() {
   ctx.strokeStyle = '#ff5a4e';
   for (const q of state.quakes) {
     const qx = gutter + ((q.at - start) / TRACE_WINDOW_MS) * plotW;
+    // The samples can miss the exact peak, so the onset draws it, matching the peak value in the card head.
+    if (q.at >= start) {
+      ctx.beginPath();
+      ctx.moveTo(qx, mid);
+      ctx.lineTo(qx, mid - q.g * scale);
+      ctx.stroke();
+    }
     ctx.save();
     ctx.beginPath();
     ctx.rect(qx, 0, ((RING_S * 1000) / TRACE_WINDOW_MS) * plotW, h);
@@ -357,8 +368,9 @@ function render() {
     $('alert-source').textContent = a.source;
     $('alert-event').textContent = [a.event, a.severity].filter(Boolean).join(', ');
     $('alert-headline').textContent = a.headline;
-    $('alert-area').textContent = a.area;
-    $('alert-area').hidden = a.headline.includes(a.area);
+    // The headline often names the area already; then the space shows when the alert came in.
+    $('alert-area').textContent = a.headline.includes(a.area)
+      ? `Issued ${new Date(a.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : a.area;
   }
 
   $('battery').hidden = !state.onBattery;

@@ -102,9 +102,14 @@ test('alert sets the banner with the source shown', () => {
     certainty: 'Observed', area: 'Richardson, TX', headline: 'M5.1 near Richardson',
   });
   assert.deepEqual(s.alert, {
-    source: 'USGS', event: 'Earthquake', severity: 'Severe', area: 'Richardson, TX', headline: 'M5.1 near Richardson',
+    source: 'USGS', event: 'Earthquake', severity: 'Severe', area: 'Richardson, TX', headline: 'M5.1 near Richardson', at: NOW,
   });
   assert.equal(s.status, 'PROTECTED');
+});
+
+test('alert stores when it arrived, for the banner issue time', () => {
+  const s = reduce(initialState(), { type: 'alert', source: 'nws', event: 'Heat Advisory' }, NOW);
+  assert.equal(s.alert.at, NOW);
 });
 
 test('source labels cover NOAA, NWS, USGS, GDACS and sensor', () => {

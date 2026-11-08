@@ -209,9 +209,15 @@
   }
   /* --at is the reading's place on the 50 to 100 F scale, from 0 to 1, set by app.js. */
   .scale-mark { position: absolute; left: calc(var(--at, 0) * 100%); top: 50%; width: 4px; height: calc(var(--u) * 1.3); transform: translate(-50%, -50%); border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px rgba(6, 16, 31, 0.8); }
+  body[data-link="down"] .scale { opacity: 0.35; }
   .scale-ends { display: flex; justify-content: space-between; margin-top: 0.4em; color: var(--muted); font-size: max(18px, calc(var(--u) * 0.9)); }
   .temp { font-size: calc(var(--u) * 4); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .temp small { font-size: 0.4em; color: var(--muted); font-weight: 500; }
+  /* Tall screens have room for a larger reading, raised toward the scale. Still smaller than the status word. */
+  @media (min-height: 900px) {
+    .temp { font-size: calc(var(--u) * 5); }
+    .heat-body::before { flex: 0 1 calc(var(--u) * 1.2); }
+  }
 
   .map-frame { position: relative; flex: 1 1 0; min-height: 0; margin-top: 0.4em; }
   #map { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -223,6 +229,8 @@
   .map .legend i.escalated { border: 2px solid var(--danger); background: radial-gradient(circle, var(--danger) 0 0.16em, transparent 0.19em); }
   .map .legend i.real { border: 2px solid var(--real); }
   #map image { filter: saturate(1.15) contrast(1.05); }
+  /* Offline the map must not look live: grey imagery and no sweep. */
+  body[data-link="down"] #map image { filter: saturate(0.35) brightness(0.7) contrast(1.05); }
   #map { background: #0b1a2e; border-radius: 8px; border: 1px solid rgba(77, 163, 255, 0.18); }
   .range { fill: none; stroke: rgba(255, 255, 255, 0.75); stroke-width: 1; filter: drop-shadow(0 0 1px rgba(3, 10, 22, 0.9)); }
   .range:last-of-type { stroke-dasharray: 2 3; }
@@ -231,19 +239,21 @@
   .tick.north { stroke: rgba(255, 255, 255, 0.9); stroke-width: 1.4; }
   .sweep { transform-origin: 150px 130px; animation: spin 6s linear infinite; }
   .sweep-edge { stroke: rgba(225, 240, 255, 0.5); stroke-width: 0.7; }
+  body[data-link="down"] .sweep { animation-play-state: paused; opacity: 0; }
   @keyframes spin { to { transform: rotate(360deg); } }
   /* --hud is set by fitMap in view units. Every HUD text sits on a .hud-bg box, so it needs no outline. */
-  .hud { fill: #d6ebff; font: 600 8px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.1em; font-size: var(--hud, 11px); }
+  .hud { fill: #d6ebff; font: 600 8px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.04em; font-size: var(--hud, 11px); }
   .hud.dim { fill: rgba(214, 235, 255, 0.85); }
+  .hud.ring-label { font-size: calc(var(--hud, 11px) * 0.75); }
   .hud-bg { fill: #06101f; fill-opacity: 0.85; }
-  .hud.alarm { fill: var(--danger); }
+  .hud.alarm { fill: #ff7885; }
   .hud.warn { fill: var(--warn); }
   .reticle { fill: none; stroke: var(--real); stroke-width: 1.3; filter: drop-shadow(0 0 1px #030a16) drop-shadow(0 0 1px #030a16); }
   .ring { fill: none; stroke-width: 1.6; filter: drop-shadow(0 0 1px #030a16); }
   .ring.real { stroke: var(--real); }
   .ring.escalated { stroke: var(--danger); stroke-width: 1.4; visibility: hidden; }
   body[data-status="CONTACTING_HELP"] .ring.escalated { visibility: visible; }
-  .node { fill: #f2f6fc; stroke: rgba(3, 10, 22, 0.85); stroke-width: 1.1; transition: fill 0.25s; }
+  .node { fill: #f2f6fc; stroke: rgba(3, 10, 22, 0.85); stroke-width: 1.4; transition: fill 0.25s; }
   .node.hit { fill: var(--danger); }
   .node.ok { fill: var(--ok); }
   body[data-link="down"] .node { opacity: 0.6; }
@@ -255,7 +265,7 @@
 
   footer {
     grid-column: 1 / -1; display: flex; gap: calc(var(--u) * 1.5); align-items: center;
-    color: var(--muted); font-size: max(15px, calc(var(--u) * 0.85)); letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); font-size: max(15px, calc(var(--u) * 0.85)); letter-spacing: 0.04em; text-transform: uppercase;
     padding-top: calc(var(--u) * 0.8); border-top: 1px solid var(--line); margin-top: calc(var(--u) * 0.8);
   }
   footer .spacer { flex: 1; }

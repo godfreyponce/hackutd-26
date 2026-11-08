@@ -94,6 +94,7 @@ export function reduce(state, msg, now) {
           severity: msg.severity ?? '',
           area: msg.area ?? '',
           headline: msg.headline ?? '',
+          at: now,
         },
       };
     case 'power':
