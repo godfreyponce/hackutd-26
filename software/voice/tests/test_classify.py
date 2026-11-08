@@ -14,6 +14,9 @@ TABLE = [
     ("I can’t get up", "help"),  # curly apostrophe from a transcriber
     ("I'm okay but I need help", "help"),
     ("yes help", "help"),
+    ("I need help", "help"),
+    ("call for help", "help"),
+    ("I feel helpless", "help"),
     # distress phrases (#68)
     ("I fell", "help"),
     ("I fell down", "help"),
@@ -38,6 +41,22 @@ TABLE = [
     ("cant breath", "help"),  # a transcriber may write the noun
     ("Chest  pain", "help"),  # extra space from a transcriber
     ("I'm on the  floor", "help"),
+    ("I tripped and fell", "help"),
+    ("I'm fine, I fell", "help"),
+    ("I'm lying on the bathroom floor", "help"),
+    ("ive fallen", "help"),  # no apostrophe, as a transcriber may write it
+    ("im on the floor", "help"),
+    ("I've been on the floor all night", "help"),
+    ("I'm still on the floor", "help"),
+    ("I'm lying here on the floor", "help"),
+    ("fell down the stairs", "help"),
+    ("I had fallen", "help"),
+    ("I'd fallen", "help"),
+    ("I have just fallen", "help"),
+    ("I had just fallen", "help"),
+    ("on the floor", "help"),
+    ("on the kitchen floor", "help"),
+    ("I lost my balance and fell", "help"),
     ("fellow", "no_answer"),
     # Rafael's words from pi-integration (1670e66)
     ("I'm injured", "help"),
@@ -50,6 +69,7 @@ TABLE = [
     ("I have an injury", "help"),
     ("okay, there's smoke", "help"),
     ("call nine one one", "help"),
+    ("call nine-one-one", "help"),
     ("I need a doctor", "help"),
     ("get a paramedic", "help"),
     ("my chest", "help"),
@@ -98,6 +118,9 @@ TABLE = [
     ("a chestnut", "no_answer"),
     ("I'm a smoker", "no_answer"),
     ("I faintly heard it", "no_answer"),
+    ("that was helpful", "no_answer"),
+    ("my son is helping me with the dishes", "no_answer"),
+    ("helper", "no_answer"),
     # words narrowed because a natural ok reply uses them;
     # a missed help still reaches the alarm after 3 asks
     ("my doctor said I'm fine", "ok"),
@@ -125,8 +148,26 @@ TABLE = [
     ("I fell asleep", "no_answer"),
     ("I fell asleep, I'm okay", "ok"),
     ("I've fallen asleep", "no_answer"),
+    ("I'm fine, I just fell back to sleep", "ok"),
+    ("yeah, I fell fast asleep in my chair, I'm okay", "ok"),
+    ("I'm okay, I fell sound asleep", "ok"),
+    # fell and the floor count only for a person, not a thing that fell
+    ("Oh I'm okay, a pot fell off the stove", "ok"),
+    ("I'm fine, the picture fell off the wall", "ok"),
+    ("yeah I'm okay, I dropped my glasses on the floor", "ok"),
+    ("the dog knocked the lamp on the floor", "no_answer"),
+    ("glasses on the floor", "no_answer"),
+    ("I'm fine, the bookcase shook and fell over", "ok"),
+    ("I'm okay the lamp tipped and fell", "ok"),
+    ("I'm on the ground floor", "no_answer"),
+    ("on the grounds", "no_answer"),
+    ("I'm on the grounds", "no_answer"),
+    ("just a smoke-alarm battery chirping", "no_answer"),
     # a negated answer must never become ok
     ("I'm not okay", "help"),
+    ("not good", "help"),
+    ("I'm not good", "help"),
+    ("no good", "help"),
     ("not okay", "help"),
     ("I'm not ok.", "help"),
     ("I'm not fine", "help"),
@@ -136,8 +177,8 @@ TABLE = [
     ("nope", "help"),
     ("I don't feel okay", "help"),
     # negations with no apostrophe, as a transcriber may write them.
-    # Some realistic ok replies become help, same as their apostrophe form;
-    # a false help only brings the fake alarm sooner.
+    # Some real ok replies become help, same as their apostrophe form.
+    # For a person who is fine, that false help raises a fake alarm.
     ("I cannot move", "help"),
     ("I cant stand", "help"),
     ("I dont feel good", "help"),
@@ -169,6 +210,14 @@ TABLE = [
     ("I'm alright", "ok"),
     ("I'm all right", "ok"),
     ("yep I'm good", "ok"),
+    ("I'm good", "ok"),
+    ("I am good", "ok"),
+    ("all good", "ok"),
+    ("doing good", "ok"),
+    ("I'm doing good", "ok"),
+    ("I'm all good", "ok"),
+    ("im good", "ok"),
+    ("the dog is doing good", "no_answer"),  # room chatter; a false ok ends the check-in
     # silence or unrelated speech
     ("", "no_answer"),
     ("   ", "no_answer"),
@@ -178,7 +227,6 @@ TABLE = [
     ("cantaloupe", "no_answer"),  # not "cant"
     ("wonton", "no_answer"),  # not "wont"
     ("Good boy", "no_answer"),  # a real mishearing of room chatter; "good" is not an answer
-    ("I'm good", "no_answer"),
 ]
 
 

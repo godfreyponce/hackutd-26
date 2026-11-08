@@ -6,24 +6,25 @@ Order matters: a help word wins over everything, then any negation counts as hel
 
 import re
 
+# fell and the floor count only for the speaker: "a pot fell off the stove" is no fall.
 # "fell asleep" and "fallen asleep" answer about sleep, not a fall; "slipped my mind" is no slip.
-# Word edges keep "painting", "fireplace", "Chester" and "smoker" out.
+# Word edges keep "helpful", "painting", "fireplace", "Chester" and "smoker" out.
 # doctor, breathe, call, blood and a fire or smoke alarm or detector are narrowed: an ok
 # reply uses them ("my doctor said I'm fine"), and a missed help still reaches the alarm
 # after 3 asks.
 HELP = re.compile(
-    r"\b(help|hurt|emergency|ambulance|bleed|injur(ed|y)|paramedic|dizzy"
+    r"\b(help(less)?\b|hurt|emergency|ambulance|bleed|injur(ed|y)|paramedic|dizzy"
     r"|(can ?not|can't|cant|can barely|can hardly) (get up|breathe?)"
-    r"|(fell|fallen)\b(?! (back )?asleep)"
-    r"|on the ((kitchen|bathroom) )?(floor|ground)"
+    r"|(^|i('?ve|'?d| have| had)? (\w+ )?|i [^,.!?]* and )(fell|fallen)\b(?! (back |fast |sound |right )?(asleep|to sleep))"
+    r"|(^|(i'?m|i am|been|lying|laying|down)( \w+)? )on the ((kitchen|bathroom) )?(floor|ground)\b(?! floor)"
     r"|(had a fall|heart attack|trouble breathing|hard to breathe?|short(ness)? of breath|hit my head)\b"
     r"|i('ve| have)? (just )?slipped\b(?! my mind| up| out)"
     r"|(need|get|call) (a |the |my )?doctors?\b"
-    r"|(fires?|smoke)\b(?! alarm| detector)"
+    r"|(fires?|smoke)\b(?![ -](alarm|detector))"
     r"|blood\b(?! pressure| sugar)"
     r"|(pain(s|ed|ful|killers?)?|chest|faint(s|ed|ing)?|trapped"
     r"|firefighters?|fire(man|men)|smok(ed|es|ey))\b"
-    r"|(911|9-1-1|9 1 1|nine one one)\b|call (someone|somebody)|save me)"
+    r"|(911|9-1-1|9 1 1|nine[ -]one[ -]one)\b|call (someone|somebody)|save me)"
 )
 # cant, dont ... aint: -n't words as a transcriber may write them, with no apostrophe.
 NEGATION = re.compile(
@@ -31,7 +32,7 @@ NEGATION = re.compile(
     r"|cant|dont|wont|didnt|doesnt|isnt|wasnt|arent|werent"
     r"|couldnt|wouldnt|shouldnt|havent|hasnt|hadnt|aint)\b|n't\b"
 )
-OK = re.compile(r"\b(yes|yeah|yep|yup|okay|ok|fine|alright|all right)\b")
+OK = re.compile(r"\b(yes|yeah|yep|yup|okay|ok|fine|alright|all right|(i'?m|i am)( doing| all)? good|^(all|doing) good)\b")
 
 
 def classify(transcript: str | None) -> str:
