@@ -3,6 +3,7 @@ import { rankHomes, applyRerank, queueMessage, DEVICE_WEIGHT } from './rank.js';
 import { PACE, MAX_TRIES, nextAttempts, coverageSweep, answerFor } from './sim.js';
 import { initialBox, applyBoxEvent, boxRankInput } from './box.js';
 import { connectBus, hubUrl } from './bus.js';
+import { panelValues } from './panel.js';
 import { initialCamera, cameraEvent, viewAt, arrivalAt, flying } from './camera.js';
 import { PALETTE, loadBasemap, drawGlobe, drawCity, drawRedRoads, drawRoadLabels } from './basemap.js';
 
@@ -67,6 +68,7 @@ let alertHtml;
 let alertLevel;
 let cam;
 let boxAlarmed = false;
+let hub = 'connecting';
 
 function freshSim() {
   return new Map(
@@ -270,6 +272,8 @@ const bus = connectBus(hubUrl(location.search), {
     if (status !== 'connecting') {
       document.body.dataset.hub = status;
       $('legend-idle').textContent = status === 'offline' ? 'Unknown' : 'Not hit';
+      hub = status;
+      renderBox();
     }
     $('hub-text').textContent =
       status === 'connected' ? 'Hub connected' : status === 'offline' ? 'Hub offline, retrying' : 'Connecting to hub';
@@ -364,14 +368,13 @@ function renderCounters() {
     if (s.no_answer > 0 && !s.answered_ok && !s.said_help) noAnswer += 1;
     if (statusOf(h.id) === 'escalated') escalated += 1;
   }
-  setText('c-hit', hit);
-  setText('c-checked', checked);
-  setText('c-noanswer', noAnswer);
-  setText('c-escalated', escalated);
-  setText('c-attempts', attempts);
-  setText('c-forced', forced);
+  const text = panelValues(
+    { 'c-hit': hit, 'c-checked': checked, 'c-noanswer': noAnswer, 'c-escalated': escalated, 'c-attempts': attempts, 'c-forced': forced },
+    hub,
+  );
+  for (const [id, t] of Object.entries(text)) setText(id, t);
   for (const [id, n] of [['c-hit', hit], ['c-checked', checked], ['c-noanswer', noAnswer], ['c-escalated', escalated]]) {
-    $(id).parentElement.classList.toggle('zero', n === 0);
+    $(id).parentElement.classList.toggle('zero', hub === 'offline' || n === 0);
   }
 }
 
@@ -379,15 +382,25 @@ const CHECKIN_LABEL = { asking: 'Asking', ok: 'Okay', help: 'Said help', no_answ
 const ANSWER_LABEL = { ok: 'Okay', help: 'Help', no_answer: 'No answer' };
 const PRESENCE_LABEL = { moving: 'Moving', still: 'Still', none: 'Nobody detected' };
 
-function renderBox() {
-  setText('b-presence', PRESENCE_LABEL[box.presence] ?? box.presence);
+function checkinText() {
   const showTry = box.try && ['asking', 'no_answer', 'alarm'].includes(box.checkin);
-  setText('b-checkin', box.checkin ? `${CHECKIN_LABEL[box.checkin] ?? box.checkin}${showTry ? `, try ${box.try}` : ''}` : 'None yet');
-  setText('b-heard', box.heard ? `${ANSWER_LABEL[box.heard.answer] ?? box.heard.answer}${box.heard.transcript ? `: "${box.heard.transcript}"` : ''}` : 'None yet');
-  setText('b-power', `${box.power === 'battery' ? 'Battery' : 'Mains'}${box.battery_pct != null ? `, ${box.battery_pct}%` : ''}`);
+  return box.checkin ? `${CHECKIN_LABEL[box.checkin] ?? box.checkin}${showTry ? `, try ${box.try}` : ''}` : 'None yet';
+}
+
+function renderBox() {
   const idx = shown.findIndex((r) => r.id === REAL_BOX_ID);
-  setText('b-rank', idx < 0 ? 'Not hit' : `#${idx + 1} of ${shown.length}`);
-  setText('b-harm', idx < 0 ? 'None yet' : `${shown[idx].harm_min} min`);
+  const text = panelValues(
+    {
+      'b-presence': PRESENCE_LABEL[box.presence] ?? box.presence,
+      'b-checkin': checkinText(),
+      'b-heard': box.heard ? `${ANSWER_LABEL[box.heard.answer] ?? box.heard.answer}${box.heard.transcript ? `: "${box.heard.transcript}"` : ''}` : 'None yet',
+      'b-power': `${box.power === 'battery' ? 'Battery' : 'Mains'}${box.battery_pct != null ? `, ${box.battery_pct}%` : ''}`,
+      'b-rank': idx < 0 ? 'Not hit' : `#${idx + 1} of ${shown.length}`,
+      'b-harm': idx < 0 ? 'None yet' : `${shown[idx].harm_min} min`,
+    },
+    hub,
+  );
+  for (const [id, t] of Object.entries(text)) setText(id, t);
   let note = '';
   if (box.alarm) note = 'Alarm raised by the agent. Demo only, no real call.';
   else if (box.said_help) note = 'Said help. Escalated to the top.';
@@ -879,7 +892,7 @@ function renderOverlays(now, cityA) {
   if (el.hidden === show) el.hidden = !show;
   if (!show) return;
   let title = 'H000, the real box';
-  let text = `Presence: ${PRESENCE_LABEL[box.presence] ?? box.presence}. Check-in: ${$('b-checkin').textContent}.`;
+  let text = `Presence: ${PRESENCE_LABEL[box.presence] ?? box.presence}. Check-in: ${checkinText()}.`;
   if (boxAlarmed) {
     title = box.said_help ? 'Said help' : 'No response after an event';
     text = box.alarm ? 'Alarm raised by the agent. Demo only, no real call.' : 'Escalated to the top.';
