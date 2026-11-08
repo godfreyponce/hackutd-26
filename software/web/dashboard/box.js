@@ -65,7 +65,8 @@ export function applyBoxEvent(state, msg, now) {
       if (msg.state === 'asking' && msg.try === 1 && !s.alarm) {
         return { ...s, answered_ok: false, no_answer: 0, said_help: false, heard: null };
       }
-      if (msg.state === 'clear') return { ...s, alarm: false, said_help: false, no_answer: 0 };
+      // With no alarm or help raised, a clear keeps the no-answer count, so a check-in nobody answered still shows it.
+      if (msg.state === 'clear' && (s.alarm || s.said_help)) return { ...s, alarm: false, said_help: false, no_answer: 0 };
       return s;
     }
     default:

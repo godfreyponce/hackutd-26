@@ -75,6 +75,13 @@ test('a new event after a check-in ends starts a new entry, even one that ended 
   assert.equal(h.checkins[2].open, true);
 });
 
+test('a clear that ends a check-in nobody answered keeps it at no response', () => {
+  const h = run({ type: 'quake', peak_g: 0.8 }, asking(1), checkin('no_answer', 1), checkin('clear', 1));
+  assert.equal(h.checkins.length, 1);
+  assert.equal(h.checkins[0].state, 'no_answer');
+  assert.equal(h.checkins[0].open, false);
+});
+
 test('a check-in state with no entry open starts one, so a mid-run page load still logs it', () => {
   const h = run(checkin('no_answer', 2));
   assert.equal(h.checkins.length, 1);

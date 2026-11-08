@@ -2,7 +2,8 @@
 
 export const TRACE_WINDOW_MS = 60_000;
 
-// Higher rank wins until checkin ok/clear, a new check-in's first ask, or reset, so a re-ask never hides an alarm.
+// Higher rank wins until checkin ok/clear, a new check-in's first ask, an event after an ended check-in, or reset,
+// so a re-ask never hides an alarm.
 const RANK = { PROTECTED: 0, CHECKING_IN: 1, NO_RESPONSE: 2, CONTACTING_HELP: 3 };
 
 const CHECKIN_STATUS = {
@@ -37,6 +38,7 @@ export function initialState() {
     home: 'idle', // node map dot: idle (white), hit (red), ok (green)
     helpSign: false, // the camera saw the HELP sign in this check-in
     trigger: null, // the first event since the last checkin message: the one the agent starts its next check-in on
+    ended: false, // the check-in ended at NO_RESPONSE: nobody seen, no answer, no alarm
   };
 }
 
@@ -75,12 +77,12 @@ export function sourceLabel(source) {
   return Object.hasOwn(SOURCE_LABELS, source) ? SOURCE_LABELS[source] : String(source ?? '').toUpperCase();
 }
 
-export function statusText(status, { alert = false, linked = true, helpSign = false } = {}) {
+export function statusText(status, { alert = false, linked = true, helpSign = false, ended = false } = {}) {
   switch (status) {
     case 'CHECKING_IN':
       return { word: 'CHECKING IN', detail: `${helpSign ? 'Help sign seen' : 'Event detected'}. Asking if you are okay.` };
     case 'NO_RESPONSE':
-      return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.' };
+      return { word: 'NO RESPONSE', detail: ended ? 'Nobody seen at home. No alarm.' : 'No response after an event. Asking again.' };
     case 'CONTACTING_HELP':
       return {
         word: 'CONTACTING HELP',
@@ -97,27 +99,33 @@ function raise(state, status) {
   return RANK[status] > RANK[state.status] ? status : state.status;
 }
 
+// After an ended check-in the agent starts a new one on the next event, so the screen leaves NO_RESPONSE.
 function onEvent(state, kind, extra = {}) {
-  return { ...state, status: raise(state, 'CHECKING_IN'), home: 'hit', trigger: state.trigger ?? kind, ...extra };
+  const status = state.ended ? 'CHECKING_IN' : raise(state, 'CHECKING_IN');
+  return { ...state, status, ended: false, home: 'hit', trigger: state.trigger ?? kind, ...extra };
 }
 
 function onCheckin(state, msg) {
   const tryNum = msg.try ?? state.tryNum;
   if (msg.state === 'ok' || msg.state === 'clear') {
-    return { ...state, status: 'PROTECTED', tryNum: null, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false, trigger: null };
+    // With nobody there, the agent sends clear right after a no answer. The check-in is over, but nobody said they were okay.
+    if (msg.state === 'clear' && state.status === 'NO_RESPONSE') {
+      return { ...state, ended: true, tryNum: null, helpSign: false, trigger: null };
+    }
+    return { ...state, status: 'PROTECTED', ended: false, tryNum: null, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false, trigger: null };
   }
   const status = CHECKIN_STATUS[msg.state];
   if (!status) return state;
   // The agent sends asking try 1 only to start a check-in or for the stand-up re-ask after an alarm
-  // (software/agent/checkin.py _speak). A check-in that ended at no response with no alarm sends no end message.
+  // (software/agent/checkin.py _speak). Its status reset also covers a check-in whose clear this screen missed.
   if (msg.state === 'asking' && msg.try === 1) {
     const standup = state.status === 'CONTACTING_HELP';
     return {
-      ...state, status: standup ? state.status : status, tryNum, heard: null, home: 'hit', trigger: null,
+      ...state, status: standup ? state.status : status, ended: false, tryNum, heard: null, home: 'hit', trigger: null,
       helpSign: standup ? state.helpSign : state.trigger === 'help_gesture',
     };
   }
-  return { ...state, status: raise(state, status), tryNum, home: 'hit', trigger: null };
+  return { ...state, status: raise(state, status), ended: false, tryNum, home: 'hit', trigger: null };
 }
 
 export function reduce(state, msg, now) {
@@ -228,8 +236,8 @@ function logAlert(h, msg, now) {
   });
 }
 
-// A check-in entry ends on ok or clear. A first ask after a new event starts a new entry, so a check-in
-// that ended with no response (nobody there, no alarm) is not merged into the next one.
+// A check-in entry ends on ok or clear. A clear after a no answer with no alarm (nobody there) ends the entry
+// at no response, since nobody said they were okay.
 function logCheckin(h, msg, now) {
   const [open, ...rest] = h.checkins;
   const sent = typeof msg.try === 'number' ? msg.try : 1;
@@ -238,7 +246,8 @@ function logCheckin(h, msg, now) {
   // After an okay to the stand-up question the agent sends clear at once (software/agent/checkin.py _apply_rule).
   const clearsLastOk = msg.state === 'clear' && open?.state === 'ok';
   // The agent ignores events while its check-in is open, which includes after the alarm until ok or clear.
-  // Only a check-in left at no response with no alarm has ended for the agent.
+  // A check-in left at no response with no alarm, then a first ask after a new event, means the agent ended it,
+  // even if this screen missed its clear.
   const replaced = open?.state === 'no_answer' && !open.escalated && msg.state === 'asking' && tries === 1 && h.trigger && h.trigger.at > open.updatedAt;
   const fresh = !clearsLastOk && (!open?.open || replaced);
   if (fresh) {
@@ -247,8 +256,9 @@ function logCheckin(h, msg, now) {
     };
     return { ...h, trigger: null, checkins: push(h.checkins, { ...entry, open: !['ok', 'clear'].includes(msg.state) }) };
   }
+  const endsUnanswered = msg.state === 'clear' && open.state === 'no_answer' && !open.escalated;
   const entry = {
-    ...open, state: msg.state, tries: Math.max(open.tries, tries), updatedAt: now, open: !['ok', 'clear'].includes(msg.state),
+    ...open, state: endsUnanswered ? open.state : msg.state, tries: Math.max(open.tries, tries), updatedAt: now, open: !['ok', 'clear'].includes(msg.state),
     escalated: open.escalated || ESCALATED.includes(msg.state),
   };
   // The agent ignores events while a check-in runs, so one that came in meanwhile started nothing.

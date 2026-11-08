@@ -462,6 +462,7 @@ class Agent:
             await self.trace("VERIFY", f"Rule: {who} + {answer}. The alarm stays up.")
         elif verdict == rule.NO_ALARM:
             inc.outcome = "no_alarm"
+            await self.send({"type": "checkin", "state": "clear", "try": try_n})
             await self.trace("VERIFY", "Rule: nobody detected + no answer = no alarm.")
         elif answer == "help":
             await self._alarm_due(inc, turn, "the answer was help")
