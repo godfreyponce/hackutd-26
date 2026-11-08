@@ -141,9 +141,6 @@
     font-size: var(--word-fs); line-height: var(--word-fs); font-weight: 800; letter-spacing: 0.03em;
     color: var(--status); margin: calc(var(--word-fs) * 0.12) 0 calc(var(--word-fs) * 0.15); white-space: nowrap;
   }
-  /* Cap each word to the space right of the shield. CONTACTING HELP measures 9.2 to 9.28 em at its tighter tracking
-     (the others at most 7.2 em), and keeps 0.6u free before the column edge. */
-  body[data-status="CONTACTING_HELP"] .word { font-size: min(calc(var(--u) * var(--word-u)), calc((100cqi - var(--shield-w) - var(--hero-gap) - var(--u) * 0.6) / 9.3)); letter-spacing: 0.005em; }
   body[data-status="PROTECTED"]:not([data-link="down"]) .word { color: var(--text); }
   body[data-status="CONTACTING_HELP"] .word { color: #ff5969; }
   .detail { font-size: max(24px, calc(var(--u) * 1.6)); }
@@ -157,6 +154,8 @@
   /* With the banner up the cards need the room, so the hidden note gives up its box and the hero its top padding. */
   main:has(> .banner:not([hidden])) .note[hidden] { display: none; }
   main:has(> .banner:not([hidden])) .hero { padding-top: calc(var(--u) * 0.5); }
+  /* While the box asks, the note tells the person what to say, in a calm look: the red pill is for the alarm. */
+  body:is([data-status="CHECKING_IN"], [data-status="NO_RESPONSE"]) .note { background: none; border-color: transparent; color: var(--muted); padding-left: 0; padding-right: 0; }
   body[data-status="CONTACTING_HELP"] .shield { animation: pulse 1.2s ease-in-out infinite; }
   @keyframes pulse {
     0%, 100% { filter: drop-shadow(0 0 calc(var(--u) * 0.15) var(--status)); }
@@ -281,12 +280,14 @@
     #temp { grid-area: temp; margin: 0; font-size: calc(var(--u) * 3); }
     #heat-msg { grid-area: msg; align-self: center; }
     #heat-at { grid-area: at; }
-    /* Option E: tighter vertical spacing, so CONTACTING HELP with the banner and a two-line quote still fits. */
+    /* Option E: tighter vertical spacing, so DEMO ALARM with the banner and a two-line quote still fits. */
     .app { padding-top: calc(var(--u) * 0.7); padding-bottom: calc(var(--u) * 0.7); }
     header { padding-bottom: calc(var(--u) * 0.6); }
     main { padding-top: calc(var(--u) * 0.8); row-gap: calc(var(--u) * 0.6); }
     .hero, main:has(> .banner:not([hidden])) .hero { padding-top: calc(var(--u) * 0.25); padding-bottom: calc(var(--u) * 0.25); }
     .convo { padding: calc(var(--u) * 0.4) 0; }
+    /* With the banner up a shown hint would add a line the cards need. */
+    body:is([data-status="CHECKING_IN"], [data-status="NO_RESPONSE"]) main:has(> .banner:not([hidden])) .note { display: none; }
   }
 
   .map-frame { position: relative; flex: 1 1 0; min-height: 0; margin-top: 0.4em; }
@@ -486,7 +487,7 @@
         <div><div class="card-title">Neighborhood</div><div class="card-sub" id="map-sub">All homes quiet</div></div>
       </div>
       <div class="map-frame"><svg id="map" viewBox="0 0 300 260" aria-label="Neighborhood node map"></svg></div>
-      <div class="legend"><span><i class="not-hit" style="background:#f4f7fa"></i><span id="legend-not-hit">Not hit</span></span><span><i style="background:var(--danger)"></i>Hit, no answer</span><span><i style="background:var(--ok)"></i>Okay</span><span><i class="escalated"></i>Escalated</span><span><i class="real"></i>Real box</span></div>
+      <div class="legend"><span><i class="not-hit" style="background:#f4f7fa"></i><span id="legend-not-hit">Not hit</span></span><span><i style="background:var(--danger)"></i>Hit</span><span><i style="background:var(--ok)"></i>Okay</span><span><i class="escalated"></i>Escalated</span><span><i class="real"></i>Real box</span></div>
     </section>
 
     <div class="cards">
@@ -501,7 +502,7 @@
       <section class="card">
         <div class="card-head">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 14V4a2 2 0 1 1 4 0v10a4 4 0 1 1-4 0z"/><path d="M12 9v7"/></svg>
-          <div><div class="card-title">Heat</div><div class="card-sub">Indoor temperature</div></div>
+          <div><div class="card-title">Heat</div><div class="card-sub" id="heat-kind">Indoor temperature</div></div>
         </div>
         <div class="heat-body">
           <div class="scale" aria-hidden="true">

@@ -1,4 +1,4 @@
-import { initialState, reduce, statusText, activeAlert, alertChip, TRACE_WINDOW_MS, initialHistory, record } from './state.js';
+import { initialState, reduce, statusText, questionOpen, tryAnswered, activeAlert, alertChip, TRACE_WINDOW_MS, initialHistory, record, tryText, heardChip } from './state.js';
 import { HOME_COUNT } from '../dashboard/homes.js';
 import { renderAlerts } from './views/alerts.js';
 import { renderDisasters } from './views/disasters.js';
@@ -241,14 +241,14 @@ function renderMap() {
   hudHit.classList.toggle('alarm', connected && hit > 0 && state.status !== 'PROTECTED');
   hudHit.classList.toggle('warn', !connected);
   hudEscalated.style.visibility = escalated ? '' : 'hidden';
-  hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
+  hudLive.textContent = connected ? 'DEMO' : 'NO LINK';
   hudLive.classList.toggle('warn', !connected);
   $('legend-not-hit').textContent = connected ? 'Not hit' : 'Unknown';
   placeHud();
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
   // One line in every state, so the map below never moves when the text changes.
   $('map-sub').textContent = !connected ? 'No live data'
-    : state.areaHit ? (hit === total ? `Quake hit all ${total} nearby` : `Quake hit ${hit} of ${total} nearby`) : homeNote ? `${homeNote}.` : 'All homes quiet';
+    : `Simulated neighbors. ${state.areaHit ? (hit === total ? `Quake hit all ${total}.` : `Quake hit ${hit} of ${total}.`) : homeNote ? `${homeNote}.` : 'All quiet.'}`;
 }
 
 // ---------- seismic trace ----------
@@ -382,13 +382,12 @@ function renderQuake() {
 
 // ---------- the rest ----------
 
-const ANSWERS = { ok: 'I\'m okay', help: 'Help', no_answer: 'No answer' };
 const timeOf = (at) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 function render() {
   const a = activeAlert(state, Date.now());
   shownAlert = a;
-  const { word, detail, note } = statusText(state.status, { alert: Boolean(a), linked: connected, helpSign: state.helpSign, ended: state.ended });
+  const { word, detail, note } = statusText(state.status, { alert: Boolean(a), linked: connected, helpSign: state.helpSign, ended: state.ended, questionOpen: questionOpen(state), tryNum: state.tryNum, answered: tryAnswered(state) });
   document.body.dataset.status = state.status;
   document.body.dataset.link = connected ? 'up' : 'down';
   $('word').textContent = word;
@@ -397,12 +396,12 @@ function render() {
   $('note').textContent = note ?? '\u00a0'; // one blank line keeps the hidden note's height
 
   $('say').textContent = state.say ? `"${state.say.text}"` : connected ? 'No prompt yet' : 'Prompt unavailable';
-  $('say-try').textContent = state.say?.tryNum ? `try ${state.say.tryNum}` : '';
+  $('say-try').textContent = tryText(state.say?.tryNum);
   const heard = state.heard;
   $('heard').textContent = heard ? (heard.transcript ? `"${heard.transcript}"` : '') : connected ? 'No reply yet' : 'Reply unavailable';
   $('heard-chip').hidden = !heard;
   $('heard-chip').className = `chip ${heard?.answer ?? ''}`;
-  $('heard-chip').textContent = heard ? ANSWERS[heard.answer] ?? heard.answer : '';
+  $('heard-chip').textContent = heardChip(heard, state.status);
 
   $('banner').hidden = !a;
   $('alert-count').hidden = !a;
@@ -424,9 +423,12 @@ function render() {
   // With no reading the gauge still shows an empty value at full size, so the card keeps its shape.
   // The dash stands alone: a dash before the unit reads as a negative temperature.
   $('temp').innerHTML = state.indoorF == null ? '<span class="no-reading">\u2013</span>' : `${Math.round(state.indoorF)}<small> &deg;F</small>`;
+  // Only the box's own sensor sends a real reading. Without one the value is the dashboard's fixed H000 profile.
+  const simulatedHeat = state.indoorF != null && !state.indoorLive;
+  $('heat-kind').textContent = simulatedHeat ? 'Indoor temperature, simulated' : 'Indoor temperature';
   $('heat-msg').textContent = !connected ? `${state.indoorF == null ? '' : 'Last known reading. '}No live heat data`
-    : a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : state.indoorF == null ? 'No reading yet' : 'No heat alerts';
-  $('heat-at').hidden = state.indoorAt == null;
+    : a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : state.indoorF == null ? 'No reading yet' : simulatedHeat ? 'Simulated reading' : 'No heat alerts';
+  $('heat-at').hidden = state.indoorAt == null || simulatedHeat;
   $('heat-at').textContent = state.indoorAt == null ? '' : `Updated ${timeOf(state.indoorAt)}`;
 
   $('hub').classList.toggle('bad', !connected);

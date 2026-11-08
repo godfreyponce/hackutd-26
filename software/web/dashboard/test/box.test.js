@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialBox, applyBoxEvent, boxRankInput, STALE_MS } from '../box.js';
+import { initialBox, applyBoxEvent, boxRankInput, STALE_MS, checkinText, heardText, boxNote } from '../box.js';
 import { generateHomes } from '../homes.js';
 import { rankHomes } from '../rank.js';
 
@@ -142,7 +142,48 @@ test('the alarm after 3 asks is not counted as a 4th try', () => {
     { type: 'checkin', state: 'no_answer', try: n },
   ]);
   const s = run([...asks, { type: 'checkin', state: 'alarm', try: 4 }]);
-  assert.equal(s.try, 3, 'the box panel prints this as "Alarm, try N"');
+  assert.equal(s.try, 3, 'the box panel prints this as "Alarm after 3 tries"');
   const late = applyBoxEvent(s, { type: 'heard', answer: 'no_answer', transcript: '' }, 0);
   assert.equal(late.no_answer, 3);
+});
+
+const ask = (n) => [{ type: 'checkin', state: 'asking', try: n }];
+const miss = (n) => [{ type: 'heard', answer: 'no_answer', transcript: '' }, { type: 'checkin', state: 'no_answer', try: n }];
+const texts = (s) => [checkinText(s), heardText(s), boxNote(s)];
+
+test('the card names the try out of 3, and Last answer names the try it missed', () => {
+  assert.deepEqual(texts(run(ask(1))), ['Asking, try 1 of 3', 'None yet', '']);
+  assert.deepEqual(texts(run([...ask(1), ...miss(1)])), ['No answer, try 1', 'No answer, try 1', 'No answer on try 1.']);
+  assert.deepEqual(texts(run([...ask(1), ...miss(1), ...ask(2)])), ['Asking, try 2 of 3', 'No answer, try 1', 'No answer on try 1. Asking again.']);
+  const alarm = run([...ask(1), ...miss(1), ...ask(2), ...miss(2), ...ask(3), ...miss(3), { type: 'checkin', state: 'alarm', try: 4 }]);
+  assert.deepEqual(texts(alarm), ['Alarm after 3 tries', 'No answer', 'Demo alarm. A fixed rule raised it.']);
+});
+
+test('a miss on try 3 heard before its checkin no_answer never says asking again', () => {
+  const s = run([...ask(1), ...miss(1), ...ask(2), ...miss(2), ...ask(3), miss(3)[0]]);
+  assert.equal(s.checkin, 'asking');
+  assert.equal(boxNote(s), 'No answer on try 3.');
+});
+
+test('an alarm seen without its tries, after a dashboard reload, says Alarm', () => {
+  assert.equal(checkinText(run([{ type: 'checkin', state: 'alarm', try: 4 }])), 'Alarm');
+});
+
+test('okay and help answers carry no try', () => {
+  const ok = run([...ask(2), { type: 'heard', answer: 'ok', transcript: "I'm okay" }, { type: 'checkin', state: 'ok', try: 2 }]);
+  assert.deepEqual([checkinText(ok), heardText(ok)], ['Okay', 'Okay: "I\'m okay"']);
+  const help = run([...ask(1), { type: 'heard', answer: 'help', transcript: 'help' }, { type: 'checkin', state: 'help', try: 1 },
+    { type: 'checkin', state: 'alarm', try: 2 }]);
+  assert.deepEqual(texts(help), ['Alarm, said help', 'Help: "help"', 'Demo alarm. A fixed rule raised it.']);
+});
+
+test('the stand-up re-ask under an alarm shows no bare try, then clears', () => {
+  const alarm = run([...ask(3), ...miss(3), { type: 'checkin', state: 'alarm', try: 4 }]);
+  const reask = applyBoxEvent(alarm, ask(1)[0], 0);
+  assert.deepEqual(texts(reask), ['Alarm, asking again', 'No answer', 'Demo alarm. A fixed rule raised it.']);
+  const missed = miss(1).reduce((s, m) => applyBoxEvent(s, m, 0), reask);
+  assert.deepEqual(texts(missed), ['Alarm, no answer', 'No answer', 'Demo alarm. A fixed rule raised it.']);
+  const okay = [{ type: 'heard', answer: 'ok', transcript: 'okay' }, { type: 'checkin', state: 'ok', try: 1 }, { type: 'checkin', state: 'clear', try: 1 }]
+    .reduce((s, m) => applyBoxEvent(s, m, 0), reask);
+  assert.deepEqual(texts(okay), ['Cleared', 'Okay: "okay"', '']);
 });
