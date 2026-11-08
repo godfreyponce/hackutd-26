@@ -80,10 +80,10 @@ Hosted Nemotron planner and Safety Guard, real key, one run at a time, paced to 
 - 90 of 90 runs made the right call. 87 of 90 were planned by hosted Nemotron end to end.
 - After "Help": alarm on screen 5.1 s median from the event (worst 7.0 s).
 - No answer 3 times: alarm on the 3rd miss, 5.1 s median from the event (worst 9.0 s).
-- 3 runs had a fallback, all still right:
+- 3 runs were not planned by Nemotron end to end. All 3 still made the right call:
   - One hosted planner turn got no reply in 20 s, and the fixed script finished the check-in. Alarm on the 3rd miss at 23.8 s.
   - One hand-off "why" got no reply in 20 s and used the template.
-  - One planner call was refused by code.
+  - In one run, code refused a planner call (no fallback).
 - Safety Guard: 56 safe, 2 unsafe (withheld from the planner), 2 unreachable. The decision uses the classified answer, so it was right in all of them.
 
 | Case | Right call | Planned by Nemotron end to end | First ask median / worst | Alarm median / worst | Nemotron plans | Runs with a fallback | Code overrides / refused calls | Wrong ask line | Safety Guard safe / unsafe / unreachable | Reply to rule median / worst |
