@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Home</title>
+<link rel="icon" href="../brand/land-favicon-16.svg" type="image/svg+xml">
 <style>
   :root {
     --bg: #06101f;
@@ -51,7 +52,7 @@
     border-bottom: 1px solid var(--line);
   }
   .brand { display: flex; align-items: center; gap: calc(var(--u) * 0.8); }
-  .brand svg { width: calc(var(--u) * 3.2); height: calc(var(--u) * 3.2); }
+  .brand .mark { width: calc(var(--u) * 3.2); height: calc(var(--u) * 3.2); }
   .brand-name { font-size: calc(var(--u) * 1.7); font-weight: 700; letter-spacing: 0.04em; }
   .brand-sub { color: var(--muted); font-size: max(16px, calc(var(--u) * 0.95)); }
   .divider { width: 1px; align-self: stretch; background: var(--line); }
@@ -312,11 +313,7 @@
 <div class="app">
   <header>
     <div class="brand">
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <rect x="2" y="2" width="44" height="44" rx="11" fill="#0f2a52" stroke="#4da3ff" stroke-width="2"/>
-        <path d="M10 24 L24 12 L38 24 V37 H10 Z" fill="none" stroke="#e8f0fb" stroke-width="2.5" stroke-linejoin="round"/>
-        <path d="M13 29 H19 L22 23 L26 34 L29 27 H35" fill="none" stroke="#3ddc84" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <img class="mark" src="../brand/land-mark-white.svg" alt="">
       <div>
         <div class="brand-name" id="product-name"></div>
         <div class="brand-sub">Home safety monitor</div>
