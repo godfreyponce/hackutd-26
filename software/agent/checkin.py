@@ -13,7 +13,7 @@ from datetime import datetime
 from . import rule
 from .handoff import HandoffWriter, build_facts
 from .planner import LLMPlanner, PlannerUnavailable, ScriptPlanner
-from .scripts import (ALARM_CALL_TEXT, ALERT_ASK_SCRIPT, ALERT_DEMO_SCRIPT, ASK_SCRIPTS, DEMO_TEXT,
+from .scripts import (ALARM_CALL_TEXT, ALERT_ASK_SCRIPT, ALERT_DEMO_SCRIPT, ALERT_TONE, ASK_SCRIPTS, DEMO_TEXT,
                       ESCALATE_SCRIPT, GESTURE_ASK_SCRIPT, REPLY_SCRIPTS, RETRY_SCRIPTS, SCRIPTS, SMS_TEMPLATES,
                       STANDUP_SCRIPT)
 
@@ -378,9 +378,15 @@ class Agent:
             inc.heard.get_nowait()
         inc.pending = sid
         await self.send({"type": "checkin", "state": "asking", "try": try_n})
-        if try_n == 1 and inc.goal == "checkin" and inc.alert and inc.alert.get("demo"):
-            await self.send({"type": "say", "script_id": ALERT_DEMO_SCRIPT, "text": SCRIPTS[ALERT_DEMO_SCRIPT]})
-        await self.send({"type": "say", "script_id": sid, "text": SCRIPTS[sid], "listen_s": self.settings.listen_s})
+        alert_opening = try_n == 1 and inc.goal == "checkin" and inc.alert
+        lines = []
+        if alert_opening and inc.alert.get("demo"):
+            lines.append({"type": "say", "script_id": ALERT_DEMO_SCRIPT, "text": SCRIPTS[ALERT_DEMO_SCRIPT]})
+        lines.append({"type": "say", "script_id": sid, "text": SCRIPTS[sid], "listen_s": self.settings.listen_s})
+        if alert_opening:
+            lines[0]["tone"] = ALERT_TONE
+        for line in lines:
+            await self.send(line)
         return {"spoken": sid, "try": try_n}
 
     async def _speak_reply(self, inc, turn, sid):
