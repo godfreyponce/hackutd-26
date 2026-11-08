@@ -101,7 +101,7 @@ export function heardText(s) {
 export function boxNote(s) {
   if (s.alarm) return 'Demo alarm. A fixed rule raised it.';
   if (s.said_help) return 'Said help. Escalated to the top.';
-  if (s.no_answer > 0) return `No answer on try ${s.no_answer}.${s.checkin === 'asking' ? ' Asking again.' : ''}`;
+  if (s.no_answer > 0) return `No answer on try ${s.no_answer}.${s.checkin === 'asking' && s.try > s.no_answer ? ' Asking again.' : ''}`;
   return '';
 }
 

@@ -358,9 +358,29 @@ test('a missed stand-up answer under the alarm shows no try on HEARD', () => {
   assert.equal(heardChip(s.heard, s.status), 'No answer');
 });
 
+const hint = (s) => statusText(s.status, { ended: s.ended, tryNum: s.tryNum }).note;
+
 test('while the box asks, the note tells the person what to say; an ended check-in and PROTECTED show none', () => {
-  assert.equal(statusText('CHECKING_IN').note, 'Say "okay" or "help".');
-  assert.equal(statusText('NO_RESPONSE').note, 'Say "okay" or "help".');
-  assert.equal(statusText('NO_RESPONSE', { ended: true }).note, undefined);
-  assert.equal(statusText('PROTECTED').note, undefined);
+  assert.equal(hint(run(quake, asking(1))), 'Say "okay" or "help".');
+  assert.equal(hint(run(quake, asking(1), noAnswer(1))), 'Say "okay" or "help".');
+  assert.equal(hint(run(quake, asking(2), noAnswer(2))), 'Say "okay" or "help".');
+  assert.equal(hint(run(...ended)), undefined);
+  assert.equal(hint(run()), undefined);
+});
+
+test('before the first ask of a check-in no note tells the person to answer', () => {
+  assert.equal(hint(run(quake)), undefined);
+  assert.equal(hint(run(...ended, quake)), undefined);
+});
+
+test('after a miss on the last try the screen neither asks for an answer nor says it is asking again', () => {
+  const s = run(quake, asking(3), missed, noAnswer(3));
+  assert.equal(s.status, 'NO_RESPONSE');
+  assert.deepEqual(statusText(s.status, { tryNum: s.tryNum }), { word: 'NO RESPONSE', detail: 'No response after an event.' });
+});
+
+test('a nobody-home end clears the try on the prompt row', () => {
+  const s = run(quake, asking(1), { type: 'say', text: 'Are you okay?' }, missed, noAnswer(1), clear);
+  assert.equal(s.say.text, 'Are you okay?');
+  assert.equal(tryText(s.say.tryNum), '');
 });

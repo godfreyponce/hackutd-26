@@ -159,6 +159,12 @@ test('the card names the try out of 3, and Last answer names the try it missed',
   assert.deepEqual(texts(alarm), ['Alarm after 3 tries', 'No answer', 'Demo alarm. A fixed rule raised it.']);
 });
 
+test('a miss on try 3 heard before its checkin no_answer never says asking again', () => {
+  const s = run([...ask(1), ...miss(1), ...ask(2), ...miss(2), ...ask(3), miss(3)[0]]);
+  assert.equal(s.checkin, 'asking');
+  assert.equal(boxNote(s), 'No answer on try 3.');
+});
+
 test('okay and help answers carry no try', () => {
   const ok = run([...ask(2), { type: 'heard', answer: 'ok', transcript: "I'm okay" }, { type: 'checkin', state: 'ok', try: 2 }]);
   assert.deepEqual([checkinText(ok), heardText(ok)], ['Okay', 'Okay: "I\'m okay"']);

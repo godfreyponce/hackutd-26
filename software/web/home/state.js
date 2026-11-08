@@ -79,12 +79,17 @@ export function sourceLabel(source) {
 
 export const SAY_HINT = 'Say "okay" or "help".';
 
-export function statusText(status, { alert = false, linked = true, helpSign = false, ended = false } = {}) {
+// tryNum is null until the first ask of a check-in. After the last try the rule has already chosen the alarm.
+export function statusText(status, { alert = false, linked = true, helpSign = false, ended = false, tryNum = null } = {}) {
   switch (status) {
-    case 'CHECKING_IN':
-      return { word: 'CHECKING IN', detail: `${helpSign ? 'Help sign seen' : 'Event detected'}. Asking if you are okay.`, note: SAY_HINT };
+    case 'CHECKING_IN': {
+      const detail = `${helpSign ? 'Help sign seen' : 'Event detected'}. Asking if you are okay.`;
+      return tryNum != null ? { word: 'CHECKING IN', detail, note: SAY_HINT } : { word: 'CHECKING IN', detail };
+    }
     case 'NO_RESPONSE':
       if (ended) return { word: 'NO RESPONSE', detail: 'Nobody seen at home. No alarm.' };
+      if (tryNum >= MAX_TRIES) return { word: 'NO RESPONSE', detail: 'No response after an event.' };
+      if (tryNum == null) return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.' };
       return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.', note: SAY_HINT };
     case 'CONTACTING_HELP':
       return {
@@ -127,7 +132,7 @@ function onCheckin(state, msg) {
   if (msg.state === 'ok' || msg.state === 'clear') {
     // With nobody there, the agent sends clear right after a no answer. The check-in is over, but nobody said they were okay.
     if (msg.state === 'clear' && state.status === 'NO_RESPONSE') {
-      return { ...state, ended: true, tryNum: null, helpSign: false, trigger: null };
+      return { ...state, ended: true, tryNum: null, say: state.say ? { ...state.say, tryNum: null } : state.say, helpSign: false, trigger: null };
     }
     return { ...state, status: 'PROTECTED', ended: false, tryNum: null, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false, trigger: null };
   }

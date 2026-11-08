@@ -141,9 +141,6 @@
     font-size: var(--word-fs); line-height: var(--word-fs); font-weight: 800; letter-spacing: 0.03em;
     color: var(--status); margin: calc(var(--word-fs) * 0.12) 0 calc(var(--word-fs) * 0.15); white-space: nowrap;
   }
-  /* Cap each word to the space right of the shield. CONTACTING HELP measures 9.2 to 9.28 em at its tighter tracking
-     (the others at most 7.2 em), and keeps 0.6u free before the column edge. */
-  body[data-status="CONTACTING_HELP"] .word { font-size: min(calc(var(--u) * var(--word-u)), calc((100cqi - var(--shield-w) - var(--hero-gap) - var(--u) * 0.6) / 9.3)); letter-spacing: 0.005em; }
   body[data-status="PROTECTED"]:not([data-link="down"]) .word { color: var(--text); }
   body[data-status="CONTACTING_HELP"] .word { color: #ff5969; }
   .detail { font-size: max(24px, calc(var(--u) * 1.6)); }
