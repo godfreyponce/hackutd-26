@@ -157,6 +157,8 @@
   /* With the banner up the cards need the room, so the hidden note gives up its box and the hero its top padding. */
   main:has(> .banner:not([hidden])) .note[hidden] { display: none; }
   main:has(> .banner:not([hidden])) .hero { padding-top: calc(var(--u) * 0.5); }
+  /* While the box asks, the note tells the person what to say, in a calm look: the red pill is for the alarm. */
+  body:is([data-status="CHECKING_IN"], [data-status="NO_RESPONSE"]) .note { background: none; border-color: transparent; color: var(--muted); padding-left: 0; padding-right: 0; }
   body[data-status="CONTACTING_HELP"] .shield { animation: pulse 1.2s ease-in-out infinite; }
   @keyframes pulse {
     0%, 100% { filter: drop-shadow(0 0 calc(var(--u) * 0.15) var(--status)); }
@@ -287,6 +289,8 @@
     main { padding-top: calc(var(--u) * 0.8); row-gap: calc(var(--u) * 0.6); }
     .hero, main:has(> .banner:not([hidden])) .hero { padding-top: calc(var(--u) * 0.25); padding-bottom: calc(var(--u) * 0.25); }
     .convo { padding: calc(var(--u) * 0.4) 0; }
+    /* With the banner up a shown hint would add a line the cards need. */
+    body:is([data-status="CHECKING_IN"], [data-status="NO_RESPONSE"]) main:has(> .banner:not([hidden])) .note { display: none; }
   }
 
   .map-frame { position: relative; flex: 1 1 0; min-height: 0; margin-top: 0.4em; }

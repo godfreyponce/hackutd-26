@@ -77,12 +77,15 @@ export function sourceLabel(source) {
   return Object.hasOwn(SOURCE_LABELS, source) ? SOURCE_LABELS[source] : String(source ?? '').toUpperCase();
 }
 
+export const SAY_HINT = 'Say "okay" or "help".';
+
 export function statusText(status, { alert = false, linked = true, helpSign = false, ended = false } = {}) {
   switch (status) {
     case 'CHECKING_IN':
-      return { word: 'CHECKING IN', detail: `${helpSign ? 'Help sign seen' : 'Event detected'}. Asking if you are okay.` };
+      return { word: 'CHECKING IN', detail: `${helpSign ? 'Help sign seen' : 'Event detected'}. Asking if you are okay.`, note: SAY_HINT };
     case 'NO_RESPONSE':
-      return { word: 'NO RESPONSE', detail: ended ? 'Nobody seen at home. No alarm.' : 'No response after an event. Asking again.' };
+      if (ended) return { word: 'NO RESPONSE', detail: 'Nobody seen at home. No alarm.' };
+      return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.', note: SAY_HINT };
     case 'CONTACTING_HELP':
       return {
         word: 'DEMO ALARM',

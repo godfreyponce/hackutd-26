@@ -357,3 +357,10 @@ test('a missed stand-up answer under the alarm shows no try on HEARD', () => {
   assert.equal(s.status, 'CONTACTING_HELP');
   assert.equal(heardChip(s.heard, s.status), 'No answer');
 });
+
+test('while the box asks, the note tells the person what to say; an ended check-in and PROTECTED show none', () => {
+  assert.equal(statusText('CHECKING_IN').note, 'Say "okay" or "help".');
+  assert.equal(statusText('NO_RESPONSE').note, 'Say "okay" or "help".');
+  assert.equal(statusText('NO_RESPONSE', { ended: true }).note, undefined);
+  assert.equal(statusText('PROTECTED').note, undefined);
+});
