@@ -64,6 +64,7 @@ let guardNote;
 let lastSweepAt;
 let eventHtml;
 let alertHtml;
+let alertLevel;
 let cam;
 let boxAlarmed = false;
 
@@ -100,6 +101,7 @@ function resetAll(now) {
   rowEls.clear();
   eventHtml = '';
   alertHtml = '';
+  alertLevel = null;
   boxAlarmed = false;
   cam = cam ? moveCamera('reset', now) : initialCamera(now, views, { reduced: reducedMotion.matches });
   renderEvent();
@@ -283,7 +285,13 @@ const bus = connectBus(hubUrl(location.search), {
         onRerank(msg);
         return;
       case 'alert':
-        alertHtml = alertLine(msg);
+        {
+          // Same rules as home/state.js: a missing level errs high, and a lower alert never replaces a higher one.
+          const level = ALERT_LEVELS.includes(msg.level) ? msg.level : 'warning';
+          if (alertLevel && ALERT_LEVELS.indexOf(level) < ALERT_LEVELS.indexOf(alertLevel)) return;
+          alertLevel = level;
+          alertHtml = alertLine(msg, level);
+        }
         renderEvent();
         return;
       case 'quake':
@@ -313,9 +321,8 @@ function esc(s) {
 
 const ALERT_LEVELS = ['info', 'watch', 'warning', 'emergency'];
 
-function alertLine(msg) {
-  const level = ALERT_LEVELS.includes(msg.level) ? msg.level : 'watch';
-  const label = [msg.source ?? 'official', msg.level ?? 'alert'].map((s) => esc(String(s).toUpperCase())).join(' ');
+function alertLine(msg, level) {
+  const label = [msg.source ?? 'official', level].map((s) => esc(String(s).toUpperCase())).join(' ');
   const demo = msg.demo === true ? 'DEMO, not a real alert. ' : '';
   return `<b class="lvl lvl-${level}">${label}</b> ${demo}${esc(msg.headline || msg.event || 'Alert')}`;
 }
@@ -427,6 +434,8 @@ function renderQueue() {
   const list = $('queue-list');
   $('queue-empty').hidden = shown.length > 0;
   const top = shown.slice(0, QUEUE_ROWS);
+  const before = new Map();
+  for (const [id, el] of rowEls) before.set(id, el.getBoundingClientRect().top);
   const keep = new Set(top.map((r) => r.id));
   for (const [id, el] of rowEls) {
     if (!keep.has(id)) {
@@ -443,6 +452,16 @@ function renderQueue() {
     fillRow(el, r, i + 1);
     list.appendChild(el);
   });
+  // Short slide so viewers see the agent move a home, only when it jumps more than one row.
+  if (!reducedMotion.matches) {
+    for (const r of top) {
+      const old = before.get(r.id);
+      if (old === undefined) continue;
+      const el = rowEls.get(r.id);
+      const dy = old - el.getBoundingClientRect().top;
+      if (Math.abs(dy) > el.offsetHeight) el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 160, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    }
+  }
 
   const pinned = $('pinned');
   const idx = shown.findIndex((r) => r.id === REAL_BOX_ID);
