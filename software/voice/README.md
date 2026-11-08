@@ -43,7 +43,7 @@ ElevenLabs gets an audio tag in front of each line, for example `[gently]` for `
 
 On `{"type":"checkin","state":"alarm"}` the box speaker plays `assets/alarm.wav` once, after the line it is speaking. The service keeps listening for later messages while the tone plays. A `reset` stops it. Text mode only logs it.
 
-The alarm is fake. The tone plays only on the box. Nothing is called. `assets/alarm.wav` is a placeholder; `assets/make_tones.py` makes the candidates.
+The alarm is fake. The tone plays only on the box. Nothing is called. `assets/alarm.wav` is a yelp siren, 3 s (owner pick). `assets/make_tones.py` makes the older candidates.
 
 Why not Eleven Realtime v1 Mini: it is a speech-to-speech agent. Its docs don't promise that it says a fixed line word for word, and they list no event that hands us a transcript of the answer. The box must say the agent's exact line, and the agent must get a transcript.
 
