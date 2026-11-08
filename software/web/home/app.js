@@ -26,7 +26,7 @@ const ROOFS = [
   [112, -37], [48, -35], [156, -33], [242, -33], [268, -20], [103, -15], [182, -8], [225, -7], [32, -5],
   [156, 23], [65, 28], [117, 42], [213, 47], [270, 47], [46, 65], [122, 73], [198, 73], [272, 73],
   [14, 75], [36, 87], [95, 97], [167, 97], [45, 123], [288, 124], [195, 125], [47, 137], [75, 138],
-  [116, 149], [212, 150], [258, 150], [167, 177], [238, 177], [125, 183], [197, 200], [275, 201], [68, 206],
+  [122, 140], [212, 150], [258, 150], [167, 177], [238, 177], [125, 183], [197, 200], [275, 201], [68, 206],
   [38, 223], [133, 228], [182, 228], [258, 228], [22, 263], [117, 278], [213, 280], [157, 283], [65, 285],
   [77, 302], [227, 302], [25, 332], [108, 332], [215, 333], [275, 334],
 ];
@@ -76,9 +76,10 @@ const vignette = svgEl('rect', { width: 300, height: 260, fill: 'url(#vignette)'
 
 const scope = svgEl('g', {}, map);
 for (const r of [40, 82, 124]) svgEl('circle', { cx: HOME.x, cy: HOME.y, r, class: 'range' }, scope);
-// One view unit is about 2 m, so the rings sit at about 80, 160 and 250 m.
-const ringLabels = [[40, '80 m'], [82, '160 m'], [124, '250 m']].map(([r, text]) =>
-  hudText(scope, HOME.x + r * 0.71 + 3, HOME.y - r * 0.71 - 2, text, { class: 'hud dim ring-label' }));
+// One view unit is about 2 m, so the rings sit at about 80, 160 and 250 m. The 80 m ring is left unlabeled:
+// its label would crowd the reticle.
+const ringLabels = [[82, '160 m'], [124, '250 m']].map(([r, text]) =>
+  hudText(scope, HOME.x + r * 0.71 + 3, HOME.y - r * 0.71 - 2, text, { class: 'hud dim' }));
 svgEl('path', { d: `M${HOME.x - 124} ${HOME.y}H${HOME.x + 124}M${HOME.x} ${HOME.y - 124}V${HOME.y + 124}`, class: 'cross' }, scope);
 for (let deg = 0; deg < 360; deg += 10) {
   const a = (deg * Math.PI) / 180;
@@ -119,6 +120,7 @@ const hudThisHome = hudText(map, 0, 0, 'THIS HOME', { 'text-anchor': 'middle' })
 
 const hudNodes = hudText(map, 6, 254, '');
 const hudHit = hudText(map, 294, 254, '', { 'text-anchor': 'end' });
+const hudEscalated = hudText(map, 294, 254, 'ESCALATED 1', { 'text-anchor': 'end', class: 'hud alarm' });
 const hudGrid = hudText(map, 6, 14, 'RICHARDSON, TX');
 const hudLive = hudText(map, 294, 14, '', { 'text-anchor': 'end' });
 const backing = (el) => {
@@ -129,6 +131,7 @@ const backing = (el) => {
 const corners = [[hudGrid, false, false], [hudLive, true, false], [hudNodes, false, true], [hudHit, true, true]]
   .map(([el, right, bottom]) => ({ el, bg: backing(el), right, bottom }));
 const northBg = backing(hudNorth);
+const escalatedBg = backing(hudEscalated);
 const ringLabelBgs = ringLabels.map(backing);
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -155,7 +158,8 @@ function fitMap() {
 
 let view = { x: 0, y: 0, w: 300, h: 260, f: 11 };
 const HUD_PAD = 4;
-const DOT_CLEAR = 6; // view units kept between a dot's center and any HUD backing box
+const DOT_CLEAR = 3; // view units kept between a dot's center and any HUD backing box
+const DOT_EXTENT = 5; // a dot's radius plus its outline and glow, in view units
 function fitBacking(bg, ...els) {
   const boxes = els.map((el) => el.getBBox());
   const x0 = Math.min(...boxes.map((bb) => bb.x)), y0 = Math.min(...boxes.map((bb) => bb.y));
@@ -170,17 +174,28 @@ function placeHud() {
   const { x, y, w, h, f } = view;
   const boxes = [fitBacking(homeLabelBg, hudThisHome), fitBacking(northBg, hudNorth),
     ...ringLabels.map((el, i) => fitBacking(ringLabelBgs[i], el))];
-  for (const { el, bg, right, bottom } of corners) {
+  for (const corner of corners) {
+    const { el, bg, right, bottom } = corner;
     el.setAttribute('x', right ? x + w - 2 * HUD_PAD : x + 2 * HUD_PAD);
     el.setAttribute('y', bottom ? y + h - HUD_PAD - 0.45 * f : y + HUD_PAD + 1.05 * f);
-    boxes.push(fitBacking(bg, el));
+    corner.box = fitBacking(bg, el);
+    boxes.push(corner.box);
+  }
+  // While help is contacted the escalation sits directly above the hit count, so both stay readable.
+  const hitBox = corners.find((c) => c.el === hudHit).box;
+  const escalated = hudEscalated.style.display !== 'none';
+  escalatedBg.style.display = escalated ? '' : 'none';
+  if (escalated) {
+    hudEscalated.setAttribute('x', x + w - 2 * HUD_PAD);
+    hudEscalated.setAttribute('y', Number(hudHit.getAttribute('y')) - hitBox.height - HUD_PAD);
+    boxes.push(fitBacking(escalatedBg, hudEscalated));
   }
   for (const dot of neighborDots) {
     const cx = dot.cx.baseVal.value, cy = dot.cy.baseVal.value;
     const covered = boxes.some((bb) => cx > bb.x - DOT_CLEAR && cx < bb.x + bb.width + DOT_CLEAR
       && cy > bb.y - DOT_CLEAR && cy < bb.y + bb.height + DOT_CLEAR);
     // A dot cut by the map's edge reads as a glitch, so it is hidden too.
-    const cut = cy < y + DOT_CLEAR || cy > y + h - DOT_CLEAR;
+    const cut = cy < y + DOT_EXTENT || cy > y + h - DOT_EXTENT || cx < x + DOT_EXTENT || cx > x + w - DOT_EXTENT;
     dot.style.visibility = covered || cut ? 'hidden' : '';
   }
 }
@@ -202,9 +217,10 @@ function renderMap() {
   const hit = state.areaHit ? neighborDots.length + (state.home === 'idle' ? 0 : 1) : state.home === 'hit' ? 1 : 0;
   hudNodes.textContent = `NODES ${total}`;
   const escalated = connected && state.status === 'CONTACTING_HELP';
-  hudHit.textContent = escalated ? 'ESC 1' : connected ? `HIT ${hit}` : 'HIT --';
-  hudHit.classList.toggle('alarm', escalated || (connected && hit > 0));
+  hudHit.textContent = connected ? `HIT ${hit}` : 'HIT --';
+  hudHit.classList.toggle('alarm', connected && hit > 0);
   hudHit.classList.toggle('warn', !connected);
+  hudEscalated.style.display = escalated ? '' : 'none';
   hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
   hudLive.classList.toggle('warn', !connected);
   $('legend-not-hit').textContent = connected ? 'Not hit' : 'Unknown';
@@ -343,6 +359,7 @@ function renderQuake() {
 // ---------- the rest ----------
 
 const ANSWERS = { ok: 'I\'m okay', help: 'Help', no_answer: 'No answer' };
+const timeOf = (at) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 function render() {
   const { word, detail, note } = statusText(state.status, { alert: Boolean(state.alert), linked: connected });
@@ -370,7 +387,7 @@ function render() {
     $('alert-headline').textContent = a.headline;
     // The headline often names the area already; then the space shows when the alert came in.
     $('alert-area').textContent = a.headline.includes(a.area)
-      ? `Issued ${new Date(a.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : a.area;
+      ? `Received ${timeOf(a.at)}` : a.area;
   }
 
   $('battery').hidden = !state.onBattery;
@@ -378,9 +395,11 @@ function render() {
 
   $('scale-mark').hidden = !connected || state.indoorF == null;
   if (state.indoorF != null) $('scale-mark').style.setProperty('--at', clamp((state.indoorF - 50) / 50, 0, 1));
-  $('temp').innerHTML = state.indoorF == null ? '<small>No reading yet</small>' : `${Math.round(state.indoorF)}<small> &deg;F</small>`;
-  $('heat-sub').textContent = !connected ? `${state.indoorF == null ? '' : 'Last known reading. '}No live heat data`
+  $('temp').innerHTML = state.indoorF == null ? '<small class="no-reading">No reading yet</small>' : `${Math.round(state.indoorF)}<small> &deg;F</small>`;
+  $('heat-msg').textContent = !connected ? `${state.indoorF == null ? '' : 'Last known reading. '}No live heat data`
     : a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : 'No heat alerts';
+  $('heat-at').hidden = state.indoorAt == null;
+  $('heat-at').textContent = state.indoorAt == null ? '' : `Updated ${timeOf(state.indoorAt)}`;
 
   $('hub').classList.toggle('bad', !connected);
   $('hub-text').textContent = connected ? 'Hub connected' : 'Hub disconnected';

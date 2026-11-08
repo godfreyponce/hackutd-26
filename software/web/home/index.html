@@ -43,7 +43,7 @@
     gap: 0 calc(var(--u) * 1.4);
   }
 
-  /* Header */
+  /* Header. SF Pro draws its slashed zero as stylistic set 6 and ignores slashed-zero, so both are set. */
   header {
     grid-column: 1 / -1;
     display: flex; align-items: center; gap: calc(var(--u) * 1.2);
@@ -55,7 +55,7 @@
   .brand-name { font-size: calc(var(--u) * 1.7); font-weight: 700; letter-spacing: 0.04em; }
   .brand-sub { color: var(--muted); font-size: max(15px, calc(var(--u) * 0.95)); }
   .divider { width: 1px; align-self: stretch; background: var(--line); }
-  .home-id { font-size: calc(var(--u) * 1.2); letter-spacing: 0.12em; font-weight: 600; }
+  .home-id { font-size: calc(var(--u) * 1.2); letter-spacing: 0.12em; font-weight: 600; font-variant-numeric: slashed-zero; font-feature-settings: "ss06"; }
   .home-id small { display: block; color: var(--muted); letter-spacing: 0; font-weight: 400; font-size: max(15px, calc(var(--u) * 0.95)); }
   .spacer { flex: 1; }
   .pill {
@@ -110,7 +110,7 @@
   .banner .src { font-weight: 800; letter-spacing: 0.08em; border: 1px solid var(--warn); color: var(--warn); border-radius: 6px; padding: 0.15em 0.6em; white-space: nowrap; }
   .banner .what { font-size: calc(var(--u) * 1.35); font-weight: 700; white-space: nowrap; }
   .banner .headline { color: #ffe9c2; font-size: max(20px, calc(var(--u) * 1.2)); font-weight: 600; }
-  .banner .area { color: var(--muted); white-space: nowrap; margin-left: auto; }
+  .banner .area { color: var(--muted); white-space: nowrap; margin-left: auto; font-size: max(16px, var(--u)); }
   /* Narrow screens: the headline gets its own row under the event text, the icon spans both rows. */
   @media (max-width: 1399.98px) {
     .banner { display: grid; grid-template-columns: auto auto 1fr auto; row-gap: calc(var(--u) * 0.3); }
@@ -196,13 +196,18 @@
   .card canvas { flex: 1; width: 100%; min-height: 0; margin-top: 0.6em; }
   .heat-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px 0 0.3em; }
   /* The bar lines up with the trace's +1 g line in the card beside it; the reading sits centered between the
-     scale and the caption at the bottom. When the card is short (alert banner at 1280) the space under the
-     scale (::after, ordered between scale and reading) gives way first, then the space above the bar. */
+     scale and the caption at the bottom. When the card is short the space under the scale (::after, ordered
+     between scale and reading) gives way first, then the space above the bar. */
   .heat-body::before { content: ""; flex: 0 1 calc(var(--u) * 2); }
   .heat-body::after { content: ""; order: 1; flex: 0 100 calc(var(--u) * 1.2); }
   #temp, #heat-sub { order: 2; }
   #temp { margin: auto 0; }
-  #heat-sub { margin-top: 0; padding-top: 0.3em; }
+  #heat-sub { margin-top: 0; padding-top: 0.6em; }
+  #heat-at { display: block; font-size: max(16px, 0.9em); }
+  #heat-at[hidden] { display: none; }
+  /* With the banner up the card is short, so the space above the bar gives way before the space under the scale. */
+  main:has(> .banner:not([hidden])) .heat-body::before { flex-shrink: 100; }
+  main:has(> .banner:not([hidden])) .heat-body::after { flex-shrink: 1; }
   .scale-bar {
     position: relative; height: calc(var(--u) * 0.45); border-radius: 999px;
     background: linear-gradient(90deg, #3f6f9e 0%, #56708f 30%, #5f7189 60%, #a4824a 80%, #a8574e 100%);
@@ -213,10 +218,15 @@
   .scale-ends { display: flex; justify-content: space-between; margin-top: 0.4em; color: var(--muted); font-size: max(18px, calc(var(--u) * 0.9)); }
   .temp { font-size: calc(var(--u) * 4); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .temp small { font-size: 0.4em; color: var(--muted); font-weight: 500; }
-  /* Tall screens have room for a larger reading, raised toward the scale. Still smaller than the status word. */
+  .temp .no-reading { font-size: max(22px, calc(var(--u) * 1.2)); font-weight: 500; line-height: 1.35; }
+  /* Tall screens: the reading sits right under the scale and the caption holds the bottom, so no band is empty. */
   @media (min-height: 900px) {
-    .temp { font-size: calc(var(--u) * 5); }
+    .temp { font-weight: 700; }
+    #temp { margin: calc(var(--u) * 1.4) 0 auto; }
     .heat-body::before { flex: 0 1 calc(var(--u) * 1.2); }
+    .heat-body::after { flex-basis: 0; }
+    .hero { padding-bottom: 0; }
+    .word { margin-bottom: calc(var(--word-fs) * 0.08); }
   }
 
   .map-frame { position: relative; flex: 1 1 0; min-height: 0; margin-top: 0.4em; }
@@ -244,7 +254,6 @@
   /* --hud is set by fitMap in view units. Every HUD text sits on a .hud-bg box, so it needs no outline. */
   .hud { fill: #d6ebff; font: 600 8px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.04em; font-size: var(--hud, 11px); }
   .hud.dim { fill: rgba(214, 235, 255, 0.85); }
-  .hud.ring-label { font-size: calc(var(--hud, 11px) * 0.75); }
   .hud-bg { fill: #06101f; fill-opacity: 0.85; }
   .hud.alarm { fill: #ff7885; }
   .hud.warn { fill: var(--warn); }
@@ -265,7 +274,7 @@
 
   footer {
     grid-column: 1 / -1; display: flex; gap: calc(var(--u) * 1.5); align-items: center;
-    color: var(--muted); font-size: max(15px, calc(var(--u) * 0.85)); letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--muted); font-size: max(16px, calc(var(--u) * 0.85)); letter-spacing: 0.02em; text-transform: uppercase; font-variant-numeric: slashed-zero; font-feature-settings: "ss06";
     padding-top: calc(var(--u) * 0.8); border-top: 1px solid var(--line); margin-top: calc(var(--u) * 0.8);
   }
   footer .spacer { flex: 1; }
@@ -368,7 +377,7 @@
             <div class="scale-ends"><span>50 &deg;F</span><span>100 &deg;F</span></div>
           </div>
           <div class="temp" id="temp"></div>
-          <div class="card-sub" id="heat-sub">No heat alerts</div>
+          <div class="card-sub" id="heat-sub"><span id="heat-msg">No heat alerts</span><span id="heat-at" hidden></span></div>
         </div>
       </section>
     </div>

@@ -24,6 +24,7 @@ export function initialState() {
     onBattery: false,
     batteryPct: null,
     indoorF: null,
+    indoorAt: null, // when the last indoor reading arrived
     quakes: [],
     areaHit: false, // neighborhood dots turn red after a quake
     home: 'idle', // node map dot: idle (white), hit (red), ok (green)
@@ -105,7 +106,7 @@ export function reduce(state, msg, now) {
     case 'queue': {
       const home = Array.isArray(msg.homes) && msg.homes.find((h) => h && h.id === 'H000');
       const f = home?.factors?.indoor_f;
-      return typeof f === 'number' ? { ...state, indoorF: f } : state;
+      return typeof f === 'number' ? { ...state, indoorF: f, indoorAt: now } : state;
     }
     case 'reset':
       return initialState();

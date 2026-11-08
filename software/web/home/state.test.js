@@ -131,6 +131,11 @@ test('queue gives this home (H000) indoor temperature', () => {
   assert.equal(s.indoorF, 71);
 });
 
+test('a queue reading records when it arrived', () => {
+  assert.equal(run({ type: 'queue', homes: [{ id: 'H000', factors: { indoor_f: 71 } }] }).indoorAt, NOW);
+  assert.equal(run({ type: 'queue', homes: [{ id: 'H000', factors: {} }] }).indoorAt, null);
+});
+
 test('unknown or malformed messages are ignored', () => {
   const s = run(quake);
   for (const m of [{ type: 'agent', step: 'PLAN', text: 'x' }, { type: 'bogus' }, {}, null, 'quake', { type: 'checkin', state: 'weird' }]) {
