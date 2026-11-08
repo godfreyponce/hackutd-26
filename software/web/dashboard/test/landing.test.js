@@ -6,13 +6,13 @@ import { readFileSync } from 'node:fs';
 const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
 const headings = [...html.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => m[1]).join(' ');
 const visibleText = headings.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-const marks = headings.match(/<img\b[^>]*\ssrc="[^"]*land-mark-white\.svg"[^>]*>/g) ?? [];
+const wordmarks = headings.match(/<img\b[^>]*\ssrc="[^"]*land-wordmark-white\.svg"[^>]*>/g) ?? [];
 
-test('the landing page heading shows the LAND mark once, named for screen readers', () => {
-  assert.equal(marks.length, 1);
-  assert.match(marks[0], /\salt="LAND"/);
+test('the landing page heading shows the LAND wordmark with its tagline once, named for screen readers', () => {
+  assert.equal(wordmarks.length, 1);
+  assert.match(wordmarks[0], /\salt="LAND: Life Against Natural Disaster"/);
 });
 
-test('the landing page heading shows no word LAND next to the mark', () => {
+test('the landing page heading shows no text next to the wordmark', () => {
   assert.equal(visibleText, '');
 });
