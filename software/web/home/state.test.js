@@ -102,9 +102,14 @@ test('alert sets the banner with the source shown', () => {
     certainty: 'Observed', area: 'Richardson, TX', headline: 'M5.1 near Richardson',
   });
   assert.deepEqual(s.alert, {
-    source: 'USGS', event: 'Earthquake', severity: 'Severe', area: 'Richardson, TX', headline: 'M5.1 near Richardson',
+    source: 'USGS', event: 'Earthquake', severity: 'Severe', area: 'Richardson, TX', headline: 'M5.1 near Richardson', at: NOW,
   });
   assert.equal(s.status, 'PROTECTED');
+});
+
+test('alert stores when it arrived, for the banner issue time', () => {
+  const s = reduce(initialState(), { type: 'alert', source: 'nws', event: 'Heat Advisory' }, NOW);
+  assert.equal(s.alert.at, NOW);
 });
 
 test('source labels cover NOAA, NWS, USGS, GDACS and sensor', () => {
@@ -126,6 +131,11 @@ test('queue gives this home (H000) indoor temperature', () => {
   assert.equal(s.indoorF, 71);
 });
 
+test('a queue reading records when it arrived', () => {
+  assert.equal(run({ type: 'queue', homes: [{ id: 'H000', factors: { indoor_f: 71 } }] }).indoorAt, NOW);
+  assert.equal(run({ type: 'queue', homes: [{ id: 'H000', factors: {} }] }).indoorAt, null);
+});
+
 test('unknown or malformed messages are ignored', () => {
   const s = run(quake);
   for (const m of [{ type: 'agent', step: 'PLAN', text: 'x' }, { type: 'bogus' }, {}, null, 'quake', { type: 'checkin', state: 'weird' }]) {
@@ -144,7 +154,7 @@ test('status text never says "fall" and the alarm note says no emergency number 
     const { word, detail } = statusText(status);
     assert.doesNotMatch(`${word} ${detail}`, /fall/i);
   }
-  assert.equal(statusText('NO_RESPONSE').detail, 'No response after an event');
+  assert.equal(statusText('NO_RESPONSE').detail, 'No response after an event. Asking again.');
   assert.match(statusText('CONTACTING_HELP').note, /demo/i);
   assert.match(statusText('CONTACTING_HELP').note, /no emergency number is called/i);
 });
@@ -152,4 +162,16 @@ test('status text never says "fall" and the alarm note says no emergency number 
 test('PROTECTED with an official alert says the alert is active', () => {
   assert.equal(statusText('PROTECTED', { alert: true }).detail, 'All okay at home. Official alert active.');
   assert.equal(statusText('PROTECTED').detail, 'No active events');
+});
+
+test('with the hub link down, a quiet home shows HUB OFFLINE instead of a live-looking PROTECTED', () => {
+  const t = statusText('PROTECTED', { linked: false });
+  assert.equal(t.word, 'HUB OFFLINE');
+  assert.equal(t.detail, 'Live status unavailable. Reconnecting to hub.');
+  assert.equal(statusText('PROTECTED').word, 'PROTECTED');
+});
+
+test('with the hub link down, an escalation keeps its word', () => {
+  assert.equal(statusText('CONTACTING_HELP', { linked: false }).word, 'CONTACTING HELP');
+  assert.equal(statusText('NO_RESPONSE', { linked: false }).word, 'NO RESPONSE');
 });
