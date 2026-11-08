@@ -161,3 +161,9 @@ def test_clean_run_has_no_fallback_takeover_override_or_refusal():
     assert judge(CASE["silence"], events)["clean"]
     events.append((1.1, agent("VERIFY", "Refused speak: x", "speak")))
     assert not judge(CASE["silence"], events)["clean"]
+
+
+def test_a_run_whose_event_never_reached_the_bus_counts_as_wrong_in_the_table():
+    lost = judge(CASE["silence"], [(0.0, {"type": "presence", "state": "moving"})])
+    assert not lost["correct"]
+    assert "| 0 of 1 | 0 of 1 |" in table([summarize(CASE["silence"], [lost])])

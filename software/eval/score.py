@@ -26,7 +26,7 @@ def judge(case, events):
     t0 = next((t for t, m in events if m.get("type") == case.trigger), None)
     if t0 is None:
         return {"case": case.id, "correct": False, "problems": ["the event never reached the bus"],
-                "first_ask_s": None, "alarm_s": None, **_counts(events)}
+                "first_ask_s": None, "alarm_s": None, "wrong_lines": [], "heard_to_rule_s": [], **_counts(events), "clean": False}
     asks = _checkins(events, "asking")
     answers = [(t, m["state"]) for t, m in events if m.get("type") == "checkin" and m.get("state") in ANSWERS]
     alarms = _checkins(events, "alarm")
