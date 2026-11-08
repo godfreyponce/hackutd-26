@@ -103,14 +103,19 @@
     grid-area: banner;
     display: flex; align-items: center; gap: calc(var(--u) * 1);
     padding: calc(var(--u) * 0.8) calc(var(--u) * 1.1);
-    border: 1px solid rgba(255, 176, 32, 0.7); border-radius: 10px;
-    background: linear-gradient(90deg, rgba(255, 176, 32, 0.22), rgba(255, 176, 32, 0.06));
+    border: 1px solid rgba(var(--lvl-rgb), 0.7); border-radius: 10px;
+    background: linear-gradient(90deg, rgba(var(--lvl-rgb), 0.22), rgba(var(--lvl-rgb), 0.06));
+    /* Watch, the hub's alert level (#35), keeps the original amber. */
+    --lvl: var(--warn); --lvl-rgb: 255, 176, 32; --lvl-text: #ffe9c2;
   }
+  .banner[data-level="info"] { --lvl: var(--accent); --lvl-rgb: 77, 163, 255; --lvl-text: #d6e9ff; }
+  .banner[data-level="warning"] { --lvl: var(--orange); --lvl-rgb: 255, 122, 26; --lvl-text: #ffdcc4; }
+  .banner[data-level="emergency"] { --lvl: var(--danger); --lvl-rgb: 255, 59, 78; --lvl-text: #ffd6da; }
   .banner[hidden] { display: none; }
-  .banner svg { width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); flex: none; color: var(--warn); }
-  .banner .src { font-size: max(16px, var(--u)); font-weight: 800; letter-spacing: 0.08em; border: 1px solid var(--warn); color: var(--warn); border-radius: 6px; padding: 0.15em 0.6em; white-space: nowrap; }
+  .banner svg { width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); flex: none; color: var(--lvl); }
+  .banner .src { font-size: max(16px, var(--u)); font-weight: 800; letter-spacing: 0.08em; border: 1px solid var(--lvl); color: var(--lvl); border-radius: 6px; padding: 0.15em 0.6em; white-space: nowrap; }
   .banner .what { font-size: calc(var(--u) * 1.35); font-weight: 700; white-space: nowrap; }
-  .banner .headline { color: #ffe9c2; font-size: max(20px, calc(var(--u) * 1.2)); font-weight: 600; }
+  .banner .headline { color: var(--lvl-text); font-size: max(20px, calc(var(--u) * 1.2)); font-weight: 600; }
   .banner .area { color: var(--muted); white-space: nowrap; margin-left: auto; padding-left: calc(var(--u) * 1.2); font-size: max(16px, var(--u)); }
   /* Narrow screens: the headline gets its own row under the event text, the icon spans both rows, and the
      area or received time sits at the right of the first row. */

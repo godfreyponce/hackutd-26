@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, reduce, statusText, sourceLabel } from './state.js';
+import { initialState, reduce, statusText, sourceLabel, activeAlert } from './state.js';
 
 const NOW = 1_000_000;
 
@@ -102,7 +102,7 @@ test('alert sets the banner with the source shown', () => {
     certainty: 'Observed', area: 'Richardson, TX', headline: 'M5.1 near Richardson',
   });
   assert.deepEqual(s.alert, {
-    source: 'USGS', event: 'Earthquake', severity: 'Severe', area: 'Richardson, TX', headline: 'M5.1 near Richardson', at: NOW,
+    source: 'USGS', event: 'Earthquake', severity: 'Severe', area: 'Richardson, TX', headline: 'M5.1 near Richardson', level: 'warning', at: NOW,
   });
   assert.equal(s.status, 'PROTECTED');
 });
@@ -110,6 +110,69 @@ test('alert sets the banner with the source shown', () => {
 test('alert stores when it arrived, for the banner issue time', () => {
   const s = reduce(initialState(), { type: 'alert', source: 'nws', event: 'Heat Advisory' }, NOW);
   assert.equal(s.alert.at, NOW);
+});
+
+const alertAt = (level, extra = {}) => ({ type: 'alert', source: 'nws', event: 'Test', headline: level, level, ...extra });
+const MIN = 60_000;
+
+test('alert keeps the level the hub added', () => {
+  for (const level of ['info', 'watch', 'warning', 'emergency']) {
+    assert.equal(run(alertAt(level)).alert.level, level);
+  }
+});
+
+test('an alert with a missing or unknown level shows as a warning', () => {
+  assert.equal(run({ type: 'alert', source: 'nws', event: 'Old hub' }).alert.level, 'warning');
+  assert.equal(run(alertAt('bogus')).alert.level, 'warning');
+});
+
+test('info shows for 2 minutes and watch for 30', () => {
+  const info = run(alertAt('info'));
+  assert.ok(activeAlert(info, NOW + 2 * MIN - 1));
+  assert.equal(activeAlert(info, NOW + 2 * MIN), null);
+  const watch = run(alertAt('watch'));
+  assert.ok(activeAlert(watch, NOW + 30 * MIN - 1));
+  assert.equal(activeAlert(watch, NOW + 30 * MIN), null);
+});
+
+test('warning and emergency show until reset', () => {
+  for (const level of ['warning', 'emergency']) {
+    const s = run(alertAt(level));
+    assert.equal(activeAlert(s, NOW + 24 * 60 * MIN), s.alert);
+    assert.equal(activeAlert(reduce(s, { type: 'reset' }, NOW + 1), NOW + 1), null);
+  }
+});
+
+test('a lower level never replaces a higher one that is still showing', () => {
+  const s = run(alertAt('emergency'), alertAt('info'), alertAt('watch'), alertAt('warning'));
+  assert.equal(s.alert.level, 'emergency');
+  assert.equal(reduce(run(alertAt('watch')), alertAt('info'), NOW + MIN).alert.level, 'watch');
+});
+
+test('the same or a higher level replaces the alert showing', () => {
+  assert.equal(run(alertAt('watch'), alertAt('warning')).alert.level, 'warning');
+  const s = run(alertAt('warning', { headline: 'first' }), alertAt('warning', { headline: 'second' }));
+  assert.equal(s.alert.headline, 'second');
+});
+
+test('a lower level replaces a higher one after it expired', () => {
+  const s = reduce(run(alertAt('watch')), alertAt('info'), NOW + 30 * MIN);
+  assert.equal(s.alert.level, 'info');
+  assert.equal(s.alert.at, NOW + 30 * MIN);
+});
+
+test('a demo alert headline starts with the demo prefix', () => {
+  const s = run(alertAt('emergency', { demo: true, headline: 'M5.1 earthquake near Richardson, TX' }));
+  assert.equal(s.alert.headline, 'DEMO, not a real alert. M5.1 earthquake near Richardson, TX');
+  assert.equal(run(alertAt('info', { demo: true, headline: '' })).alert.headline, 'DEMO, not a real alert.');
+  assert.equal(run(alertAt('info', { demo: 'yes', headline: 'x' })).alert.headline, 'x');
+});
+
+test('an alert never changes the home status word', () => {
+  for (const level of ['info', 'watch', 'warning', 'emergency']) {
+    assert.equal(run(alertAt(level)).status, 'PROTECTED');
+    assert.equal(run(quake, alertAt(level)).status, 'CHECKING_IN');
+  }
 });
 
 test('source labels cover NOAA, NWS, USGS, GDACS and sensor', () => {

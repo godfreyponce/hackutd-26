@@ -10,7 +10,7 @@ import re
 import time
 from dataclasses import dataclass, field
 
-from .scripts import HANDOFF_CONTACTS
+from .scripts import DEMO_TEXT, HANDOFF_CONTACTS
 
 HOME_ID = "H000"  # the real box (contract addendum v1)
 MAX_WORDS = 60  # the brief asks for about 60 words
@@ -31,6 +31,7 @@ NOTE_PROMPT = f"""You write a short hand-off note for responders after a fake al
 Use only the facts given. Copy every number exactly as it is in the facts. Add no other number.
 Never write a phone number or an emergency number. Say "no response after an event", never "fall detection".
 Write 3 or 4 plain short sentences, under {MAX_WORDS} words. Use plain words, not field names.
+When the alert has demo true, write "{DEMO_TEXT}." in the note.
 Pick who to contact first from the contacts, by id.
 Reply with only one JSON object: {{"note": "...", "contact": "<contact id>"}}"""
 
@@ -43,7 +44,7 @@ Reply with only the lines."""
 def build_facts(*, trigger, peak_g, presence, answers, battery_pct, power, alert, reason, at):
     """answers: (try, answer, transcript) in order. alert: the last `alert` message or None."""
     event = {"quake": "earthquake", "fall_hint": "presence sensor saw the person go from moving to still",
-             "recheck": "scheduled recheck"}.get(trigger, trigger)
+             "recheck": "scheduled recheck", "alert": "emergency alert"}.get(trigger, trigger)
     return {
         "home": HOME_ID,
         "time": at,
@@ -53,7 +54,8 @@ def build_facts(*, trigger, peak_g, presence, answers, battery_pct, power, alert
         "answers": [{"try": n, "answer": a, "transcript": t} for n, a, t in answers],
         "battery_pct": battery_pct,
         "power": power,
-        "alert": {k: alert.get(k) for k in ("source", "event", "headline")} if alert else None,
+        "alert": {**{k: alert.get(k) for k in ("source", "event", "headline")},
+                  **{k: alert[k] for k in ("code", "level", "demo") if k in alert}} if alert else None,
         "alarm_reason": reason,
     }
 
@@ -69,6 +71,8 @@ def check_note(text, facts):
         return "names an emergency number"
     if _BANNED_WORDS.search(text):
         return "says fall or radar"
+    if (facts.get("alert") or {}).get("demo") and DEMO_TEXT.lower() not in text.lower():
+        return f"does not say {DEMO_TEXT}"
     known = set(_NUMBER.findall(json.dumps(facts)))
     for number in _NUMBER.findall(text):
         if number not in known:
@@ -90,7 +94,11 @@ def template_note(facts, contact_id):
     if facts["battery_pct"] is not None:
         parts.append(f"Battery {facts['battery_pct']}%{', on battery power' if facts['power'] == 'battery' else ''}.")
     if facts["alert"]:
-        parts.append(f"Official alert: {facts['alert']['event']} ({facts['alert']['source']}).")
+        alert = facts["alert"]
+        if alert.get("demo"):
+            parts.append(f"Alert: {alert['event']} ({alert['source']}). {DEMO_TEXT}.")
+        else:
+            parts.append(f"Official alert: {alert['event']} ({alert['source']}).")
     contact = HANDOFF_CONTACTS[contact_id]
     parts.append(f"Alarm at {facts['time']}. Contact {contact['name']} ({contact['role']}) first.")
     return " ".join(parts)

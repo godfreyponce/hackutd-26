@@ -1,4 +1,4 @@
-import { initialState, reduce, statusText, TRACE_WINDOW_MS } from './state.js';
+import { initialState, reduce, statusText, activeAlert, TRACE_WINDOW_MS } from './state.js';
 
 // The product name is not settled. Change it here only.
 export const PRODUCT_NAME = 'LAND';
@@ -12,6 +12,7 @@ const $ = (id) => document.getElementById(id);
 
 let state = initialState();
 let connected = false;
+let shownAlert = null;
 let lastWaveAt = null;
 
 document.title = `${PRODUCT_NAME} Home`;
@@ -377,7 +378,9 @@ const ANSWERS = { ok: 'I\'m okay', help: 'Help', no_answer: 'No answer' };
 const timeOf = (at) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 function render() {
-  const { word, detail, note } = statusText(state.status, { alert: Boolean(state.alert), linked: connected });
+  const a = activeAlert(state, Date.now());
+  shownAlert = a;
+  const { word, detail, note } = statusText(state.status, { alert: Boolean(a), linked: connected });
   document.body.dataset.status = state.status;
   document.body.dataset.link = connected ? 'up' : 'down';
   $('word').textContent = word;
@@ -393,10 +396,10 @@ function render() {
   $('heard-chip').className = `chip ${heard?.answer ?? ''}`;
   $('heard-chip').textContent = heard ? ANSWERS[heard.answer] ?? heard.answer : '';
 
-  const a = state.alert;
   $('banner').hidden = !a;
   $('alert-count').hidden = !a;
   if (a) {
+    $('banner').dataset.level = a.level;
     $('alert-source').textContent = a.source;
     $('alert-event').textContent = [a.event, a.severity].filter(Boolean).join(', ');
     $('alert-headline').textContent = a.headline;
@@ -444,6 +447,7 @@ function connect() {
 function tick() {
   $('clock').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   renderQuake();
+  if (activeAlert(state, Date.now()) !== shownAlert) render();
 }
 setInterval(tick, 1000);
 tick();

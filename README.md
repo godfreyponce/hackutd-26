@@ -1,3 +1,9 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/land-wordmark-white.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/brand/land-wordmark-navy.svg">
+  <img alt="LAND: Life Against Natural Disaster" src="docs/brand/land-wordmark-navy.svg" width="360">
+</picture>
+
 # hackutd-26
 HackUTD 26: Zero Day · Sat Nov 7 12:00 PM → Sun Nov 8 12:00 PM · ECSW, UTD
 Team: Godfrey (software/AI) · Rafael (hardware/embedded)
@@ -29,6 +35,7 @@ Team: Godfrey (software/AI) · Rafael (hardware/embedded)
 docs/              hub, event info, ideas, plan, inventory + shopping list
 docs/research/     edge AI, cascades, boards, embedded, judging, judge UI, pitch/demo, risks, Claude loadout
 docs/tracks/       official tracks + one research card per sponsor + MLH + past NVIDIA winners
+docs/brand/        LAND logo SVGs + PNG exports (redo the PNGs: sh docs/brand/export-png.sh)
 hardware/case/     custom Pi 5 + AI HAT+ case (build123d source, PLAN.md)
 hardware/case/cad/ STEP/STL/3MF exports + interactive assembly viewer (open the .html)
 ```

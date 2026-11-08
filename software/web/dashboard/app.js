@@ -279,7 +279,7 @@ const bus = connectBus(hubUrl(location.search), {
         onRerank(msg);
         return;
       case 'alert':
-        alertHtml = `Official alert: ${esc(msg.headline || msg.event || 'alert')} (${esc(msg.source ?? 'unknown')}).`;
+        alertHtml = `Official alert${msg.level ? `, ${esc(msg.level)}` : ''}: ${msg.demo === true ? 'DEMO, not a real alert. ' : ''}${esc(msg.headline || msg.event || 'alert')} (${esc(msg.source ?? 'unknown')}).`;
         renderEvent();
         return;
       case 'quake':

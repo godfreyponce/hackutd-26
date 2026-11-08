@@ -6,6 +6,7 @@ from pathlib import Path
 
 from websockets.asyncio.server import ServerConnection, broadcast, serve
 
+from software.hub.alert_level import alert_level
 from software.hub.web import start_static
 
 log = logging.getLogger("hub")
@@ -41,6 +42,8 @@ class Hub:
 
     def publish(self, msg: dict) -> dict:
         msg.setdefault("t", now_ms())
+        if msg.get("type") == "alert":
+            msg["level"] = alert_level(msg)
         broadcast(self.clients, json.dumps(msg))
         for listener in self.listeners:
             listener(msg)

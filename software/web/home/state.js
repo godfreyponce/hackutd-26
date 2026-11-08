@@ -12,6 +12,13 @@ const CHECKIN_STATUS = {
   help: 'CONTACTING_HELP',
 };
 
+// The hub adds `level` to every alert (software/hub/alert_level.py). Warning and emergency stay until reset.
+const ALERT_RANK = { info: 0, watch: 1, warning: 2, emergency: 3 };
+const ALERT_TTL_MS = { info: 2 * 60_000, watch: 30 * 60_000, warning: Infinity, emergency: Infinity };
+// An alert from a hub without levels errs high: orange, until reset.
+const DEFAULT_ALERT_LEVEL = 'warning';
+const DEMO_PREFIX = 'DEMO, not a real alert.';
+
 const SOURCE_LABELS = { noaa: 'NOAA', nws: 'NWS', usgs: 'USGS', gdacs: 'GDACS', sensor: 'Sensor' };
 
 export function initialState() {
@@ -28,6 +35,30 @@ export function initialState() {
     quakes: [],
     areaHit: false, // neighborhood dots turn red after a quake
     home: 'idle', // node map dot: idle (white), hit (red), ok (green)
+  };
+}
+
+export function activeAlert(state, now) {
+  const a = state.alert;
+  return a && now - a.at < ALERT_TTL_MS[a.level] ? a : null;
+}
+
+function onAlert(state, msg, now) {
+  const level = Object.hasOwn(ALERT_RANK, msg.level) ? msg.level : DEFAULT_ALERT_LEVEL;
+  const showing = activeAlert(state, now);
+  if (showing && ALERT_RANK[level] < ALERT_RANK[showing.level]) return state;
+  const headline = String(msg.headline ?? '');
+  return {
+    ...state,
+    alert: {
+      source: sourceLabel(msg.source),
+      event: msg.event ?? 'Alert',
+      severity: msg.severity ?? '',
+      area: msg.area ?? '',
+      headline: msg.demo === true ? [DEMO_PREFIX, headline].filter(Boolean).join(' ') : headline,
+      level,
+      at: now,
+    },
   };
 }
 
@@ -87,17 +118,7 @@ export function reduce(state, msg, now) {
     case 'heard':
       return { ...state, heard: { answer: msg.answer, transcript: String(msg.transcript ?? ''), tryNum: state.tryNum } };
     case 'alert':
-      return {
-        ...state,
-        alert: {
-          source: sourceLabel(msg.source),
-          event: msg.event ?? 'Alert',
-          severity: msg.severity ?? '',
-          area: msg.area ?? '',
-          headline: msg.headline ?? '',
-          at: now,
-        },
-      };
+      return onAlert(state, msg, now);
     case 'power':
       if (msg.state !== 'battery' && msg.state !== 'mains') return state;
       return { ...state, onBattery: msg.state === 'battery' };
