@@ -212,7 +212,7 @@ const HUB = qs.get("hub") || `ws://${HOST}:8765`;
 const $ = (id) => document.getElementById(id);
 $("video").src = qs.get("video") || `http://${HOST}:8090/stream.mjpg`;
 $("video").onerror = () => { $("videoNote").textContent = "No camera stream (land-camera on :8090)."; };
-let ws, drain = null;
+let ws, drain = null, lastCheckin = null;
 
 function light(id, text, red) {
   const n = $("n-" + id); if (!n) return;
@@ -283,8 +283,11 @@ function show(m) {
     case "heard": light("mics", `heard: ${m.answer}`); return row("r-heard", `👂 heard: ${m.answer}${m.transcript ? ` — "${m.transcript}"` : ""}`);
     case "checkin": {
       const s = m.state, red = s === "alarm" || s === "help";
+      // The agent sends clear right after no_answer only when nobody was seen (no alarm, software/agent/checkin.py _apply_rule).
+      const nobody = s === "clear" && lastCheckin === "no_answer"; lastCheckin = s;
       light("ring", { asking: "amber · asking", no_answer: "amber · asking", alarm: "RED · alarm", help: "RED · alarm", ok: "green", clear: "green" }[s] || s, red);
       light("screens", "check-in " + s, red);
+      if (nobody) { setStatus("NO RESPONSE", "asking"); return row("", `check-in → ${s}${m.try ? " (try " + m.try + ")" : ""}: Nobody seen at home. No alarm.`); }
       setStatus({ asking: `CHECKING IN${m.try ? " · try " + m.try : ""}`, no_answer: "NO ANSWER", alarm: "ALARM · CONTACTING HELP", help: "HELP REQUESTED", ok: "PROTECTED", clear: "PROTECTED" }[s] || s,
         red ? "alarm" : s === "ok" || s === "clear" ? "ok" : "asking");
       return row(red ? "r-bad" : "", `check-in → ${s}${m.try ? " (try " + m.try + ")" : ""}`);
@@ -320,7 +323,7 @@ Level ${m.rms_dbfs} dBFS, peak ${m.peak_dbfs} dBFS, voice found: ${m.voice_s} s`
       return;
     }
     case "demo_state": if (m.volume != null) { $("vol").value = Math.round(m.volume * 100); $("volText").textContent = Math.round(m.volume * 100) + " %"; } return;
-    case "reset": setStatus("PROTECTED", "ok"); $("trace").textContent = ""; return row("", "↺ reset: all parts back to start");
+    case "reset": lastCheckin = null; setStatus("PROTECTED", "ok"); $("trace").textContent = ""; return row("", "↺ reset: all parts back to start");
   }
 }
 function connect() {
