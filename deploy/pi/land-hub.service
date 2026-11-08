@@ -4,7 +4,7 @@ After=network-online.target
 
 [Service]
 WorkingDirectory=%h/hackutd-26
-ExecStart=%h/hackutd-26/.venv/bin/python -m software.hub --host 0.0.0.0
+ExecStart=%h/hackutd-26/.venv/bin/python -m software.hub --bus --host 0.0.0.0
 Restart=always
 RestartSec=2
 

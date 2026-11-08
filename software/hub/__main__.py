@@ -7,7 +7,9 @@ from software.hub.bus import running_hub
 
 async def main(args):
     async with running_hub(args.host, args.ws_port, args.http_port) as hub:
-        if args.sim:
+        if args.bus:
+            await asyncio.Event().wait()  # bus + web only: the Pi's sensor services are normal hub clients
+        elif args.sim:
             from software.hub.sim import run_sim
 
             await run_sim(hub)
@@ -22,6 +24,7 @@ def cli():
     mode = p.add_mutually_exclusive_group(required=True)
     mode.add_argument("--sim", action="store_true", help="the Mac pretends to be the box (keyboard)")
     mode.add_argument("--serial", metavar="PORT", help="read JSON lines from the ESP32, e.g. /dev/tty.usbserial-XXXX")
+    mode.add_argument("--bus", action="store_true", help="bus and web only (the Pi: sensors connect as clients)")
     p.add_argument("--ws-port", type=int, default=8765)
     p.add_argument("--http-port", type=int, default=8080)
     p.add_argument("--host", default="localhost", help="bind address (0.0.0.0 to reach the hub from another device)")
