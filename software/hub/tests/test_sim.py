@@ -42,7 +42,17 @@ def test_a_sends_cap_shaped_demo_alert():
     assert alert["type"] == "alert"
     for field in ("source", "event", "severity", "urgency", "certainty", "area", "headline"):
         assert alert[field]
-    assert "DEMO" in alert["headline"]
+    assert alert["code"] == "EQW" and alert["station"] == "HACKDEMO"
+    assert alert["demo"] is True
+    assert alert["distance_mi"] <= 25
+    assert "DEMO" not in alert["headline"]
+
+
+def test_a_alert_reaches_the_bus_as_emergency():
+    from software.hub.alert_level import alert_level
+
+    (alert,), _ = key_events("a", START_STATE)
+    assert alert_level(alert) == "emergency"
 
 
 def test_r_sends_reset_and_restores_start_state():
