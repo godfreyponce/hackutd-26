@@ -17,7 +17,23 @@ Part of [HackUTD-2026](HackUTD-2026.md). Merged 2026-11-07 ~3:50 PM from:
 **Stock and prices are unverified** (Micro Center blocks bots). Call or check the app before driving. Micro Center Dallas, 13929 N Central Expy, open until 9 PM.
 The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 
-## Buy list, by priority (Micro Center only; exact names to look for)
+## BOUGHT (Micro Center, Sat 2026-11-07 ~6 PM): the actual purchase
+Rafael: "everything else on the buy list we won't have."
+
+| Bought | MC SKU | Price | vs the plan |
+|---|---|---|---|
+| Raspberry Pi 45 W USB-C power supply | 829002 | $14.99 | Replaces the 27 W supply / the "45 W charger if needed" line |
+| USB 3.0 A-to-A extension, 3 ft, male/female | 601583 | $9.99 | The SDR extension (longer than planned) |
+| **Raspberry Pi AI HAT+ 26 TOPS** | 772574 | $109.99 | **Was dropped from the plan**; now owned |
+| Software defined radio ("NPD", likely a **Nooelec NESDR**) | 051086 | $59.99 | Replaces the Adafruit stick. Nooelec sticks normally use an **SMA** antenna connector (check) |
+| Adafruit I2S MEMS microphone | 837724 | $8.99 | **1 bought** (the plan had 2) |
+| Adafruit NeoPixel ring (LED count: check the bag) | 466599 | $8.99 | As planned |
+| Raspberry Pi Active Cooler | 620310 | $9.99 | As planned |
+| Raspberry Pi 4 case | 188631 | $4.99 | Not on the plan. A Pi 4 case does not fit a Pi 5 |
+
+**NOT bought (won't have):** PiPower 5 UPS, 5 A USB-C cable, DFRobot SEN0395 radar, MAX98357A amp, 40 mm speaker, power strip, PLA filament, M2.5 screws, Command strips.
+
+## Buy list, by priority (plan before the purchase) (Micro Center only; exact names to look for)
 **Micro Center only** (Rafael can't order from Amazon, 2026-11-07). MC numbers come from research and are unverified, so match the name on the box.
 
 ### Priority 1: the demo doesn't work without these
