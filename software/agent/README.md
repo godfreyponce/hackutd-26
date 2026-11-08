@@ -40,6 +40,7 @@ The agent stores every hub `alert` (the last one goes into the hand-off facts). 
 
 - An EQW alert within `ALERT_QUIET_S` (300 s) of any check-in start, except a help sign check-in, is ignored, so a shake followed by an alert asks once. A shake right after an alert check-in still starts its own check-in. A VERIFY row says when an alert is ignored.
 - The hand-off note uses the alert that started the check-in, not a later one.
+- The first line of an EQW alert check-in carries `"tone":"warning"`, so the voice service plays a short warning tone before it (#64). On a demo alert that line is `alert_demo`. No other check-in gets the tone.
 - `demo: true`: the box says `alert_demo` ("DEMO, not a real alert.") before the first ask. Trace rows, the planner brief, the decision row and the hand-off note say it too. A Nemotron note about a demo alert without those words gets the template.
 
 ## Camera help sign (#46)

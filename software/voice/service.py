@@ -77,6 +77,8 @@ class VoiceService:
                 self.log("WARNING TONE (EQW alert, not the alarm)")
                 if self.warning:
                     await asyncio.to_thread(self._audio, "warning tone", self.warning.play)
+                if self.resets != reset_mark:
+                    continue
             self.log(f"SAY [{msg.get('script_id')}] {text}")
             try:
                 await asyncio.to_thread(self.engine.speak, text, msg.get("script_id"))

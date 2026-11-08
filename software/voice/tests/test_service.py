@@ -1,6 +1,7 @@
 import asyncio
 import json
 import threading
+import time
 
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import broadcast, serve
@@ -207,14 +208,20 @@ def test_other_checkin_states_play_no_tone():
 class FakeWarning:
     """Records the warning tone instead of playing it."""
 
-    def __init__(self, events, broken=False):
+    def __init__(self, events, broken=False, hold=None):
         self.events = events
         self.broken = broken
+        self.hold = hold
 
     def play(self):
         self.events.append("warning tone")
+        if self.hold:
+            self.hold.wait(5)
+        else:
+            time.sleep(0.02)
         if self.broken:
             raise OSError("audio device unplugged")
+        self.events.append("warning tone end")
 
 
 def test_say_with_the_warning_tone_plays_the_tone_before_the_line():
@@ -228,7 +235,7 @@ def test_say_with_the_warning_tone_plays_the_tone_before_the_line():
         await next_heard(ws)
 
     run_with_service(engine, body, warning=FakeWarning(events))
-    assert events == ["warning tone", "say test", "say test"]
+    assert events == ["warning tone", "warning tone end", "say test", "say test"]
 
 
 def test_unknown_tone_plays_nothing_and_still_speaks():
@@ -266,3 +273,22 @@ def test_broken_warning_tone_still_speaks_the_line():
 
     run_with_service(engine, body, warning=FakeWarning(events, broken=True))
     assert events == ["warning tone", "say test"]
+
+
+def test_reset_during_the_warning_tone_drops_the_line():
+    events = []
+    hold = threading.Event()
+    engine = OrderedEngine([], events)
+
+    async def body(ws, service):
+        await say(ws, "Something just happened. Are you okay?", listen_s=6, tone="warning")
+        await wait_for(lambda: "warning tone" in events)
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 1)
+        hold.set()
+        await say(ws, "After the reset.")
+        await wait_for(lambda: engine.spoken)
+
+    run_with_service(engine, body, warning=FakeWarning(events, hold=hold))
+    assert engine.spoken == ["After the reset."]
+    assert engine.listens == []

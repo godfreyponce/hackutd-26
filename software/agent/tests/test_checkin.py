@@ -526,6 +526,30 @@ def test_standup_reask_after_an_eqw_alarm_asks_for_no_tone():
     assert _tones(bus) == [("ask_event", "warning")]
 
 
+def test_recheck_after_an_eqw_checkin_asks_for_no_tone():
+    def recheck_once(messages):
+        r = last_result(messages)
+        if r is not None and r["next"] == "done":
+            return [] if any('"recheck_in_min"' in str(m.get("content")) for m in messages) else [
+                ("schedule_recheck", {"minutes": 1})]
+        return cooperative(messages)
+
+    async def scenario():
+        bus = FakeBus(["ok", "ok"])
+        agent = make_agent(bus, planners=llm(FakeClient(recheck_once)))
+        await agent.handle(STILL)
+        await agent.handle(EQW)
+        await agent.idle()
+        await asyncio.sleep(FAST.recheck_unit_s * 2)
+        await agent.idle()
+        return bus, agent
+
+    bus, agent = asyncio.run(scenario())
+    assert agent.incident.trigger == "recheck"
+    assert bus.says().count("ask_event") == 1
+    assert _tones(bus) == [("ask_event", "warning")]
+
+
 def _note(bus):
     [handoff] = [m for m in bus.sent if m["type"] == "handoff"]
     return handoff["note"]
