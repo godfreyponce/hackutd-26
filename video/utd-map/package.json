@@ -1,0 +1,13 @@
+{
+  "name": "land-utd-map-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "record": "node record.mjs",
+    "preview": "node record.mjs --preview",
+    "serve": "node record.mjs --serve"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0"
+  }
+}

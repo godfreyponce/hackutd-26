@@ -1,0 +1,14 @@
+{
+  "$comment": "Fixed camera framings (CONTRACT.md §8). target = feature id or 'origin'; az = degrees clockwise from grid north, the direction the camera looks FROM; elev = degrees above horizontal; dist = metres from the target; eye = metres above ground for street-level framings; width = visible metres across the viewport for top-down ortho. Screenshots: 1600x900, DPR 1, docs/qa/<phase>/<id>.png",
+  "framings": [
+    { "id": "F0", "target": "origin", "mode": "ortho-top", "width": 1400, "northUp": true, "reference": "NAIP 2022 ortho overlay at 50 % (data/raw/imagery/naip2022.tif; 2024 unavailable)" },
+    { "id": "F1", "target": "origin", "mode": "orbit", "az": 135, "elev": 35, "dist": 1600, "reference": "overview; owner sign-off" },
+    { "id": "F2", "target": "SU", "mode": "street", "az": 180, "elev": 0, "dist": 60, "eye": 1.7, "reference": "mall at street level; owner photos (Phase 2)" },
+    { "id": "F3", "target": "ECSS", "mode": "orbit", "az": 225, "elev": 30, "dist": 350, "reference": "ECS complex; owner photos" },
+    { "id": "F4", "target": "JSOM", "mode": "orbit", "az": 160, "elev": 30, "dist": 400, "reference": "south campus incl. APC, JSOM3" },
+    { "id": "F5", "target": "RHA", "mode": "orbit", "az": 60, "elev": 30, "dist": 450, "reference": "residence halls" },
+    { "id": "F6", "target": "NS12", "mode": "orbit", "az": 200, "elev": 30, "dist": 450, "reference": "Northside + DART station" },
+    { "id": "F7", "target": "ECSS", "mode": "street", "az": 270, "elev": 0, "dist": 90, "eye": 1.7, "reference": "ECSS west face from Rutford Ave at street level (facades.md §3.3); owner photos" },
+    { "id": "F8", "target": "JO", "mode": "street", "az": 90, "elev": 0, "dist": 85, "eye": 1.7, "reference": "JO east face at street level (facades.md §3.3); owner photos" }
+  ]
+}

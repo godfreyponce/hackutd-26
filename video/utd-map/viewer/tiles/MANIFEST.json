@@ -1,0 +1,35 @@
+{
+  "stage": "tiles",
+  "started": "2026-10-27T21:10:10Z",
+  "wall_time_s": 18.14,
+  "inputs": [],
+  "outputs": [
+    {
+      "path": "dist/tiles/tileset.json",
+      "bytes": 149336,
+      "sha256": "4a3920c8ca00b4454f109ea2de820af4100c7a807bfba64d606faf637c1fd4ff"
+    },
+    {
+      "path": "dist/aris/tiles/tileset.json",
+      "bytes": 64762,
+      "sha256": "ec21c428052093f3ad12c5e59fe4f8308ecd606885cd09c093edae625d3cb85e"
+    }
+  ],
+  "tools": {
+    "python": "3.13.3",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "node": "v22.23.2"
+  },
+  "params": {
+    "only": null,
+    "note": "whole-campus; --only ignored"
+  },
+  "counts": {
+    "release_features": 2057,
+    "release_contents": 344,
+    "release_MB": 16.49,
+    "aris_features": 2057,
+    "aris_contents": 256,
+    "aris_MB": 11.66
+  }
+}

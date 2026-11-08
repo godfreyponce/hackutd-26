@@ -1,0 +1,16 @@
+{
+  "note": "Camera path for the LAND video. Metres in the viewer frame: x = east, y = up, z = SOUTH (north is -z). Origin is the campus centre. Each key is a time in seconds, a camera position and the point it looks at. The path is a smooth spline through the keys, eased in and out, then held on the last key. Landmarks: TAGER Tower base (-7.4, 7.5, -167), top y 94.7. Canyon Creek Heights South centre (-448.5, 3, 832.5), roofs y 10.8.",
+  "fps": 60,
+  "width": 1920,
+  "height": 1080,
+  "hold": 1.5,
+  "labels": false,
+  "keys": [
+    { "t": 0,    "pos": [95, 45, -40],     "look": [-7, 55, -167] },
+    { "t": 3.5,  "pos": [120, 95, -300],   "look": [-7, 60, -167] },
+    { "t": 5,    "pos": [60, 140, -320],   "look": [-60, 40, -40] },
+    { "t": 8,    "pos": [-200, 170, 260],  "look": [-400, 10, 760] },
+    { "t": 10.5, "pos": [-330, 90, 620],   "look": [-448, 5, 832] },
+    { "t": 13,   "pos": [-365, 40, 765],   "look": [-448, 6, 832] }
+  ]
+}
