@@ -16,6 +16,8 @@ Built at HackUTD 2026 "Zero Day" by Godfrey (software) and Rafael Amador (hardwa
 
 ## How it works
 
+![LAND architecture: the box talks to a websockets event hub, which connects the Nemotron agent, Safety Guard, ElevenLabs voice, the offline backup and the dashboard. A fixed rule in code decides the demo alarm.](docs/architecture.png)
+
 1. **An event.** A quake, a NOAA earthquake warning, or a person in the room who goes from moving to still.
 2. **A voice check-in.** The box asks "Are you okay?" up to three times. ElevenLabs speaks and listens. A keyword match, not a model, sorts each answer into okay, help or no answer.
 3. **A Nemotron agent.** NVIDIA Nemotron runs the check-in as an agent. Each turn it picks a tool, such as check presence, speak, listen or raise the alarm. Nemotron Safety Guard screens each transcript before the agent sees it. The box only says lines from a fixed list. Nemotron picks a line by its id.
