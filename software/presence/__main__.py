@@ -69,7 +69,7 @@ async def run(url, frames, tracker, wait_for_hub=False):
     A pipe or a camera must not wait for the hub. wait_for_hub=True suits a file, which can wait.
     """
     async def resend_state():
-        # A reset puts every piece's presence back to none. Restore it now, not at the next 5 s repeat.
+        # A reset or a hub restart puts every piece's presence back to none. Restore it now, not at the next 5 s repeat.
         tracker.hub_reset()
         if tracker.state is not None:
             await link.send({"type": "presence", "state": tracker.state})

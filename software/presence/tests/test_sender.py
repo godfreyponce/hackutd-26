@@ -261,6 +261,7 @@ def test_the_hub_logs_no_error_when_the_service_exits(tmp_path, caplog):
             while hub.clients:  # the hub handles the close after the process is gone
                 await asyncio.sleep(0.01)
 
-    with caplog.at_level(logging.INFO, logger="websockets.server"):
+    with caplog.at_level(logging.INFO, logger="hub"):
         asyncio.run(asyncio.wait_for(scenario(), timeout=15))
+    assert any(r.getMessage().startswith("client connected") for r in caplog.records)
     assert [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR] == []
