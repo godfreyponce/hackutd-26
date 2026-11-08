@@ -64,7 +64,7 @@ test('a quake or a stand-up re-ask never hides CONTACTING_HELP', () => {
 });
 
 test('a first ask after a check-in that ended at no response, with no alarm, shows CHECKING_IN', () => {
-  // Nobody home: the agent sends asking 1, no_answer 1, then nothing. The next event starts a new check-in.
+  // Nobody home: the agent sends asking 1, no_answer 1, then clear, which this page missed. The next event starts a new check-in.
   const s = run(quake, asking(1), noAnswer(1), { type: 'fall_hint' }, asking(1));
   assert.equal(s.status, 'CHECKING_IN');
   assert.equal(s.tryNum, 1);
@@ -92,6 +92,12 @@ for (const end of ['clear', 'ok']) {
     assert.equal(s.home, 'ok');
   });
 }
+
+test('a clear that ends a check-in nobody answered keeps the home dot red', () => {
+  const s = run(quake, asking(1), noAnswer(1), { type: 'checkin', state: 'clear', try: 1 });
+  assert.equal(s.status, 'PROTECTED');
+  assert.equal(s.home, 'hit');
+});
 
 const STATES = {
   PROTECTED: [],

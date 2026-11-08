@@ -109,7 +109,8 @@ def test_okay_logs_with_no_alarm(kind):
 @pytest.mark.parametrize("kind", PLANNERS)
 def test_nobody_and_no_answer_is_no_alarm(kind):
     bus, _ = go(["no_answer"], [NOBODY, QUAKE], PLANNERS[kind]())
-    assert bus.checkins() == [("asking", 1), ("no_answer", 1)]
+    # The box asks once and stops, so the screens must not stay on "Asking again".
+    assert bus.checkins() == [("asking", 1), ("no_answer", 1), ("clear", 1)]
     assert "alarm" not in bus.states()
 
 
@@ -319,7 +320,7 @@ def test_an_unknown_answer_with_words_counts_as_no_answer_and_skips_the_guard():
     guard = FakeGuard()
     bus, _ = go([{"answer": "maybe", "transcript": "blah"}], [NOBODY, QUAKE], guard=guard)
     assert guard.seen == []
-    assert bus.states()[-1] == "no_answer"
+    assert bus.states()[-2:] == ["no_answer", "clear"]
 
 
 def test_skipped_noise_never_reaches_the_planner():
@@ -487,7 +488,7 @@ def test_eqw_alert_keeps_the_alarm_rule(kind):
     assert bus.says() == ["ask_event", "ask_retry_2", "ask_retry_3", "escalate"]
     assert bus.states()[-1] == "alarm"
     bus, _ = go(["no_answer"], [NOBODY, EQW], PLANNERS[kind]())
-    assert bus.checkins() == [("asking", 1), ("no_answer", 1)]
+    assert bus.checkins() == [("asking", 1), ("no_answer", 1), ("clear", 1)]
 
 
 def test_planner_asking_with_the_other_ask_id_still_gets_ask_event():
@@ -739,7 +740,7 @@ def test_help_sign_keeps_the_alarm_rule(kind):
     assert bus.says() == GESTURE_ASKS + ["escalate"]
     assert bus.states()[-1] == "alarm"
     bus, _ = go(["no_answer"], [NOBODY, HELP_SIGN], PLANNERS[kind]())
-    assert bus.checkins() == [("asking", 1), ("no_answer", 1)]
+    assert bus.checkins() == [("asking", 1), ("no_answer", 1), ("clear", 1)]
     assert "alarm" not in bus.states()
 
 

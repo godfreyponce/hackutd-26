@@ -104,12 +104,15 @@ function onEvent(state, kind, extra = {}) {
 function onCheckin(state, msg) {
   const tryNum = msg.try ?? state.tryNum;
   if (msg.state === 'ok' || msg.state === 'clear') {
-    return { ...state, status: 'PROTECTED', tryNum: null, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false, trigger: null };
+    // With nobody there, the agent sends clear right after a no answer. The check-in is over, but nobody said they were okay.
+    const unanswered = msg.state === 'clear' && state.status === 'NO_RESPONSE';
+    const home = state.home === 'hit' && !unanswered ? 'ok' : state.home;
+    return { ...state, status: 'PROTECTED', tryNum: null, home, helpSign: false, trigger: null };
   }
   const status = CHECKIN_STATUS[msg.state];
   if (!status) return state;
   // The agent sends asking try 1 only to start a check-in or for the stand-up re-ask after an alarm
-  // (software/agent/checkin.py _speak). A check-in that ended at no response with no alarm sends no end message.
+  // (software/agent/checkin.py _speak). Its status reset also covers a check-in whose clear this screen missed.
   if (msg.state === 'asking' && msg.try === 1) {
     const standup = state.status === 'CONTACTING_HELP';
     return {
@@ -224,8 +227,8 @@ function logAlert(h, msg, now) {
   });
 }
 
-// A check-in entry ends on ok or clear. A first ask after a new event starts a new entry, so a check-in
-// that ended with no response (nobody there, no alarm) is not merged into the next one.
+// A check-in entry ends on ok or clear. A clear after a no answer with no alarm (nobody there) ends the entry
+// at no response, since nobody said they were okay.
 function logCheckin(h, msg, now) {
   const [open, ...rest] = h.checkins;
   const sent = typeof msg.try === 'number' ? msg.try : 1;
@@ -234,7 +237,8 @@ function logCheckin(h, msg, now) {
   // After an okay to the stand-up question the agent sends clear at once (software/agent/checkin.py _apply_rule).
   const clearsLastOk = msg.state === 'clear' && open?.state === 'ok';
   // The agent ignores events while its check-in is open, which includes after the alarm until ok or clear.
-  // Only a check-in left at no response with no alarm has ended for the agent.
+  // A check-in left at no response with no alarm, then a first ask after a new event, means the agent ended it,
+  // even if this screen missed its clear.
   const replaced = open?.state === 'no_answer' && !open.escalated && msg.state === 'asking' && tries === 1 && h.trigger && h.trigger.at > open.updatedAt;
   const fresh = !clearsLastOk && (!open?.open || replaced);
   if (fresh) {
@@ -243,8 +247,9 @@ function logCheckin(h, msg, now) {
     };
     return { ...h, trigger: null, checkins: push(h.checkins, { ...entry, open: !['ok', 'clear'].includes(msg.state) }) };
   }
+  const endsUnanswered = msg.state === 'clear' && open.state === 'no_answer' && !open.escalated;
   const entry = {
-    ...open, state: msg.state, tries: Math.max(open.tries, tries), updatedAt: now, open: !['ok', 'clear'].includes(msg.state),
+    ...open, state: endsUnanswered ? open.state : msg.state, tries: Math.max(open.tries, tries), updatedAt: now, open: !['ok', 'clear'].includes(msg.state),
     escalated: open.escalated || ESCALATED.includes(msg.state),
   };
   // The agent ignores events while a check-in runs, so one that came in meanwhile started nothing.

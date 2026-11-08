@@ -40,6 +40,18 @@ test('help and alarm put the real box at clock 0; ok and clear bring it back', (
   assert.deepEqual([cleared.alarm, cleared.no_answer, cleared.said_help, cleared.answered_ok], [false, 0, false, true]);
 });
 
+test('a clear with no alarm or help keeps the no-answer count', () => {
+  const s = run([
+    { type: 'presence', state: 'none' },
+    { type: 'checkin', state: 'asking', try: 1 },
+    { type: 'checkin', state: 'no_answer', try: 1 },
+    { type: 'checkin', state: 'clear', try: 1 },
+  ]);
+  assert.equal(s.checkin, 'clear');
+  assert.equal(s.no_answer, 1);
+  assert.equal(boxRankInput(s, 0).no_answer, 1);
+});
+
 test('the real box goes stale after 5 minutes without a sensor message', () => {
   const s = initialBox(0);
   assert.equal(boxRankInput(s, STALE_MS).stale, false);
