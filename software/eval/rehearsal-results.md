@@ -51,8 +51,9 @@ Read from `raw.jsonl` (hub publish times):
 - Safety Guard. On the room-noise listens, Scribe returned words instead of nothing:
   "[singing] And I want you to be mine", "[singing]", "[outro jingle]". The classifier still said
   no_answer each time, so every call was right. But a non-empty transcript goes to the hosted Safety Guard
-  before the rule runs, and each check took 0.5 to 17 s. Per demo run that added 17.4 s median
-  (45.5 s worst) with a 6 s listen, and 15.6 s median (43.3 s worst) with a 4 s listen.
+  before the rule runs, and each check took 0.5 to 19.7 s. Per demo run that added 17.3 s median
+  (45.5 s worst) with a 6 s listen, and 15.5 s median (43.3 s worst) with a 4 s listen.
+  These online numbers describe the agent before #65 (PR #67), which removes the guard wait on no_answer.
 - Without the guard wait, the online demo run would be 55.3 s median (6 s listen) and 47.4 s median (4 s
   listen). Measured per run as the last word minus that run's guard waits.
 - With the internet cut, the guard fails at once and the transcript is withheld. Kokoro and Moonshine
@@ -67,7 +68,7 @@ guard check. That is runtime behavior. This issue does not change it; the owner 
 - Internet cut, listen 6 s, demo run 8 (alarm 41.1 s, last word 59.6 s): the agent was not slow. The fixed
   script put each ask on the bus at once. Every voice step was slower: the first line started 5.7 s after
   the event (median 0.5 s), and the 3 asks took 14.6, 14.2 and 12.1 s from `say` to `heard` (9.3 to
-  10.6 s in runs 7 and 10). No error, and the same 6 fallbacks as every run. So the time went to local
+  10.9 s in runs 7 and 10). No error, and the same 6 agent fallback rows as every run. So the time went to local
   Kokoro synthesis and Moonshine transcription. The logs do not say why they were slower in that run.
   Other work shared the laptop then: #55's hosted pass was still running. Run 1 shows a smaller delay
   on its first line (4.3 s).
