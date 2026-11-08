@@ -199,3 +199,9 @@ def test_contacts_have_no_phone_numbers():
     for contact in HANDOFF_CONTACTS.values():
         assert not any(ch.isdigit() for ch in str(contact))
     assert handoff.HOME_ID == "H000"
+
+
+def test_a_note_that_says_fall_or_radar_fails():
+    assert check_note("The person fell and stayed still.", FACTS) == "says fall or radar"
+    assert check_note("Possible fall at the box.", FACTS) == "says fall or radar"
+    assert check_note("Radar shows the person still.", FACTS) == "says fall or radar"

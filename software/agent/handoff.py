@@ -21,6 +21,7 @@ WHY_REASONING_BUDGET = 200
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 # The short numbers notify.py guards against, as digits or spoken.
 _EMERGENCY = re.compile(r"(?<![\w.])(?:911|112|999)(?!\w|\.\d)|nine[\s-]*one[\s-]*one", re.I)
+_BANNED_WORDS = re.compile(r"\b(?:fall|falls|fell|fallen|radar)\b", re.I)
 _THINK = re.compile(r"<think>.*?</think>", re.S)
 
 RULE_TEXT = ("Nobody detected + no answer = no alarm. Someone detected + no answer after 3 tries = alarm. "
@@ -66,6 +67,8 @@ def check_note(text, facts):
         return f"{words} words, over {MAX_WORDS}"
     if _EMERGENCY.search(text):
         return "names an emergency number"
+    if _BANNED_WORDS.search(text):
+        return "says fall or radar"
     known = set(_NUMBER.findall(json.dumps(facts)))
     for number in _NUMBER.findall(text):
         if number not in known:
