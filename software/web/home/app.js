@@ -425,7 +425,7 @@ function render() {
   $('heat-at').textContent = state.indoorAt == null ? '' : `Updated ${timeOf(state.indoorAt)}`;
 
   $('hub').classList.toggle('bad', !connected);
-  $('hub-text').textContent = connected ? 'Hub connected' : 'Hub disconnected';
+  $('hub-text').textContent = connected ? 'Hub connected' : 'Hub offline, retrying';
 
   renderQuake();
   renderMap();

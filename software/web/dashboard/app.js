@@ -137,7 +137,7 @@ function startQuake(now, peakG, from) {
   waveAt = HOME_DIST.map((d) => waveStart + (d / MAX_HOME_DIST) * WAVE_MS);
   const when = new Date().toLocaleTimeString();
   const peak = typeof peakG === 'number' ? `, peak ${peakG} g` : '';
-  eventHtml = `<b>Earthquake</b>${peak}, ${when}. The wave is hitting 500 homes.`;
+  eventHtml = `<b>Earthquake</b>${peak}, ${when}. 500 homes hit.`;
   renderEvent();
   addTrace('EVENT', `Quake${peak} from ${from}. Every home in the area gets a contact attempt.`, null, 'dashboard');
 }
@@ -356,7 +356,7 @@ function renderCounters() {
   }
 }
 
-const CHECKIN_LABEL = { asking: 'Asking', ok: 'Okay', help: 'Said help', no_answer: 'No answer', alarm: 'Alarm (demo)', clear: 'Cleared' };
+const CHECKIN_LABEL = { asking: 'Asking', ok: 'Okay', help: 'Said help', no_answer: 'No answer', alarm: 'Alarm', clear: 'Cleared' };
 const ANSWER_LABEL = { ok: 'Okay', help: 'Help', no_answer: 'No answer' };
 const PRESENCE_LABEL = { moving: 'Moving', still: 'Still', none: 'Nobody detected' };
 
@@ -403,7 +403,7 @@ function chipsFor(id, r) {
   else if (s.answered_ok) out.push(chip('okay ×1.5', 'good'));
   else if (s.pendingAt != null) out.push(chip('calling', 'on'));
   else out.push(chip('not reached'));
-  out.push(f.stale ? chip('stale ×0.75', 'warn') : chip('fresh'));
+  if (f.stale) out.push(chip('stale ×0.75', 'warn'));
   return out.join('');
 }
 
