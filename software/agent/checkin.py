@@ -455,9 +455,9 @@ class Agent:
             await self.trace(step, text, tool)
         await self.send(h.event())
         contact = h.event()["contact"]
-        await self.trace("VERIFY", f"Hand-off note by {h.by}: {h.note} Contact first: {contact['name']} "
+        await self.trace("VERIFY", f"Hand-off note by {h.by.capitalize()}: {h.note} Contact first: {contact['name']} "
                          f"({contact['role']}).", "write_handoff")
-        await self.trace("VERIFY", f"Why by {h.why_by}: {' '.join(h.why)}", "explain_alarm")
+        await self.trace("VERIFY", f"Why by {h.why_by.capitalize()}: {' '.join(h.why)}", "explain_alarm")
 
     async def _notify_contact(self, inc, turn, args):
         tid = args.get("template_id")

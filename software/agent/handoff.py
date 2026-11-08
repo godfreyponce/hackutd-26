@@ -15,6 +15,8 @@ from .scripts import HANDOFF_CONTACTS
 HOME_ID = "H000"  # the real box (contract addendum v1)
 MAX_WORDS = 60  # the brief asks for about 60 words
 MAX_WHY_LINES = 3
+# Measured on hosted Nemotron 3.5 Lightning: 200 gave 1.8 s and clean lines. No budget took 11 to 18 s.
+WHY_REASONING_BUDGET = 200
 
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 # The short numbers notify.py guards against, as digits or spoken.
@@ -27,13 +29,13 @@ RULE_TEXT = ("Nobody detected + no answer = no alarm. Someone detected + no answ
 NOTE_PROMPT = f"""You write a short hand-off note for responders after a fake alarm from a home safety box.
 Use only the facts given. Copy every number exactly as it is in the facts. Add no other number.
 Never write a phone number or an emergency number. Say "no response after an event", never "fall detection".
-Plain short sentences, under {MAX_WORDS} words.
+Write 3 or 4 plain short sentences, under {MAX_WORDS} words. Use plain words, not field names.
 Pick who to contact first from the contacts, by id.
 Reply with only one JSON object: {{"note": "...", "contact": "<contact id>"}}"""
 
 WHY_PROMPT = f"""A home safety box raised a fake alarm. Code made the decision with a fixed rule; you do not decide.
 Explain why the rule raised the alarm, from the facts only, in at most {MAX_WHY_LINES} short lines.
-Copy every number exactly as it is in the facts. Never write a phone number or an emergency number.
+Use plain words, not field names. Copy every number exactly as it is in the facts. Never write a phone number or an emergency number.
 Reply with only the lines."""
 
 
@@ -137,11 +139,14 @@ class HandoffWriter:
                        [note_row, why_row])
 
     async def _ask(self, system, payload, thinking):
+        extra = {"chat_template_kwargs": {"enable_thinking": thinking}}
+        if thinking:
+            extra["reasoning_budget"] = WHY_REASONING_BUDGET
         resp = await asyncio.wait_for(self.client.chat.completions.create(
             model=self.model, temperature=0.6, top_p=0.95,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": json.dumps(payload)}],
-            extra_body={"chat_template_kwargs": {"enable_thinking": thinking}}), self.timeout_s)
-        return _THINK.sub("", resp.choices[0].message.content or "").replace("—", ", ").strip()
+            extra_body=extra), self.timeout_s)
+        return _THINK.sub("", resp.choices[0].message.content or "").replace("\u2014", ", ").strip()
 
     async def _timed(self, what, tool, ask, parse):
         start = time.perf_counter()
@@ -150,7 +155,8 @@ class HandoffWriter:
         except _Refused as e:
             return None, ("VERIFY", f"{what} refused: {e}. Using the template.", tool)
         except Exception as e:  # any failure means: the template takes over
-            return None, ("FALLBACK", f"LLM unreachable for the {what.lower()} ({type(e).__name__}: {e}). "
+            reason = f"{type(e).__name__}: {e}" if str(e) else f"no reply in {self.timeout_s:g} s"
+            return None, ("FALLBACK", f"LLM unreachable for the {what.lower()} ({reason}). "
                                       "Using the template.", tool)
         return value, ("VERIFY", f"{what} check passed: every number from the facts, no emergency number, "
                                  f"under {MAX_WORDS} words. Nemotron took {time.perf_counter() - start:.1f} s.", tool)
@@ -176,7 +182,8 @@ class HandoffWriter:
         return (*(value or (None, None)), row)
 
     async def _why(self, facts):
-        payload = {"rule": RULE_TEXT, "decision": "alarm", "facts": facts}
+        payload = {"rule": RULE_TEXT, "decision": "alarm",
+                   **{k: facts[k] for k in ("presence", "someone_detected", "answers", "alarm_reason")}}
 
         def parse(text):
             lines = [re.sub(r"^(?:[-*•]|\d+[.)])\s+", "", ln.strip()) for ln in text.splitlines()]

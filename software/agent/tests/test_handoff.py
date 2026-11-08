@@ -75,8 +75,21 @@ def test_nemotron_note_and_why_pass_the_check():
     assert (h.note, h.contact, h.by) == (GOOD_NOTE, "rafael", "nemotron")
     assert h.why == ["Someone is there: radar says still.", "No answer on 3 tries.", "The rule says that is an alarm."]
     assert h.why_by == "nemotron"
-    thinking = [r["extra_body"]["chat_template_kwargs"]["enable_thinking"] for r in client.requests]
-    assert sorted(thinking) == [False, True]
+    note_req, why_req = sorted(client.requests, key=lambda r: r["extra_body"]["chat_template_kwargs"]["enable_thinking"])
+    assert note_req["extra_body"] == {"chat_template_kwargs": {"enable_thinking": False}}
+    assert why_req["extra_body"]["chat_template_kwargs"] == {"enable_thinking": True}
+    assert why_req["extra_body"]["reasoning_budget"] == handoff.WHY_REASONING_BUDGET
+    assert "battery" not in str(why_req["messages"])  # the why sees only what the rule used
+
+
+def test_a_timeout_names_the_wait():
+    async def slow(**kw):
+        await asyncio.sleep(1)
+
+    client = FakeWriterClient()
+    client.chat.completions.create = slow
+    h = asyncio.run(HandoffWriter(client, "fake-model", timeout_s=0.01).write(FACTS))
+    assert "no reply in 0.01 s" in h.rows[0][1]
 
 
 def test_no_client_uses_the_template():
