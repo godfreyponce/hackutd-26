@@ -128,9 +128,10 @@ body[data-hub="offline"] .box-card dd { color: var(--muted); }
 .box-card h2 b { color: var(--real); font-family: var(--mono); }
 .ring { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--real); }
 .box-card dl { display: grid; gap: 4px; font-size: 13px; }
-.box-card dl div { display: flex; justify-content: space-between; gap: 8px; }
+.box-card dl div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 8px; }
 .box-card dt { color: var(--muted); white-space: nowrap; }
-.box-card dd { text-align: right; font-variant-numeric: tabular-nums; }
+/* A value too long for its row takes its own line, right-aligned, instead of breaking mid-phrase. */
+.box-card dd { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
 .box-card.lit { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
 .box-note { margin: 10px 0 0; padding: 6px 8px; border-radius: 6px; background: var(--red-soft); color: #ffb4ae; font-size: 12px; font-weight: 600; }
 .keys[hidden] { display: none; }

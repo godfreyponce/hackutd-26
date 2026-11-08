@@ -1,7 +1,7 @@
 import { generateHomes, BOUNDS, REAL_BOX_ID } from './homes.js';
 import { rankHomes, applyRerank, queueMessage, DEVICE_WEIGHT } from './rank.js';
 import { PACE, MAX_TRIES, nextAttempts, coverageSweep, answerFor } from './sim.js';
-import { initialBox, applyBoxEvent, boxRankInput } from './box.js';
+import { initialBox, applyBoxEvent, boxRankInput, checkinText, heardText, boxNote } from './box.js';
 import { connectBus, hubUrl } from './bus.js';
 import { panelValues } from './panel.js';
 import { initialCamera, cameraEvent, viewAt, arrivalAt, flying } from './camera.js';
@@ -378,22 +378,15 @@ function renderCounters() {
   }
 }
 
-const CHECKIN_LABEL = { asking: 'Asking', ok: 'Okay', help: 'Said help', no_answer: 'No answer', alarm: 'Alarm', clear: 'Cleared' };
-const ANSWER_LABEL = { ok: 'Okay', help: 'Help', no_answer: 'No answer' };
 const PRESENCE_LABEL = { moving: 'Moving', still: 'Still', none: 'Nobody detected' };
-
-function checkinText() {
-  const showTry = box.try && ['asking', 'no_answer', 'alarm'].includes(box.checkin);
-  return box.checkin ? `${CHECKIN_LABEL[box.checkin] ?? box.checkin}${showTry ? `, try ${box.try}` : ''}` : 'None yet';
-}
 
 function renderBox() {
   const idx = shown.findIndex((r) => r.id === REAL_BOX_ID);
   const text = panelValues(
     {
       'b-presence': PRESENCE_LABEL[box.presence] ?? box.presence,
-      'b-checkin': checkinText(),
-      'b-heard': box.heard ? `${ANSWER_LABEL[box.heard.answer] ?? box.heard.answer}${box.heard.transcript ? `: "${box.heard.transcript}"` : ''}` : 'None yet',
+      'b-checkin': checkinText(box),
+      'b-heard': heardText(box),
       'b-power': `${box.power === 'battery' ? 'Battery' : 'Mains'}${box.battery_pct != null ? `, ${box.battery_pct}%` : ''}`,
       'b-rank': idx < 0 ? 'Not hit' : `#${idx + 1} of ${shown.length}`,
       'b-harm': idx < 0 ? 'None yet' : `${shown[idx].harm_min} min`,
@@ -401,10 +394,7 @@ function renderBox() {
     hub,
   );
   for (const [id, t] of Object.entries(text)) setText(id, t);
-  let note = '';
-  if (box.alarm) note = 'Demo alarm. A fixed rule raised it.';
-  else if (box.said_help) note = 'Said help. Escalated to the top.';
-  else if (box.no_answer > 0) note = `No response after an event, ${box.no_answer} ${box.no_answer === 1 ? 'try' : 'tries'}.`;
+  const note = boxNote(box);
   const noteEl = $('box-note');
   noteEl.hidden = !note;
   setText('box-note', note);
@@ -909,7 +899,7 @@ function renderOverlays(now, cityA) {
   if (el.hidden === show) el.hidden = !show;
   if (!show) return;
   let title = 'H000, the real box';
-  let text = `Presence: ${PRESENCE_LABEL[box.presence] ?? box.presence}. Check-in: ${checkinText()}.`;
+  let text = `Presence: ${PRESENCE_LABEL[box.presence] ?? box.presence}. Check-in: ${checkinText(box)}.`;
   if (boxAlarmed) {
     title = box.said_help ? 'Said help' : 'No response after an event';
     text = box.alarm ? 'Demo alarm. A fixed rule raised it, not the model. No emergency number is called.' : 'Escalated to the top.';

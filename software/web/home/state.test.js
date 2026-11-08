@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, reduce, statusText, sourceLabel, activeAlert, alertChip } from './state.js';
+import { initialState, reduce, statusText, sourceLabel, activeAlert, alertChip, tryText, heardChip } from './state.js';
 
 const NOW = 1_000_000;
 
@@ -336,4 +336,24 @@ test('alert chip names source and level, but not a level the event title already
   assert.equal(alertChip({ source: 'NOAA', level: 'warning', event: 'Earthquake Warning' }), 'NOAA');
   assert.equal(alertChip({ source: 'USGS', level: 'emergency', event: 'Earthquake' }), 'USGS EMERGENCY');
   assert.equal(alertChip({ source: '', level: 'watch', event: 'Flood' }), 'WATCH');
+});
+
+const missed = { type: 'heard', answer: 'no_answer', transcript: '' };
+
+test('the try chip says try N of 3, and HEARD names the try it missed', () => {
+  const s = run(quake, asking(1), { type: 'say', text: 'Are you okay?' }, missed, noAnswer(1), asking(2), { type: 'say', text: 'Can you hear me?' });
+  assert.equal(tryText(s.say.tryNum), 'try 2 of 3');
+  assert.equal(heardChip(s.heard, s.status), 'No answer, try 1');
+  assert.equal(tryText(null), '');
+});
+
+test('okay and help on HEARD carry no try', () => {
+  assert.equal(heardChip(run(quake, asking(2), { type: 'heard', answer: 'ok', transcript: 'okay' }).heard, 'CHECKING_IN'), "I'm okay");
+  assert.equal(heardChip(run(quake, asking(1), { type: 'heard', answer: 'help', transcript: 'help' }).heard, 'CHECKING_IN'), 'Help');
+});
+
+test('a missed stand-up answer under the alarm shows no try on HEARD', () => {
+  const s = run(quake, asking(3), missed, noAnswer(3), { type: 'checkin', state: 'alarm', try: 4 }, asking(1), missed, noAnswer(1));
+  assert.equal(s.status, 'CONTACTING_HELP');
+  assert.equal(heardChip(s.heard, s.status), 'No answer');
 });

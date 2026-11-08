@@ -55,7 +55,8 @@ export function applyBoxEvent(state, msg, now) {
       if (msg.home !== REAL_BOX_ID) return s;
       return { ...s, handoff: { note: msg.note, contact: msg.contact, by: msg.by, why: msg.why, why_by: msg.why_by } };
     case 'heard':
-      return answered({ ...s, heard: { answer: msg.answer, transcript: msg.transcript } }, msg.answer);
+      // heard comes before its checkin no_answer, so s.try is still the try that was asked
+      return answered({ ...s, heard: { answer: msg.answer, transcript: msg.transcript, try: s.try } }, msg.answer);
     case 'checkin': {
       // The agent sends alarm with try = tries + 1 and the home screen relies on that. Keep the last ask's try here.
       s = { ...s, checkin: msg.state, try: msg.state === 'alarm' ? s.try : msg.try ?? s.try };
@@ -72,6 +73,36 @@ export function applyBoxEvent(state, msg, now) {
     default:
       return s;
   }
+}
+
+// rule.MAX_TRIES in software/agent. The bus does not send it.
+export const MAX_TRIES = 3;
+const CHECKIN_LABEL = { asking: 'Asking', ok: 'Okay', help: 'Said help', no_answer: 'No answer', alarm: 'Alarm', clear: 'Cleared' };
+const ANSWER_LABEL = { ok: 'Okay', help: 'Help', no_answer: 'No answer' };
+
+// Under an alarm the agent asks the stand-up question as try 1, so no bare try shows there.
+export function checkinText(s) {
+  if (!s.checkin) return 'None yet';
+  if (s.alarm && s.checkin === 'asking') return 'Alarm, asking again';
+  if (s.alarm && s.checkin === 'no_answer') return 'Alarm, no answer';
+  if (s.checkin === 'alarm') return s.said_help ? 'Alarm, said help' : `Alarm after ${s.try} tries`;
+  if (s.try && s.checkin === 'asking') return `Asking, try ${s.try} of ${MAX_TRIES}`;
+  if (s.try && s.checkin === 'no_answer') return `No answer, try ${s.try}`;
+  return CHECKIN_LABEL[s.checkin] ?? s.checkin;
+}
+
+export function heardText(s) {
+  if (!s.heard) return 'None yet';
+  const { answer, transcript } = s.heard;
+  const tryNote = answer === 'no_answer' && s.heard.try && !s.alarm ? `, try ${s.heard.try}` : '';
+  return `${ANSWER_LABEL[answer] ?? answer}${tryNote}${transcript ? `: "${transcript}"` : ''}`;
+}
+
+export function boxNote(s) {
+  if (s.alarm) return 'Demo alarm. A fixed rule raised it.';
+  if (s.said_help) return 'Said help. Escalated to the top.';
+  if (s.no_answer > 0) return `No answer on try ${s.no_answer}.${s.checkin === 'asking' ? ' Asking again.' : ''}`;
+  return '';
 }
 
 export function boxRankInput(s, now) {

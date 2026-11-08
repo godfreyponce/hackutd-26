@@ -95,6 +95,20 @@ export function statusText(status, { alert = false, linked = true, helpSign = fa
   }
 }
 
+// rule.MAX_TRIES in software/agent. The bus does not send it.
+export const MAX_TRIES = 3;
+const ANSWERS = { ok: 'I\'m okay', help: 'Help', no_answer: 'No answer' };
+
+export const tryText = (tryNum) => (tryNum ? `try ${tryNum} of ${MAX_TRIES}` : '');
+
+// A missed answer names its try, so it never reads as the try being asked now. Under the alarm the
+// stand-up re-ask is sent as try 1, so no try shows there.
+export function heardChip(heard, status) {
+  if (!heard) return '';
+  const label = ANSWERS[heard.answer] ?? heard.answer;
+  return heard.answer === 'no_answer' && heard.tryNum && status !== 'CONTACTING_HELP' ? `${label}, try ${heard.tryNum}` : label;
+}
+
 function raise(state, status) {
   return RANK[status] > RANK[state.status] ? status : state.status;
 }

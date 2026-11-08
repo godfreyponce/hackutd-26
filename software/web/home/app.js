@@ -1,4 +1,4 @@
-import { initialState, reduce, statusText, activeAlert, alertChip, TRACE_WINDOW_MS, initialHistory, record } from './state.js';
+import { initialState, reduce, statusText, activeAlert, alertChip, TRACE_WINDOW_MS, initialHistory, record, tryText, heardChip } from './state.js';
 import { HOME_COUNT } from '../dashboard/homes.js';
 import { renderAlerts } from './views/alerts.js';
 import { renderDisasters } from './views/disasters.js';
@@ -382,7 +382,6 @@ function renderQuake() {
 
 // ---------- the rest ----------
 
-const ANSWERS = { ok: 'I\'m okay', help: 'Help', no_answer: 'No answer' };
 const timeOf = (at) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 function render() {
@@ -397,12 +396,12 @@ function render() {
   $('note').textContent = note ?? '\u00a0'; // one blank line keeps the hidden note's height
 
   $('say').textContent = state.say ? `"${state.say.text}"` : connected ? 'No prompt yet' : 'Prompt unavailable';
-  $('say-try').textContent = state.say?.tryNum ? `try ${state.say.tryNum}` : '';
+  $('say-try').textContent = tryText(state.say?.tryNum);
   const heard = state.heard;
   $('heard').textContent = heard ? (heard.transcript ? `"${heard.transcript}"` : '') : connected ? 'No reply yet' : 'Reply unavailable';
   $('heard-chip').hidden = !heard;
   $('heard-chip').className = `chip ${heard?.answer ?? ''}`;
-  $('heard-chip').textContent = heard ? ANSWERS[heard.answer] ?? heard.answer : '';
+  $('heard-chip').textContent = heardChip(heard, state.status);
 
   $('banner').hidden = !a;
   $('alert-count').hidden = !a;
