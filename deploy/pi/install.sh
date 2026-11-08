@@ -26,8 +26,13 @@ step "offline voice models (needs internet once)"
 
 step "audio: make the I2S card (Google voiceHAT overlay) the default speaker and mic"
 grep -q '^dtoverlay=googlevoicehat-soundcard' /boot/firmware/config.txt || fail "add dtoverlay=googlevoicehat-soundcard to /boot/firmware/config.txt and reboot"
-sink=$(wpctl status | sed -n '/Sinks:/,/Sources:/p' | grep -i voicehat | grep -oE '[0-9]+\.' | head -1 | tr -d .)
-src=$(wpctl status | sed -n '/Sources:/,/Filters:\|Streams:/p' | grep -i voicehat | grep -oE '[0-9]+\.' | head -1 | tr -d .)
+# PipeWire names the I2S card "Built-in Audio", so match on the ALSA card name of each node
+voicehat_node() {  # $1 = Sinks or Sources
+  for id in $(wpctl status | sed -n "/$1:/,/^ │  *$/p" | grep -oE '[0-9]+\.' | tr -d .); do
+    wpctl inspect "$id" | grep -q 'alsa.card_name = "snd_rpi_googlevoicehat' && { echo "$id"; return; }
+  done
+}
+sink=$(voicehat_node Sinks); src=$(voicehat_node Sources)
 [ -n "$sink" ] && [ -n "$src" ] || fail "voiceHAT sink/source not found in 'wpctl status'"
 wpctl set-default "$sink"; wpctl set-default "$src"
 wpctl set-volume "$sink" 0.35   # loud amp: keep the box voice comfortable
