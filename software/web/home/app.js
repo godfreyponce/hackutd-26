@@ -24,12 +24,14 @@ function neighbors() {
   let seed = 7;
   const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const dots = [];
-  for (let row = 0; row < 6; row++) {
+  // Rows run from about 190 units above this home to 190 below, so the dots fill the tall map view.
+  for (let row = -2; row < 8; row++) {
     for (let col = 0; col < 7; col++) {
       const x = 22 + col * 43 + (rand() - 0.5) * 22;
-      // The row 3, col 5 dot is nudged south so it does not sit on the imagery's E POLK ST label.
-      const y = 22 + row * 44 + (rand() - 0.5) * 22 + (row === 3 && col === 5 ? 8 : 0);
-      if (Math.hypot(x - HOME.x, y - HOME.y) > 24 && rand() > 0.2) dots.push({ x, y });
+      const y = 22 + row * 42 + (rand() - 0.5) * 22;
+      // Keep clear of this home and of its H000 labels on its left.
+      const clear = Math.hypot(x - HOME.x, y - HOME.y) > 24 && !(x < HOME.x && Math.abs(y - HOME.y) < 26);
+      if (clear && rand() > 0.2) dots.push({ x, y });
     }
   }
   return dots;
@@ -66,12 +68,14 @@ map.innerHTML = `
     <clipPath id="scope"><circle cx="${HOME.x}" cy="${HOME.y}" r="124"/></clipPath>
   </defs>`;
 
-// USGS The National Map imagery of Richardson, TX (zoom 15, public domain), saved in map/ so the page works offline.
-// Offsets put lat 32.9483, lon -96.7299 on HOME.
+// USGS The National Map imagery of Richardson, TX (USGSImageryOnly, public domain), saved in map/ so the page works offline.
+// Zoom 16 is the closest zoom the service has here: one view unit is one imagery pixel, about 2 m, so the outer
+// ring spans about 500 m. Offsets put lat 32.9483, lon -96.7299 on HOME.
 const TILE = 256;
-for (const [col, x] of [[0, 7578], [1, 7579], [2, 7580]]) {
-  for (const [row, y] of [[0, 13204], [1, 13205]]) {
-    svgEl('image', { href: `map/15-${x}-${y}.jpg`, x: -216 + col * TILE, y: -11 + row * TILE, width: TILE, height: TILE }, map);
+const IMAGERY = { x0: -326, y0: -407, x1: -326 + 3 * TILE, y1: -407 + 4 * TILE };
+for (const [col, x] of [[0, 15157], [1, 15158], [2, 15159]]) {
+  for (const [row, y] of [[0, 26407], [1, 26408], [2, 26409], [3, 26410]]) {
+    svgEl('image', { href: `map/16-${x}-${y}.jpg`, x: IMAGERY.x0 + col * TILE, y: IMAGERY.y0 + row * TILE, width: TILE, height: TILE }, map);
   }
 }
 const vignette = svgEl('rect', { width: 300, height: 260, fill: 'url(#vignette)' }, map);
@@ -98,19 +102,21 @@ const wave = svgEl('circle', { class: 'wave', cx: HOME.x, cy: HOME.y, r: 4 }, ma
 
 const neighborDots = neighbors().map(({ x, y }) => {
   const el = svgEl('circle', { class: 'node', cx: x, cy: y, r: 3, filter: 'url(#glow)' }, map);
-  el.style.transitionDelay = `${Math.round(Math.hypot(x - HOME.x, y - HOME.y) * 8)}ms`;
+  el.style.transitionDelay = `${Math.round(Math.hypot(x - HOME.x, y - HOME.y) * 6)}ms`;
   return el;
 });
 
 // Reticle on this home: four corner brackets.
-const b = 13, l = 5;
+const b = 15, l = 5;
 svgEl('path', {
   class: 'reticle',
   d: [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) =>
     `M${HOME.x + sx * b} ${HOME.y + sy * (b - l)}V${HOME.y + sy * b}H${HOME.x + sx * (b - l)}`).join(''),
 }, map);
+// This home is the real box: a blue ring, as on the operator dashboard, and a red ring inside it while help is contacted.
+svgEl('circle', { class: 'ring escalated', cx: HOME.x, cy: HOME.y, r: 8 }, map);
+svgEl('circle', { class: 'ring real', cx: HOME.x, cy: HOME.y, r: 11 }, map);
 const homeDot = svgEl('circle', { class: 'node home', cx: HOME.x, cy: HOME.y, r: 4.5, filter: 'url(#glow)' }, map);
-// Left of the dot: the imagery prints BELT LINE RD to the right.
 const hudHome = hudText(map, 0, 0, 'H000', { 'text-anchor': 'end' });
 const hudThisHome = hudText(map, 0, 0, 'THIS HOME', { class: 'hud dim', 'text-anchor': 'end' });
 
@@ -125,18 +131,16 @@ const corners = [[hudGrid, false, false], [hudLive, true, false], [hudNodes, fal
     return { el, bg, right, bottom };
   });
 
-const IMAGERY = { x0: -216, y0: -11, x1: -216 + 3 * TILE, y1: -11 + 2 * TILE };
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
 // Grow the 300x260 scope view to the card's shape so the imagery fills it with no letterbox,
-// centered a little right of this home (so the imagery's street labels east of it are not cut)
-// but kept inside the imagery so no black strip shows past the tiles.
+// centered on this home but kept inside the imagery so no black strip shows past the tiles.
 function fitMap() {
   const { width, height } = map.getBoundingClientRect();
   if (!width || !height) return;
   const k = Math.max(300 / width, 260 / height);
   const w = width * k, h = height * k;
-  const x = clamp(HOME.x + w * 0.06 - w / 2, IMAGERY.x0, IMAGERY.x1 - w), y = clamp(HOME.y - h / 2, IMAGERY.y0, IMAGERY.y1 - h);
+  const x = clamp(HOME.x - w / 2, IMAGERY.x0, IMAGERY.x1 - w), y = clamp(HOME.y - h / 2, IMAGERY.y0, IMAGERY.y1 - h);
   map.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
   for (const [k2, v] of Object.entries({ x, y, width: w, height: h })) vignette.setAttribute(k2, v);
   // HUD text is 1u on screen, never under 16 px so it reads from 2 m at 1280x800.
@@ -183,7 +187,7 @@ function renderMap() {
   hudHit.classList.toggle('warn', !connected);
   hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
   hudLive.classList.toggle('warn', !connected);
-  $('legend-quiet').textContent = connected ? 'Quiet' : 'Unknown';
+  $('legend-not-hit').textContent = connected ? 'Not hit' : 'Unknown';
   placeHud();
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
   $('map-sub').textContent = !connected ? 'No live data'

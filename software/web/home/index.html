@@ -17,6 +17,7 @@
     --warn: #ffb020;
     --orange: #ff7a1a;
     --danger: #ff3b4e;
+    --real: #4fc3ff; /* the real box ring on the operator dashboard */
     --status: var(--accent);
     --u: clamp(12px, min(1.05vw, 1.68vh), 22px);
   }
@@ -210,12 +211,14 @@
 
   .map-frame { position: relative; flex: 1 1 0; min-height: 0; margin-top: 0.4em; }
   #map { position: absolute; inset: 0; width: 100%; height: 100%; }
-  /* Fades the imagery's edges, and the street labels cut there, under the HUD corners. */
+  /* Fades the imagery's edges under the HUD corners. */
   .map-frame::after { content: ""; position: absolute; inset: 0; border-radius: 8px; pointer-events: none; box-shadow: inset 0 0 calc(var(--u) * 1.4) calc(var(--u) * 0.5) rgba(6, 16, 31, 0.85); }
-  .map .legend { display: flex; gap: 1em; color: var(--muted); font-size: max(18px, calc(var(--u) * 1.1)); flex-wrap: wrap; margin-top: 0.5em; }
+  /* The five keys do not fit one line in the narrow card, so they sit in two rows on three shared columns. */
+  .map .legend { display: grid; grid-template-columns: repeat(3, auto); justify-content: space-between; gap: 0.15em 0.8em; color: var(--muted); font-size: max(18px, calc(var(--u) * 1.1)); white-space: nowrap; margin-top: 0.5em; }
   .map .legend i { display: inline-block; width: 0.75em; height: 0.75em; border-radius: 50%; margin-right: 0.35em; vertical-align: -0.05em; }
-  /* Narrow screens: "Unknown" (offline) needs the tighter gap to keep the legend on one line. */
-  @media (max-width: 1399.98px) { .map .legend { gap: 0.5em; justify-content: space-between; } }
+  .map .legend i.escalated { border: 2px solid var(--danger); background: radial-gradient(circle, var(--danger) 0 0.16em, transparent 0.19em); }
+  .map .legend i.real { border: 2px solid var(--real); }
+  #map image { filter: saturate(1.15) contrast(1.05); }
   #map { background: #0b1a2e; border-radius: 8px; border: 1px solid rgba(77, 163, 255, 0.18); }
   .range { fill: none; stroke: rgba(255, 255, 255, 0.6); stroke-width: 0.8; filter: drop-shadow(0 0 0.6px rgba(3, 10, 22, 0.9)); }
   .range:last-of-type { stroke-dasharray: 2 3; }
@@ -230,14 +233,18 @@
   .hud-bg { fill: #06101f; fill-opacity: 0.85; }
   .hud.alarm { fill: var(--danger); }
   .hud.warn { fill: var(--warn); }
-  .reticle { fill: none; stroke: #8fc4ff; stroke-width: 1.3; filter: drop-shadow(0 0 1px #030a16) drop-shadow(0 0 1px #030a16); }
+  .reticle { fill: none; stroke: var(--real); stroke-width: 1.3; filter: drop-shadow(0 0 1px #030a16) drop-shadow(0 0 1px #030a16); }
+  .ring { fill: none; stroke-width: 1.6; filter: drop-shadow(0 0 1px #030a16); }
+  .ring.real { stroke: var(--real); }
+  .ring.escalated { stroke: var(--danger); stroke-width: 1.4; visibility: hidden; }
+  body[data-status="CONTACTING_HELP"] .ring.escalated { visibility: visible; }
   .node { fill: #f2f6fc; stroke: rgba(3, 10, 22, 0.85); stroke-width: 1.1; transition: fill 0.25s; }
   .node.hit { fill: var(--danger); }
   .node.ok { fill: var(--ok); }
   body[data-link="down"] .node { opacity: 0.6; }
   .wave { fill: none; stroke: var(--danger); stroke-width: 2; opacity: 0; }
   .wave.go { animation: wave 1.6s ease-out forwards; }
-  @keyframes wave { from { r: 4; opacity: 0.9; } to { r: 160; opacity: 0; } }
+  @keyframes wave { from { r: 4; opacity: 0.9; } to { r: 250; opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .wave.go, .sweep { animation: none; } .node { transition: none; } }
 
 
@@ -323,7 +330,7 @@
         <div><div class="card-title">Neighborhood</div><div class="card-sub" id="map-sub">All homes quiet</div></div>
       </div>
       <div class="map-frame"><svg id="map" viewBox="0 0 300 260" aria-label="Neighborhood node map"></svg></div>
-      <div class="legend"><span><i style="background:#f2f6fc"></i><span id="legend-quiet">Quiet</span></span><span><i style="background:var(--danger)"></i>Hit</span><span><i style="background:var(--ok)"></i>Okay</span><span><i style="border:2px solid #8fc4ff;border-radius:2px"></i>This home</span></div>
+      <div class="legend"><span><i style="background:#f2f6fc"></i><span id="legend-not-hit">Not hit</span></span><span><i style="background:var(--danger)"></i>Hit, no answer</span><span><i style="background:var(--ok)"></i>Okay</span><span><i class="escalated"></i>Escalated</span><span><i class="real"></i>Real box</span></div>
     </section>
 
     <div class="cards">
