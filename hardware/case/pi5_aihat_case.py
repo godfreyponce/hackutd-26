@@ -96,9 +96,14 @@ def deck_protect(text=True):  # lid-top areas that must stay flat: fan seat, cam
     return p + box(54.5, 67.5, 17.5, 48.0, -99, 199) if text else p
 
 
-def _skin_add(part, skin, z0, z1):
+def _skin_add(part, skin, z0, z1, ch_top=0.0, ch_bot=0.0):
     if skin and skin.env:
-        part += (skin.env() & box(*WORLD, z0, z1)) - keepouts()
+        e = skin.env() & box(*WORLD, z0, z1)
+        if ch_bot:
+            e = chamfer(e.edges().group_by(Axis.Z)[0], ch_bot)
+        if ch_top:
+            e = chamfer(e.edges().group_by(Axis.Z)[-1], ch_top)
+        part += e - keepouts()
     if skin and skin.side_cut:
         part -= skin.side_cut() - outline(z0 - 1, z1 + 1)   # cuts never touch the functional walls
     return part
@@ -106,7 +111,7 @@ def _skin_add(part, skin, z0, z1):
 
 # ================= BASE =================
 def make_base(skin=None):
-    b = _skin_add(outline(-FLOOR, SPLIT, bottom_ch=0.8), skin, -FLOOR, SPLIT)
+    b = _skin_add(outline(-FLOOR, SPLIT, bottom_ch=0.8), skin, -FLOOR, SPLIT, ch_bot=skin.bot_ch if skin else 0)
     b -= box(IX0, IX1, IY0, IY1, 0, SPLIT + 1)
     for x, y in TOWERS:  # re-add towers inside the cavity corners, then insert holes
         b += cz(x, y, TOWER_R, 0, SPLIT)          # inside the cavity only, so the bed chamfer survives
@@ -144,7 +149,8 @@ FAN_INS = [(FAN_C[0] + sx * FAN_P, FAN_C[1] + sy * FAN_P) for sx in (-1, 1) for 
 
 def make_lid(skin=None):
     top = LID_TOP + (skin.deck if skin else 0.0)   # optional deck on top of the 2.4 plate (styling depth)
-    l = _skin_add(outline(SPLIT, top, top_ch=skin.top_ch if skin else 0.6), skin, SPLIT, top)
+    l = _skin_add(outline(SPLIT, top, top_ch=min(skin.top_ch, 0.6) if skin else 0.6), skin, SPLIT, top,
+                  ch_top=skin.top_ch if skin else 0)
     l -= box(IX0, IX1, IY0, IY1, SPLIT - 1, PLATE_Z0)
     for x, y in TOWERS:
         l += cz(x, y, TOWER_R, SPLIT, PLATE_Z0)
