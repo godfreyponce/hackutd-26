@@ -230,7 +230,7 @@ function renderMap() {
   hudNodes.textContent = `NEARBY ${total} OF ${HOME_COUNT}`;
   const escalated = connected && state.status === 'CONTACTING_HELP';
   hudHit.textContent = connected ? `HIT ${hit}` : 'HIT --';
-  // Red only while an event is unresolved; a protected home that was hit reads neutral, like NODES. The dots keep their encoding.
+  // Red only while an event is unresolved; a protected home that was hit reads neutral, like NEARBY. The dots keep their encoding.
   hudHit.classList.toggle('alarm', connected && hit > 0 && state.status !== 'PROTECTED');
   hudHit.classList.toggle('warn', !connected);
   hudEscalated.style.visibility = escalated ? '' : 'hidden';
@@ -402,7 +402,7 @@ function render() {
   if (a) {
     $('banner').dataset.level = a.level;
     // Same label as the dashboard header: source and level, in the level color.
-    $('alert-source').textContent = `${a.source} ${a.level}`.toUpperCase();
+    $('alert-source').textContent = [a.source, a.level].filter(Boolean).join(' ').toUpperCase();
     $('alert-event').textContent = a.event;
     $('alert-headline').textContent = a.headline;
     // The headline often names the area already; then the space shows when the alert came in.

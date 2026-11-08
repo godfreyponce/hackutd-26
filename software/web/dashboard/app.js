@@ -139,7 +139,7 @@ function startQuake(now, peakG, from) {
   waveAt = HOME_DIST.map((d) => waveStart + (d / MAX_HOME_DIST) * WAVE_MS);
   const when = new Date().toLocaleTimeString();
   const peak = typeof peakG === 'number' ? `, peak ${peakG} g` : '';
-  eventHtml = `<b>Earthquake</b>${peak}, ${when}. 500 homes hit.`;
+  eventHtml = `<b>Earthquake</b>${peak}, ${when}. 500 homes in the quake area.`;
   renderEvent();
   addTrace('EVENT', `Quake${peak} from ${from}. Every home in the area gets a contact attempt.`, null, 'dashboard');
 }
@@ -266,8 +266,11 @@ const bus = connectBus(hubUrl(location.search), {
     const el = $('hub');
     el.dataset.status = status;
     el.title = hubUrl(location.search);
-    document.body.dataset.hub = status;
-    $('legend-idle').textContent = status === 'offline' ? 'Unknown' : 'Not hit';
+    // The bus retries every second; keep the offline look through each retry so the map does not flicker.
+    if (status !== 'connecting') {
+      document.body.dataset.hub = status;
+      $('legend-idle').textContent = status === 'offline' ? 'Unknown' : 'Not hit';
+    }
     $('hub-text').textContent =
       status === 'connected' ? 'Hub connected' : status === 'offline' ? 'Hub offline, retrying' : 'Connecting to hub';
   },
@@ -330,8 +333,10 @@ function alertLine(msg, level) {
 
 function renderEvent() {
   const el = $('event');
-  const html = [eventHtml, alertHtml].filter(Boolean).join(' ');
+  // The alert leads so its headline is not the part cut off at narrow widths; the full line is the tooltip.
+  const html = [alertHtml && alertHtml.replace(/[.!]?$/, '.'), eventHtml].filter(Boolean).join(' ');
   el.innerHTML = html || 'No event yet. Waiting for the box.';
+  el.title = el.textContent;
   el.classList.toggle('live', Boolean(html));
 }
 
