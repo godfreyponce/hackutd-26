@@ -109,8 +109,9 @@ svgEl('path', {
     `M${HOME.x + sx * b} ${HOME.y + sy * (b - l)}V${HOME.y + sy * b}H${HOME.x + sx * (b - l)}`).join(''),
 }, map);
 const homeDot = svgEl('circle', { class: 'node home', cx: HOME.x, cy: HOME.y, r: 4.5, filter: 'url(#glow)' }, map);
-hudText(map, HOME.x + 18, HOME.y - 4, 'H000');
-hudText(map, HOME.x + 18, HOME.y + 9, 'THIS HOME', { class: 'hud dim' });
+// Left of the dot: the imagery prints BELT LINE RD to the right.
+hudText(map, HOME.x - 18, HOME.y - 4, 'H000', { 'text-anchor': 'end' });
+hudText(map, HOME.x - 18, HOME.y + 9, 'THIS HOME', { class: 'hud dim', 'text-anchor': 'end' });
 
 const hudNodes = hudText(map, 6, 254, '');
 const hudHit = hudText(map, 294, 254, '', { 'text-anchor': 'end' });
@@ -118,12 +119,17 @@ const hudGrid = hudText(map, 6, 14, 'GRID H000');
 const hudLive = hudText(map, 294, 14, '', { 'text-anchor': 'end' });
 const corners = [[hudGrid, false, false], [hudLive, true, false], [hudNodes, false, true], [hudHit, true, true]];
 
-// Grow the 300x260 scope view to the card's shape so the imagery fills it with no letterbox.
+const IMAGERY = { x0: -216, y0: -11, x1: -216 + 3 * TILE, y1: -11 + 2 * TILE };
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+// Grow the 300x260 scope view to the card's shape so the imagery fills it with no letterbox,
+// centered on this home but kept inside the imagery so no black strip shows past the tiles.
 function fitMap() {
   const { width, height } = map.getBoundingClientRect();
   if (!width || !height) return;
   const k = Math.max(300 / width, 260 / height);
-  const w = width * k, h = height * k, x = HOME.x - w / 2, y = HOME.y - h / 2;
+  const w = width * k, h = height * k;
+  const x = clamp(HOME.x - w / 2, IMAGERY.x0, IMAGERY.x1 - w), y = clamp(HOME.y - h / 2, IMAGERY.y0, IMAGERY.y1 - h);
   map.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
   for (const [k2, v] of Object.entries({ x, y, width: w, height: h })) vignette.setAttribute(k2, v);
   for (const [el, right, bottom] of corners) {
@@ -148,10 +154,11 @@ function renderMap() {
   // A home that answered okay was still hit, so check-in answers never lower the quake count.
   const hit = state.areaHit ? neighborDots.length + (state.home === 'idle' ? 0 : 1) : state.home === 'hit' ? 1 : 0;
   hudNodes.textContent = `NODES ${total}`;
-  hudHit.textContent = `HIT ${hit}`;
-  hudHit.classList.toggle('alarm', hit > 0);
+  hudHit.textContent = connected ? `HIT ${hit}` : 'HIT --';
+  hudHit.classList.toggle('alarm', connected && hit > 0);
+  hudHit.classList.toggle('warn', !connected);
   hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
-  hudLive.classList.toggle('alarm', !connected);
+  hudLive.classList.toggle('warn', !connected);
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
   $('map-sub').textContent = !connected ? 'No live data'
     : state.areaHit ? `Quake hit ${hit} of ${total} homes${state.home === 'ok' ? '. This home answered okay' : ''}` : homeNote ? `${homeNote}.` : 'All homes quiet';
@@ -212,6 +219,8 @@ function drawTrace() {
   ctx.fillText('now', gutter + plotW, h - fs * 0.3);
   ctx.textAlign = 'left';
 
+  // Offline there is no live signal, so draw no line rather than a flat one that reads as calm.
+  if (!connected) { requestAnimationFrame(drawTrace); return; }
   const start = now - TRACE_WINDOW_MS;
   const trace = new Path2D();
   const steps = Math.min(w, 1200);
