@@ -1,6 +1,9 @@
 // Base map: the dark globe (Natural Earth) and the Richardson street map
-// (OpenStreetMap). Loads only the vendored files in data/. Needs the vendored
-// d3-geo, loaded as a classic script before the page module.
+// (OpenStreetMap) over USGS aerial imagery. Loads only the vendored files in
+// data/ and imagery/. Needs the vendored d3-geo, loaded as a classic script
+// before the page module.
+import { TILE_SETS, TILE_PX, setBounds, setTiles } from './imagery.js';
+
 const { geoPath, geoGraticule10, geoCentroid, geoDistance } = globalThis.d3;
 
 export const PALETTE = {
@@ -8,17 +11,26 @@ export const PALETTE = {
   ocean: '#0a111c',
   oceanEdge: '#05080e',
   land: '#141b25',
+  landClear: 'rgba(20, 27, 37, 0)',
   coast: '#2a3647',
   border: 'rgba(120, 140, 165, 0.28)',
   state: 'rgba(120, 140, 165, 0.14)',
   texas: 'rgba(160, 185, 215, 0.5)',
   graticule: 'rgba(110, 140, 180, 0.07)',
   glow: '100, 160, 255',
-  park: '#122119',
-  water: '#0c1c2c',
-  waterway: '#14314a',
-  rail: '#2e3846',
-  road: { minor: '#1f2834', tertiary: '#27313f', major: '#323f50', link: '#2d3949', motorway: '#46576d' },
+  // Laid over the aerial imagery so the dots, red roads and labels stay on top.
+  imageryDim: 'rgba(4, 8, 14, 0.52)',
+  // Offline the page greys and darkens the whole map; the darker imagery keeps the grey dots findable.
+  imageryDimOffline: 'rgba(4, 8, 14, 0.75)',
+  waterway: 'rgba(90, 160, 220, 0.35)',
+  rail: 'rgba(200, 210, 225, 0.25)',
+  road: {
+    minor: 'rgba(200, 215, 235, 0.10)',
+    tertiary: 'rgba(200, 215, 235, 0.18)',
+    major: 'rgba(210, 222, 240, 0.28)',
+    link: 'rgba(210, 222, 240, 0.24)',
+    motorway: 'rgba(220, 230, 245, 0.42)',
+  },
 };
 // Road widths in px at the city view; they grow a little when zoomed in.
 const ROAD_PX = { minor: 0.7, tertiary: 1.1, major: 1.6, link: 1, motorway: 2.6 };
@@ -38,7 +50,7 @@ async function getJson(name) {
 // At city zoom the orthographic projection is flat to well under a pixel.
 function cityPaths(city) {
   const kx = Math.cos(city.origin[1] * RAD);
-  const addLine = (path, flat, close) => {
+  const addLine = (path, flat) => {
     let x = 0;
     let y = 0;
     for (let i = 0; i < flat.length; i += 2) {
@@ -47,24 +59,16 @@ function cityPaths(city) {
       if (i === 0) path.moveTo(x * kx, -y);
       else path.lineTo(x * kx, -y);
     }
-    if (close) path.closePath();
   };
   const lines = (list) => {
     const p = new Path2D();
-    for (const l of list) addLine(p, l, false);
-    return p;
-  };
-  const areas = (list) => {
-    const p = new Path2D();
-    for (const poly of list) for (const ring of poly) addLine(p, ring, true);
+    for (const l of list) addLine(p, l);
     return p;
   };
   return {
     roads: Object.fromEntries(Object.entries(city.roads).map(([k, v]) => [k, lines(v)])),
     rail: lines(city.rail),
     waterways: lines(city.waterways),
-    water: areas(city.water),
-    parks: areas(city.parks),
   };
 }
 
@@ -78,9 +82,40 @@ function landParts(land) {
   });
 }
 
+async function getImage(file) {
+  const img = new Image();
+  img.src = new URL(file, import.meta.url).href;
+  await img.decode();
+  return img;
+}
+
+const IMAGERY_FILTER = 'saturate(1.35) contrast(1.05)';
+
+// One canvas per tile set, so each set is one drawImage with no seams between tiles.
+async function mosaic(set) {
+  const tiles = setTiles(set);
+  const images = await Promise.all(tiles.map((t) => getImage(t.file)));
+  const canvas = document.createElement('canvas');
+  canvas.width = (set.x[1] - set.x[0] + 1) * TILE_PX;
+  canvas.height = (set.y[1] - set.y[0] + 1) * TILE_PX;
+  const g = canvas.getContext('2d');
+  // Done once here, not per frame: brings the lawns and trees back up under the dim.
+  g.filter = IMAGERY_FILTER;
+  tiles.forEach((t, i) => g.drawImage(images[i], t.col * TILE_PX, t.row * TILE_PX));
+  return { canvas, bounds: setBounds(set) };
+}
+
 export async function loadBasemap() {
-  const [world, city] = await Promise.all([getJson('world.json'), getJson('richardson.json')]);
-  return { world, city, landParts: landParts(world.land), paths: cityPaths(city), graticule: geoGraticule10() };
+  const [world, city, imagery] = await Promise.all([
+    getJson('world.json'),
+    getJson('richardson.json'),
+    // The streets and the globe still draw if the imagery fails.
+    Promise.all(TILE_SETS.map(mosaic)).catch((err) => {
+      console.error('Imagery did not load:', err);
+      return null;
+    }),
+  ]);
+  return { world, city, imagery, landParts: landParts(world.land), paths: cityPaths(city), graticule: geoGraticule10() };
 }
 
 // Whole globe: the coarse land. Zoomed in: only the fine polygons in view.
@@ -171,20 +206,61 @@ function placeCity(c, map, proj, dpr) {
   return s;
 }
 
+// The close set only adds detail past the city zoom, so it fades in on the way to H000.
+const CLOSE_FADE = [1.5, 3];
+
+// Draws in the city frame set by placeCity: x is lon scaled by cos(lat), y is -lat, both in stored units.
+function drawImagery(c, map, alpha, zoomIn, offline) {
+  if (!map.imagery) return;
+  const { origin, units } = map.city;
+  const kx = Math.cos(origin[1] * RAD);
+  const rect = (b) => [(b.lonMin - origin[0]) * units * kx, (origin[1] - b.latMax) * units, (b.lonMax - b.lonMin) * units * kx, (b.latMax - b.latMin) * units];
+  const [wide, close] = map.imagery;
+  const closeShare = Math.min(1, Math.max(0, (zoomIn - CLOSE_FADE[0]) / (CLOSE_FADE[1] - CLOSE_FADE[0])));
+  // The default 'low' skips pixels when the mosaic shrinks on the flight from the globe, which shimmers.
+  c.imageSmoothingQuality = 'high';
+  c.drawImage(wide.canvas, ...rect(wide.bounds));
+  if (closeShare > 0) {
+    c.globalAlpha = alpha * closeShare;
+    c.drawImage(close.canvas, ...rect(close.bounds));
+  }
+  c.globalAlpha = alpha;
+  c.fillStyle = offline ? PALETTE.imageryDimOffline : PALETTE.imageryDim;
+  c.fillRect(...rect(wide.bounds));
+  fadeEdges(c, rect(wide.bounds), EDGE_FADE_KM * (units / 111.32));
+}
+
+// Fades the imagery edges into the land color, so the flight from the globe
+// shows no hard square. The fade sits outside the city view at 1920x1080.
+const EDGE_FADE_KM = 1;
+
+function fadeEdges(c, [x, y, w, h], f) {
+  const strips = [
+    [x, y, x + f, y, x, y, f, h],
+    [x + w, y, x + w - f, y, x + w - f, y, f, h],
+    [x, y, x, y + f, x, y, w, f],
+    [x, y + h, x, y + h - f, x, y + h - f, w, f],
+  ];
+  for (const [x0, y0, x1, y1, rx, ry, rw, rh] of strips) {
+    const g = c.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, PALETTE.land);
+    g.addColorStop(1, PALETTE.landClear);
+    c.fillStyle = g;
+    c.fillRect(rx, ry, rw, rh);
+  }
+}
+
 // zoomIn: projection scale over the city view scale (1 at the city view).
-export function drawCity(c, map, proj, dpr, alpha, zoomIn) {
+export function drawCity(c, map, proj, dpr, alpha, zoomIn, offline) {
   const p = map.paths;
   c.save();
   c.globalAlpha = alpha;
   const s = placeCity(c, map, proj, dpr);
   const grow = Math.min(2.2, Math.max(0.6, Math.sqrt(zoomIn)));
   const px = (n) => (n * grow) / s;
+  drawImagery(c, map, alpha, zoomIn, offline);
   c.lineCap = 'round';
   c.lineJoin = 'round';
-  c.fillStyle = PALETTE.park;
-  c.fill(p.parks);
-  c.fillStyle = PALETTE.water;
-  c.fill(p.water);
   c.strokeStyle = PALETTE.waterway;
   c.lineWidth = px(1.2);
   c.stroke(p.waterways);
@@ -225,7 +301,7 @@ export function drawRoadLabels(c, map, proj, alpha) {
     const [x, y] = proj([l.lon, l.lat]);
     const w = c.measureText(l.text).width + 10;
     c.fillStyle = '#1d2733';
-    c.strokeStyle = PALETTE.road.motorway;
+    c.strokeStyle = '#46576d';
     c.lineWidth = 1;
     c.beginPath();
     c.roundRect(x - w / 2, y - 8, w, 16, 4);
