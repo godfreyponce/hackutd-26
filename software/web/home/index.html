@@ -229,7 +229,7 @@
   .scale-zones span { position: absolute; }
   .scale-zones .comfort { left: 40%; transform: translateX(-50%); }
   .scale-zones .hot { right: 0; }
-  @media (max-width: 1399.98px) { .scale-zones { font-size: 17px; } .scale-zones .long { display: none; } }
+  @media (max-width: 1399.98px) { .scale-zones { font-size: 17px; } .scale-zones .comfort { display: none; } }
   .temp { font-size: calc(var(--u) * 4); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .temp small { font-size: max(18px, 0.4em); color: var(--muted); font-weight: 500; }
   .temp .no-reading { color: var(--muted); font-weight: 300; }
@@ -403,7 +403,7 @@
           <div class="scale" aria-hidden="true">
             <div class="scale-bar"><i class="scale-tick" style="--at: 0.2"></i><i class="scale-tick" style="--at: 0.6"></i><i class="scale-tick" style="--at: 0.8"></i><i class="scale-mark" id="scale-mark"></i></div>
             <div class="scale-ends"><span>50 &deg;F</span><span>100 &deg;F</span></div>
-            <div class="scale-zones"><span>Cold</span><span class="comfort">Comfort<span class="long">able</span></span><span class="hot">Heat risk</span></div>
+            <div class="scale-zones"><span>Cold</span><span class="comfort">Comfortable</span><span class="hot">Heat risk</span></div>
           </div>
           <div class="temp" id="temp"></div>
           <div class="card-sub" id="heat-sub"><span id="heat-msg">No heat alerts</span><span id="heat-at" hidden></span></div>

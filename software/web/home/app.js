@@ -266,7 +266,7 @@ function signal(t) {
   for (const q of state.quakes) {
     const dt = (t - q.at) / 1000;
     // The decay scales with RING_S, so the wiggle fades to about 0.1% of its peak by the end of the ring.
-    if (dt >= 0 && dt < RING_S) g += q.g * Math.exp((-dt * 6.6) / RING_S) * Math.cos(dt * 2 * Math.PI * 2.2);
+    if (dt >= 0 && dt < RING_S) g += q.g * Math.exp((-dt * 6.6) / RING_S) * Math.cos(dt * 2 * Math.PI * 0.4);
   }
   return g;
 }
@@ -411,7 +411,8 @@ function render() {
   $('scale-mark').hidden = !connected || state.indoorF == null;
   if (state.indoorF != null) $('scale-mark').style.setProperty('--at', clamp((state.indoorF - 50) / 50, 0, 1));
   // With no reading the gauge still shows an empty value at full size, so the card keeps its shape.
-  $('temp').innerHTML = `${state.indoorF == null ? '<span class="no-reading">\u2013</span>' : Math.round(state.indoorF)}<small> &deg;F</small>`;
+  // The dash stands alone: a dash before the unit reads as a negative temperature.
+  $('temp').innerHTML = state.indoorF == null ? '<span class="no-reading">\u2013</span>' : `${Math.round(state.indoorF)}<small> &deg;F</small>`;
   $('heat-msg').textContent = !connected ? `${state.indoorF == null ? '' : 'Last known reading. '}No live heat data`
     : a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : state.indoorF == null ? 'No reading yet' : 'No heat alerts';
   $('heat-at').hidden = state.indoorAt == null;
