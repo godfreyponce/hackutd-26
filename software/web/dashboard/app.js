@@ -402,7 +402,7 @@ function renderBox() {
   );
   for (const [id, t] of Object.entries(text)) setText(id, t);
   let note = '';
-  if (box.alarm) note = 'Alarm raised by the agent. Demo only, no real call.';
+  if (box.alarm) note = 'Demo alarm. A fixed rule raised it.';
   else if (box.said_help) note = 'Said help. Escalated to the top.';
   else if (box.no_answer > 0) note = `No response after an event, ${box.no_answer} ${box.no_answer === 1 ? 'try' : 'tries'}.`;
   const noteEl = $('box-note');
@@ -912,7 +912,7 @@ function renderOverlays(now, cityA) {
   let text = `Presence: ${PRESENCE_LABEL[box.presence] ?? box.presence}. Check-in: ${checkinText()}.`;
   if (boxAlarmed) {
     title = box.said_help ? 'Said help' : 'No response after an event';
-    text = box.alarm ? 'Alarm raised by the agent. Demo only, no real call.' : 'Escalated to the top.';
+    text = box.alarm ? 'Demo alarm. A fixed rule raised it, not the model. No emergency number is called.' : 'Escalated to the top.';
   }
   setText('callout-title', title);
   setText('callout-text', text);
