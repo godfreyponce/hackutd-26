@@ -17,7 +17,6 @@ let shownAlert = null;
 let lastWaveAt = null;
 
 document.title = `${PRODUCT_NAME} Home`;
-$('product-name').textContent = PRODUCT_NAME;
 $('hub').title = `Hub ${hubUrl}`;
 
 // ---------- neighborhood map (tactical display) ----------
