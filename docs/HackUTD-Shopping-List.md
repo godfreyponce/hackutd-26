@@ -17,6 +17,40 @@ Part of [HackUTD-2026](HackUTD-2026.md). Merged 2026-11-07 ~3:50 PM from:
 **Stock and prices are unverified** (Micro Center blocks bots). Call or check the app before driving. Micro Center Dallas, 13929 N Central Expy, open until 9 PM.
 The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 
+## Bring list (Rafael, 2026-11-07 ~6:45 PM, his words)
+| Item | Notes |
+|---|---|
+| Soldering station + accessories | |
+| Raspberry Pi 5 + Camera Module 3 | |
+| Raspberry Pi 45 W USB-C power supply | bought |
+| AI HAT+ 26 TOPS | bought |
+| Active Cooler | bought |
+| Case fan | bought; **size to measure** (the case session needs width, thickness, hole spacing) |
+| Software defined radio kit | bought |
+| Adafruit NeoPixel ring(s) | bought (status display) |
+| Adafruit I2S mic | bought |
+| Arduino Uno R3 + servo motors | **Uno R3 uses a USB-A to USB-B cable, not micro-USB** |
+| All kit modules (accelerometer, OLED, temperature, etc.) | see [HackUTD-Inventory](HackUTD-Inventory.md) |
+| Jumper wires, wire cutters/strippers | |
+| USB to micro-USB cable | |
+| HDMI to micro-HDMI cable | Pi 5 → monitor |
+| Screwdriver set, multimeter | |
+| Keyboard, mouse | |
+| 9 V batteries | |
+| Capacitors, diodes, heat sinks, bolts and screws | include the M3 screws/nuts + heat-set inserts the case needs |
+
+**Not on his list (suggested checks):**
+- microSD card with Pi OS (+ a spare)
+- heat-set insert tip
+- M2.5 screws (getting later)
+- laptop + charger
+- the tablet monitor + its power cable
+- phone
+- USB headset or speaker (voice output still open)
+- power bank (outage power still open)
+- filament (owned)
+- USB-A to USB-B cable for the Uno
+
 ## BOUGHT (Micro Center, Sat 2026-11-07 ~6 PM): the actual purchase
 Rafael: "everything else on the buy list we won't have."
 
