@@ -32,7 +32,7 @@ def _tool(name, description, props=None, required=()):
 
 def build_tools(ask_script):
     return [
-        _tool("get_presence", "Latest radar state: moving, still or none."),
+        _tool("get_presence", "Latest presence sensor state: moving, still or none."),
         _tool("speak", "Say a fixed question by id. The voice service then listens.",
               {"script_id": {"type": "string", "enum": [ask_script, STANDUP_SCRIPT]}}, ["script_id"]),
         _tool("listen", "Wait for the answer to the last question: ok, help or no_answer, plus a transcript.",
@@ -173,7 +173,7 @@ class Agent:
         if not (inc and inc.open and prev == "still" and state == "moving"):
             return
         inc.stood_up = True
-        await self.trace("VERIFY", "Stand-up: radar went from still to moving. Next question: \"Are you okay?\"")
+        await self.trace("VERIFY", "Stand-up: presence sensor went from still to moving. Next question: \"Are you okay?\"")
         if inc.alarm_raised:
             if self.task and not self.task.done():
                 inc.standup_pending = True
@@ -263,15 +263,15 @@ class Agent:
 
     def _brief(self, inc):
         if inc.goal == "standup":
-            return ("The person stood up after the alarm (radar went from still to moving). "
+            return ("The person stood up after the alarm (presence sensor went from still to moving). "
                     f"Ask {STANDUP_SCRIPT} once and listen. An ok answer clears the alarm.")
-        return (f"Event: {inc.trigger}. Radar presence now: {self.presence}. Start the check-in. "
+        return (f"Event: {inc.trigger}. Presence sensor now: {self.presence}. Start the check-in. "
                 "Tool results tell you what the rule needs next.")
 
     def _decision_text(self, inc):
         someone = "someone detected" if rule.someone_detected(self.presence) else "nobody detected"
         answers = ", ".join(inc.answers) or "none"
-        return (f"Decision: trigger {inc.trigger}; radar {self.presence} ({someone}); "
+        return (f"Decision: trigger {inc.trigger}; presence sensor {self.presence} ({someone}); "
                 f"answers {answers}; outcome {inc.outcome}.")
 
     # ---- tools ----

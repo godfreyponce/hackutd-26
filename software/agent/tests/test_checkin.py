@@ -49,7 +49,7 @@ def test_three_no_answers_then_alarm_on_fourth(kind):
         ("alarm", 4),
     ]
     escalate = [m for m in bus.sent if m["type"] == "say"][-1]
-    assert escalate["text"] == "Contacting emergency services now"
+    assert escalate["text"] == "Alerting your emergency contact now."
     assert "listen_s" not in escalate
 
 
