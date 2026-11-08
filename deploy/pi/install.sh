@@ -50,7 +50,7 @@ mkdir -p ~/.config/systemd/user ~/land-logs
 cp deploy/pi/land-*.service ~/.config/systemd/user/
 loginctl enable-linger "$USER"
 systemctl --user daemon-reload
-systemctl --user enable --now land-hub land-agent land-voice land-camera land-sensors land-ring land-radio
+systemctl --user enable --now land-hub land-agent land-voice land-camera land-sensors land-ring land-radio land-scream
 sleep 5
 systemctl --user --no-pager --plain list-units 'land-*'
 echo

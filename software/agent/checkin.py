@@ -140,7 +140,7 @@ class Agent:
         kind = msg.get("type")
         if kind == "presence":
             await self._on_presence(msg.get("state"))
-        elif kind in ("quake", "fall_hint", "help_gesture"):
+        elif kind in ("quake", "fall_hint", "help_gesture", "heat", "scream"):
             self._start_checkin(kind, msg.get("peak_g"))
         elif kind == "heartbeat":
             self.battery_pct = msg.get("battery_pct")
@@ -199,6 +199,8 @@ class Agent:
             ask = ALERT_ASK_SCRIPT
         elif trigger == "help_gesture":
             ask = GESTURE_ASK_SCRIPT
+        elif trigger in ("heat", "scream"):
+            ask = ALERT_ASK_SCRIPT  # "Something just happened": the person may still be moving
         else:
             ask = self.settings.ask_script
         self.incident = Incident(trigger, ask, self.clock(), peak_g, alert)

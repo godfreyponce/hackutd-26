@@ -6,6 +6,7 @@ Events (contract #19 + the proposal on #19):
   {"type":"quake","peak_g":0.42}                       existing contract; the agent starts a check-in
   {"type":"indoor","temp_f":73.4,"temp_c":23.0,"pressure_hpa":1000.1}   every INDOOR_EVERY_S
   {"type":"pir","motion":true}                          rising edge of the PIR output
+  {"type":"heat","temp_f":92.1,"reason":"over 90 F"}    too hot, or a fast rise (heater, fire); the agent starts a check-in
 
 Run: HUB_URL=ws://localhost:8765 python3 hardware/sensors/sensors.py   (--dry-run prints only)
 """
@@ -28,6 +29,11 @@ QUAKE_REPORT_S = 1.5    # collect the peak for this long after the trigger
 QUAKE_COOLDOWN_S = 15
 INDOOR_EVERY_S = 15
 PIR_COOLDOWN_S = 3
+HEAT_F = float(os.environ.get("HEAT_F", 90))          # absolute limit
+HEAT_RISE_F = float(os.environ.get("HEAT_RISE_F", 3))  # ... or this many F within HEAT_RISE_S
+HEAT_RISE_S = 60
+HEAT_EVERY_S = 2
+HEAT_COOLDOWN_S = 120
 
 
 def log(*a):
@@ -118,6 +124,7 @@ async def main():
     pir = DigitalInputDevice(PIR_GPIO, pull_up=False)
 
     hits, last_quake, next_indoor, pir_was, last_pir = [], 0.0, 0.0, False, 0.0
+    temps, next_heat, last_heat = [], 0.0, -HEAT_COOLDOWN_S
     while True:
         now = time.monotonic()
         dev = await loop.run_in_executor(None, mpu.deviation)
@@ -129,6 +136,15 @@ async def main():
                     peak = max(peak, await loop.run_in_executor(None, mpu.deviation))
                 emit({"type": "quake", "peak_g": round(peak, 2)})
                 last_quake, hits = time.monotonic(), []
+        if now >= next_heat:
+            f = bmp.read()[0] * 9 / 5 + 32
+            temps = [(t, v) for t, v in temps if now - t <= HEAT_RISE_S] + [(now, f)]
+            rise = f - min(v for _, v in temps)
+            reason = f"over {HEAT_F:g} F" if f >= HEAT_F else f"rose {rise:.1f} F in {HEAT_RISE_S} s" if rise >= HEAT_RISE_F else None
+            if reason and now - last_heat > HEAT_COOLDOWN_S:
+                emit({"type": "heat", "temp_f": round(f, 1), "reason": reason})
+                last_heat = now
+            next_heat = now + HEAT_EVERY_S
         if now >= next_indoor:
             c, hpa = bmp.read()
             emit({"type": "indoor", "temp_f": round(c * 9 / 5 + 32, 1), "temp_c": round(c, 2), "pressure_hpa": round(hpa, 1)})

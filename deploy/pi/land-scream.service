@@ -1,0 +1,16 @@
+[Unit]
+Description=LAND scream trigger (loud sustained sound on the box mics) -> hub
+After=land-hub.service pipewire.service wireplumber.service
+Wants=land-hub.service
+
+[Service]
+WorkingDirectory=%h/hackutd-26
+Environment=HUB_URL=ws://localhost:8765
+ExecStart=%h/hackutd-26/.venv/bin/python hardware/sound/scream.py
+StandardOutput=append:%h/land-logs/scream.log
+StandardError=append:%h/land-logs/scream.log
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

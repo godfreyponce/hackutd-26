@@ -30,6 +30,7 @@ SCORE_MIN = 0.5
 KP_MIN = 0.4
 HOLD_S = 0.8             # a presence state must hold this long before it is sent
 FALL_COOLDOWN_S = 20     # at most one fall_hint per 20 s
+FALL_STILL_S = 5         # lying + still this long sends fall_hint even without a seen fall
 HELP_HOLD_S = 1.0        # arms up this long = HELP
 HELP_COOLDOWN_S = 15
 SHAKE_PX = 6.0           # whole-frame shift (px at 320x180) that counts as a shake
@@ -219,7 +220,8 @@ def main():
     ap.add_argument("--stream-port", type=int, default=0,
                     help="serve the overlay as MJPEG on http://<pi>:PORT/stream.mjpg (0 = off)")
     ap.add_argument("--no-presence", action="store_true",
-                    help="do not send presence/fall_hint (software.presence owns them); camera-only events still go out")
+                    help="do not send presence (software.presence owns it); camera events still go out")
+    ap.add_argument("--no-fall-hint", action="store_true", help="never send fall_hint (lying down + still)")
     args = ap.parse_args()
 
     hub = Hub(args.hub)
@@ -334,10 +336,7 @@ def main():
                 presence = candidate
                 if not args.no_presence:
                     hub.send({"type": "presence", "state": presence})
-                if (not args.no_presence and presence == "still" and posture == "LYING" and now - upright_until < 6
-                        and now - last_fall > FALL_COOLDOWN_S):
-                    hub.send({"type": "fall_hint"})
-                    last_fall = now
+
 
             # --- person-down timer ---
             if posture == "LYING" and presence == "still":
@@ -345,6 +344,12 @@ def main():
             else:
                 down_since = None
             down_s = int(now - down_since) if down_since else 0
+            # fall_hint = someone LYING and still: right after being upright, or for FALL_STILL_S.
+            # Just stopping (standing or sitting still) never sends it.
+            if (not args.no_fall_hint and down_since and now - last_fall > FALL_COOLDOWN_S
+                    and (down_since - upright_until < 6 or down_s >= FALL_STILL_S)):
+                hub.send({"type": "fall_hint", "posture": "lying"})
+                last_fall = now
 
             # --- overlay ---
             fps_n += 1
