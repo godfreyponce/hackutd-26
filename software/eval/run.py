@@ -114,11 +114,15 @@ def hosted_calls(r, key, case):
 
 
 async def run_cases(cases, runs, out_dir, *, key=None, listen_s=1.0, max_rpm=None, run_timeout_s=240.0,
-                    progress=lambda line: print(line, flush=True)):
+                    progress=lambda line: print(line, flush=True), engine=None, settle=None, agent_settings=None):
     """Run every case `runs` times, one run at a time. Returns [(case, [judged run, ...]), ...].
 
     max_rpm paces the runs: after each run, wait until its estimated hosted calls average out
-    to at most max_rpm per minute."""
+    to at most max_rpm per minute.
+    engine: the voice engine, with load(transcripts), speak and listen. Default: ScriptedEngine.
+    settle: async (run_events) -> dict, awaited once a run has its decisions, before the reset.
+    run_events() returns the run's bus messages so far. The dict is merged into the judged run.
+    agent_settings: env for the agent child, applied after DROP_ENV."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     results = []
@@ -127,13 +131,13 @@ async def run_cases(cases, runs, out_dir, *, key=None, listen_s=1.0, max_rpm=Non
         async with running_hub("127.0.0.1", 0, 0) as hub:
             hub.listeners.append(rec)
             url = f"ws://127.0.0.1:{hub.ws_port}"
-            env = agent_env(key, listen_s)
+            env = agent_env(key, listen_s) | (agent_settings or {})
             env["HUB_URL"] = url
             proc = await asyncio.create_subprocess_exec(
                 sys.executable, "-m", "software.agent", cwd=REPO, env=env,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
             pump = asyncio.create_task(_pump(proc.stdout, out_dir / "agent.log", key))
-            engine = ScriptedEngine()
+            engine = engine or ScriptedEngine()
             voice = VoiceService(engine, log=lambda line: print(line, file=voice_log, flush=True))
             voice_task = asyncio.create_task(voice.run(url))
             try:
@@ -149,7 +153,7 @@ async def run_cases(cases, runs, out_dir, *, key=None, listen_s=1.0, max_rpm=Non
                         judged = []
                         for n in range(1, runs + 1):
                             began = time.monotonic()
-                            judged.append(await _one_run(case, n, driver, engine, rec, run_timeout_s, listen_s))
+                            judged.append(await _one_run(case, n, driver, engine, rec, run_timeout_s, listen_s, settle))
                             r = judged[-1]
                             r["hosted_calls_est"] = hosted_calls(r, key, case)
                             r["seconds"] = round(time.monotonic() - began, 2)
@@ -179,7 +183,7 @@ async def _drain(ws):
         pass
 
 
-async def _one_run(case, n, driver, engine, rec, timeout, listen_s):
+async def _one_run(case, n, driver, engine, rec, timeout, listen_s, settle=None):
     rec.run_id = f"{case.id}#{n}"
     await driver.send(json.dumps({"type": "reset"}))
     engine.load(case.transcripts)
@@ -191,8 +195,9 @@ async def _one_run(case, n, driver, engine, rec, timeout, listen_s):
         if await rec.wait(start, _alarmed, timeout):
             await driver.send(json.dumps({"type": "presence", "state": "moving"}))
     finished = await rec.wait(start, lambda ev: _decisions(ev) >= wanted, timeout)
+    extra = await settle(lambda: rec.events[start:]) if settle and finished else {}
     result = judge(case, rec.events[start:])
-    result["run"] = n
+    result.update(extra, run=n)
     # Cancels any recheck the planner scheduled, so it cannot start a check-in during the pause.
     await driver.send(json.dumps({"type": "reset"}))
     if not finished:

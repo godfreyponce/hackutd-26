@@ -88,5 +88,5 @@ def test_landing_page_says_land_and_every_brand_file_it_points_to_is_served():
 
     page, refs, served = asyncio.run(scenario())
     assert "<title>LAND</title>" in page
-    assert "brand/land-favicon-16.svg" in refs and "brand/land-mark-white.svg" in refs
+    assert "brand/land-favicon-16.svg" in refs and "brand/land-wordmark-white.svg" in refs
     assert all(ctype == "image/svg+xml" and body.startswith("<svg") for ctype, body in served)

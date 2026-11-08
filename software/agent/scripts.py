@@ -28,6 +28,9 @@ ALERT_ASK_SCRIPT = "ask_event"
 GESTURE_ASK_SCRIPT = "ask_gesture"
 # Said before the first ask when the alert has demo true.
 ALERT_DEMO_SCRIPT = "alert_demo"
+# The `tone` field on the first `say` of an EQW alert check-in. The voice service plays a short
+# warning tone, then speaks the line. Not the fake alarm's siren, and not the real EAS tones.
+ALERT_TONE = "warning"
 # Tries 2 and 3. Code picks the line by try number, so the planner cannot skip or reorder them.
 RETRY_SCRIPTS = ("ask_retry_2", "ask_retry_3")
 STANDUP_SCRIPT = "standup_ask"

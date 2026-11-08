@@ -80,12 +80,12 @@ def _wrong_lines(case, events):
 
 
 def _heard_to_rule(events):
-    """Seconds from each spoken `heard` to the agent's checkin answer: mostly the Safety Guard check,
-    which runs before the rule. Silence skips the guard, so it is left out."""
+    """Seconds from each spoken `heard` to the agent's checkin answer: it includes the Safety Guard check,
+    which runs before the rule. Silence and no_answer replies skip the guard, so they are left out."""
     gaps, spoken_at = [], None
     for t, m in events:
         if m.get("type") == "heard":
-            spoken_at = t if m.get("transcript") else None
+            spoken_at = t if m.get("transcript") and m.get("answer") != "no_answer" else None
         elif m.get("type") == "checkin" and m.get("state") in ANSWERS and spoken_at is not None:
             gaps.append(round(t - spoken_at, 3))
             spoken_at = None

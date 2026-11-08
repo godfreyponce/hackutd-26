@@ -80,3 +80,44 @@ test('a help sign is kept for the event line until reset', () => {
   assert.equal(run([help, { type: 'checkin', state: 'ok', try: 1 }]).helpSign, true);
   assert.equal(run([help, { type: 'reset' }]).helpSign, false);
 });
+
+test('a new check-in starts fresh: ok last time, no answer now is a no answer', () => {
+  const s = run([
+    { type: 'checkin', state: 'asking', try: 1 },
+    { type: 'heard', answer: 'ok', transcript: "I'm okay" },
+    { type: 'checkin', state: 'ok', try: 1 },
+    { type: 'checkin', state: 'asking', try: 1 },
+    { type: 'heard', answer: 'no_answer', transcript: '' },
+    { type: 'checkin', state: 'no_answer', try: 1 },
+  ]);
+  assert.deepEqual([s.answered_ok, s.no_answer], [false, 1]);
+});
+
+test('a new check-in after a no-alarm no answer is still asking, with nothing heard yet', () => {
+  const s = run([
+    { type: 'checkin', state: 'asking', try: 1 },
+    { type: 'checkin', state: 'no_answer', try: 1 },
+    { type: 'checkin', state: 'asking', try: 1 },
+  ]);
+  assert.deepEqual([s.no_answer, s.said_help, s.answered_ok, s.heard], [0, false, false, null]);
+});
+
+test('the stand-up re-ask after an alarm keeps the alarm up', () => {
+  const s = run([
+    { type: 'checkin', state: 'no_answer', try: 3 },
+    { type: 'checkin', state: 'alarm', try: 4 },
+    { type: 'checkin', state: 'asking', try: 1 },
+  ]);
+  assert.deepEqual([s.alarm, s.no_answer], [true, 3]);
+});
+
+test('the alarm after 3 asks is not counted as a 4th try', () => {
+  const asks = [1, 2, 3].flatMap((n) => [
+    { type: 'checkin', state: 'asking', try: n },
+    { type: 'checkin', state: 'no_answer', try: n },
+  ]);
+  const s = run([...asks, { type: 'checkin', state: 'alarm', try: 4 }]);
+  assert.equal(s.try, 3, 'the box panel prints this as "Alarm, try N"');
+  const late = applyBoxEvent(s, { type: 'heard', answer: 'no_answer', transcript: '' }, 0);
+  assert.equal(late.no_answer, 3);
+});

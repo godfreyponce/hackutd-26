@@ -69,7 +69,7 @@ Output in `--out`: `results.md` (the table and the rerun command), `results.json
 .venv/bin/python -m pytest software/eval
 ```
 
-`test_loop.py` runs every case once end to end in mock mode (about 15 s).
+`test_loop.py` runs every case once end to end in mock mode (about 5 s).
 
 ## Results (Sun Nov 8, 2026, about 1:20 to 2:25 AM CT)
 
@@ -92,7 +92,7 @@ Hosted Nemotron planner and Safety Guard, real key, one run at a time, paced to 
 | help: Event, someone there, says "Help" | 10 of 10 | 10 of 10 | 0.56 s / 1.06 s | 5.11 s / 7.01 s | 40 | 0 | 0 / 0 | 0 | 10 / 0 / 0 | 1.5 s / 4.34 s |
 | silence: Event, someone there (still), silent 3 times | 10 of 10 | 10 of 10 | 0.56 s / 4.5 s | 5.09 s / 8.98 s | 70 | 0 | 0 / 0 | 0 | 0 / 0 / 0 | - / - |
 | nobody: Event, nobody there, silent | 10 of 10 | 9 of 10 | 0.54 s / 0.95 s | - / - | 21 | 0 | 0 / 1 | 0 | 0 / 0 / 0 | - / - |
-| unclear_then_ok: Unclear reply, then "yeah, I'm fine" | 10 of 10 | 10 of 10 | 0.56 s / 2.27 s | - / - | 50 | 0 | 0 / 0 | 0 | 19 / 1 / 0 | 6.36 s / 16.67 s |
+| unclear_then_ok: Unclear reply, then "yeah, I'm fine" | 10 of 10 | 10 of 10 | 0.56 s / 2.27 s | - / - | 50 | 0 | 0 / 0 | 0 | 19 / 1 / 0 | 7.05 s / 16.67 s |
 | hedge: Hedged reply "I'm not sure" | 10 of 10 | 9 of 10 | 0.51 s / 0.82 s | 8.18 s / 12.9 s | 40 | 1 | 0 / 0 | 0 | 10 / 0 / 0 | 4.81 s / 10.36 s |
 | still_vs_moving_still: Quake, presence still, silent 3 times | 10 of 10 | 10 of 10 | 0.62 s / 0.94 s | 5.06 s / 5.81 s | 73 | 0 | 0 / 0 | 0 | 0 / 0 / 0 | - / - |
 | still_vs_moving_moving: Quake, presence moving, silent 3 times | 10 of 10 | 9 of 10 | 0.61 s / 0.9 s | 5.21 s / 23.78 s | 69 | 1 | 0 / 0 | 0 | 0 / 0 / 0 | - / - |
@@ -104,8 +104,54 @@ Hosted Nemotron planner and Safety Guard, real key, one run at a time, paced to 
 - After "Help": alarm 17.4 s from the event. No answer 3 times: alarm on the 3rd miss at 20.2 s.
 - Speaking time is not simulated, so on the real box add the time to say each line.
 
-The Safety Guard check runs before the rule, so a spoken reply waits for it. That wait was 0.4 to 13.3 s
+The Safety Guard check runs before the rule, so in these runs every spoken reply waited for it.
+Since #65 only an ok or help reply does. That wait was 0.4 to 13.3 s
 (per-case medians), worst 20 s when the guard timed out.
 
 Times are measured from the hub's publish time of the event to the hub's publish time of the
 `checkin` message, so they include the planner and Safety Guard calls but not text to speech.
+
+# Judge-table rehearsal timing (issue #60)
+
+Times the demo run and the "Help" fast path end to end, with real speaking and listening time.
+It reuses the eval above: the real hub on a free port, the real agent process, the real voice service.
+
+- Demo run (case `standup`): event, 3 asks with no answer, alarm, dashboard zoom, the person stands
+  up, "Are you okay?", "I'm okay", stand-down.
+- Help fast path (case `help`): help sign, one ask, "Help", alarm.
+
+The voice engines are real: ElevenLabs (or Kokoro offline) makes every line, and Scribe (or Moonshine
+offline) reads every reply. Only the speaker and the microphone are stand-ins, so a rehearsal makes no
+sound while the live loop is filmed. A line waits its audio's real length instead of playing. A listen
+waits the listen window, then gives the speech-to-text a recorded reply clip (the voice test fixtures,
+macOS `say` voice) half a second into real room noise.
+
+Step times come from the hub's publish time of each bus message, measured from the event. First and
+last word come from the stand-in speaker, because speaking time is not on the bus. The dashboard zoom
+lands 1.6 s after the alarm (or "help") message, the city to home flight in `camera.js` (the flight from the
+world view is longer). No browser runs.
+
+## Run
+
+```bash
+NVIDIA_API_KEY=... ELEVENLABS_API_KEY=... .venv/bin/python -m software.eval.rehearsal --out /tmp/land-rehearsal --runs 10
+```
+
+Flags:
+
+- `--cut-internet`: sets a dead proxy (a closed local port) in this process and the agent child, so
+  hosted Nemotron, the Safety Guard and ElevenLabs all fail at once. Nothing global changes: no Wi-Fi,
+  firewall or hosts file. The fixed script plans and Kokoro and Moonshine take every line. A refused
+  connection fails at once, so these times are the best case: a network that hangs instead waits out the
+  ElevenLabs timeout on each line and the planner timeout on each turn.
+- `--listen-s S`: the agent's `AGENT_LISTEN_S` (demo default 6).
+- `--voice online|offline`: online needs `ELEVENLABS_API_KEY` (the default when it is set).
+- `--max-rpm R` (default 15): paces hosted Nemotron calls, as in the eval.
+- `--cases ID,ID` (default `standup,help`): only cases whose replies have a recorded clip ("I'm okay",
+  "Help", or silence).
+- `--run-timeout-s S` (default 240): a run with no decision by then counts as failed.
+
+Output in `--out`: `rehearsal.md`, `rehearsal.json`, plus the eval's `raw.jsonl`, `agent.log`,
+`voice.log`, and `engine.log` (the voice engines' fallback lines). Keys are redacted from the logs.
+
+Results from the table rehearsal: `software/eval/rehearsal-results.md`.

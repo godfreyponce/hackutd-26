@@ -22,7 +22,7 @@ class Notifier:
         if missing:
             self.mock = f"MOCK: no {', '.join(missing)}. On-screen alarm only."
         elif not _PHONE.fullmatch(self.to):
-            self.mock = "MOCK: TWILIO_TO is not a full phone number in +1XXXXXXXXXX form. On-screen alarm only."
+            self.mock = "MOCK: TWILIO_TO is not a full phone number (+ and 10 to 15 digits). On-screen alarm only."
         else:
             self.mock = None
 

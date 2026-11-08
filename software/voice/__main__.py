@@ -36,7 +36,7 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m software.voice")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--online", dest="mode", action="store_const", const="online", help="ElevenLabs (default)")
-    group.add_argument("--offline", dest="mode", action="store_const", const="offline", help="Piper + Moonshine, no network")
+    group.add_argument("--offline", dest="mode", action="store_const", const="offline", help="offline voice + Moonshine, no network")
     group.add_argument("--text", dest="mode", action="store_const", const="text", help="print lines, read typed answers")
     group.add_argument("--download", action="store_true", help="fetch the offline models once, then exit")
     args = parser.parse_args(argv)
@@ -54,11 +54,13 @@ def main(argv: list[str]) -> int:
         log(warning)
     log(f"mode: {mode}")
 
-    from software.voice.engines import AlarmTone
+    from software.voice.engines import AlarmTone, WarningTone
     from software.voice.service import VoiceService
 
     url = os.environ.get("HUB_URL", "ws://localhost:8765")
-    service = VoiceService(build_engine(mode), log, None if mode == "text" else AlarmTone())
+    speaker = mode != "text"
+    service = VoiceService(build_engine(mode), log, AlarmTone() if speaker else None,
+                           WarningTone() if speaker else None)
     try:
         asyncio.run(service.run(url))
     except KeyboardInterrupt:

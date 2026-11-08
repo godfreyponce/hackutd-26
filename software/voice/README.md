@@ -15,7 +15,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -r software/voice/requirements
 
 ```bash
 .venv/bin/python -m software.voice            # online if ELEVENLABS_API_KEY is set, else offline
-.venv/bin/python -m software.voice --offline  # Piper speaks, Moonshine listens, no network
+.venv/bin/python -m software.voice --offline  # the offline voice speaks, Moonshine listens, no network
 .venv/bin/python -m software.voice --text     # prints the line, reads a typed answer
 ```
 
@@ -23,7 +23,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -r software/voice/requirements
 
 ## Modes
 
-- **Online:** ElevenLabs text-to-speech (`eleven_v4_turbo`) and speech-to-text (`scribe_v2`). If a request fails, that line falls back to Piper or Moonshine, so cutting the Wi-Fi mid-demo keeps working. With no `ELEVENLABS_API_KEY` it logs `MOCK/OFFLINE: no ELEVENLABS_API_KEY` and runs offline.
+- **Online:** ElevenLabs text-to-speech (`eleven_v4_turbo`) and speech-to-text (`scribe_v2`). If a request fails, that line falls back to the offline voice or Moonshine, so cutting the Wi-Fi mid-demo keeps working. With no `ELEVENLABS_API_KEY` it logs `MOCK/OFFLINE: no ELEVENLABS_API_KEY` and runs offline.
 - **Offline:** Piper or Kokoro speaks, Moonshine (`moonshine/base`) listens. `moonshine/tiny` missed the "help me" fixture.
 
 ## Voice
@@ -39,6 +39,10 @@ One setting each. Set the env var, or change the default in `engines.py`.
 
 ElevenLabs gets an audio tag in front of each line, for example `[gently]` for `ask_retry_2`. The tags live in `ELEVEN_TAGS` in `engines.py`, keyed by the `say` message's `script_id`. A line with an unknown id gets no tag. The agent's text has no tags, so a tag never reaches the bus or the home screen. The offline voice never gets one, because it would read the tag out loud.
 
+## Warning tone (EQW alert)
+
+A `say` with `"tone":"warning"` plays a short warning tone first, then the line. The agent sends it only on the first line of an EQW alert check-in. The tone is three short beeps at 1320 Hz, about 0.6 s with the pause before the line. It is made in code (`WarningTone` in `engines.py`), so there is no WAV to ship and a test checks its pitch. It is not the alarm siren, and it stays clear of the real Emergency Alert System tones (853 + 960 Hz, 1050 Hz, the SAME bursts). Text mode logs `WARNING TONE` instead.
+
 ## Alarm tone
 
 On `{"type":"checkin","state":"alarm"}` the box speaker plays `assets/alarm.wav` once, after the line it is speaking. The service keeps listening for later messages while the tone plays. A `reset` stops it. Text mode only logs it.
@@ -52,7 +56,7 @@ Why not Eleven Realtime v1 Mini: it is a speech-to-speech agent. Its docs don't 
 `classify.py` is a keyword match, no LLM. In order:
 1. A help word is `help`: help or helpless (not "helpful" or "helping"), hurt, emergency, ambulance, bleed or bleeding, blood (not "blood pressure" or "blood sugar"), injured or injury, paramedic, dizzy, can't, can barely or can hardly get up or breathe, fell or fallen said by the speaker ("I fell", "I've fallen", "I have just fallen", "I tripped and fell", or "fell" first in the reply; not "fell asleep", "fell back to sleep" or "fell fast asleep", and "a pot fell off the stove" or "the bookcase shook and fell" is no fall), on the floor or ground first in the reply or after I'm, I am, been, lying, laying or down, with at most one word between ("on the floor", "I'm still on the floor", "I've been on the floor all night", also the kitchen or bathroom floor; not "the ground floor", and "my glasses on the floor" is not help), had a fall, heart attack, trouble breathing, hard to breathe, short of breath or shortness of breath, I slipped (not "slipped my mind", "slipped up" or "slipped out"), hit my head, need/get/call a doctor, fire or smoke (not a fire or smoke alarm or detector, with a space or a hyphen), pain, chest, faint, trapped, firefighter, fireman, 911 (also 9-1-1, 9 1 1, nine one one, nine-one-one), call someone or somebody, save me. blood, pain, chest, faint, trapped, fire and smoke match only as whole words or listed forms (pains, painful, fainting, smokes and so on), so "painting", "fireplace", "Chester", "bloody" and "smoking" are not help. "Doctor", "breathe" and "call my" alone are not help, because ok replies use them ("my doctor said I'm fine", "I can breathe", "I'll call my daughter"). "Stuck" and "please come" are not help, for the same reason ("stuck in traffic", "please come in"). A missed help still reaches the alarm after 3 asks.
 2. Any negation (no, nope, nah, not, never, cannot, -n't, and -nt words with no apostrophe such as cant, dont, wont, isnt) is `help`, so "I'm not okay" and "no" never become `ok`.
-3. yes, yeah, yep, okay, ok, fine, alright is `ok`. So are I'm good, I am good, I'm doing good and I'm all good, and "all good" or "doing good" at the start of the reply. "Good" alone is not: room chatter misheard as "Good boy" became `ok` in a live test.
+3. yes, yeah, yep, yup, okay, ok, fine, alright, all right is `ok`. So are I'm good, I am good, I'm doing good and I'm all good, and "all good" or "doing good" at the start of the reply. "Good" alone is not: room chatter misheard as "Good boy" became `ok` in a live test.
 4. Anything else, silence included, is `no_answer`.
 
 ## Microphone
@@ -67,4 +71,4 @@ The listener trims the quiet around the answer before Moonshine reads it. The ga
 .venv/bin/python -m pytest software/voice
 ```
 
-The offline speech-to-text tests use fixtures made with macOS `say` and converted to 16 kHz mono WAV with `afconvert`, plus one real room-noise recording.
+The offline speech-to-text tests use fixtures made with macOS `say` and converted to 16 kHz mono WAV with `afconvert`, plus one ElevenLabs recording (`eleven_long_answer.wav`) and one real room-noise recording.
