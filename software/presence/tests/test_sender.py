@@ -2,7 +2,9 @@ import asyncio
 import io
 import json
 import logging
+import os
 import socket
+import subprocess
 import sys
 
 import pytest
@@ -159,12 +161,28 @@ def test_frames_are_read_while_the_hub_is_down():
     assert len(read) == 40
 
 
-def test_stdin_closing_is_logged(monkeypatch, caplog):
-    monkeypatch.setattr(sys, "stdin", io.StringIO('{"t": 0, "boxes": []}\n'))
+def test_stdin_frames_skip_event_lines_and_end_when_stdin_closes(monkeypatch):
+    monkeypatch.setattr(sys, "stdin", io.StringIO('{"t": 0, "boxes": []}\nEVENT {"type": "fall_hint"}\n{"t": 1, "boxes": []}\n'))
 
     async def read_all():
         return [f async for f in stdin_frames()]
 
-    with caplog.at_level(logging.INFO, logger="presence.sources"):
-        assert asyncio.run(read_all()) == [(0.0, [])]
-    assert any("stdin closed" in r.getMessage() for r in caplog.records)
+    assert asyncio.run(read_all()) == [(0.0, []), (1.0, [])]
+
+
+def test_a_bad_hub_url_exits_even_when_stdin_is_idle(tmp_path):
+    # A blocked stdin read must not keep the program alive after it fails.
+    err = tmp_path / "stderr.txt"
+    with open(err, "w") as err_file:
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "software.presence", "--stdin"],
+            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=err_file,
+            env={**os.environ, "HUB_URL": "localhost:8765"},  # no ws:// scheme, so it fails before any connect
+        )
+        try:
+            returncode = proc.wait(timeout=10)  # stdin stays open and idle. A guess: the fix exits in about 1 s, the bug never does.
+        finally:
+            proc.kill()
+            proc.stdin.close()
+    assert returncode != 0
+    assert "InvalidURI" in err.read_text()

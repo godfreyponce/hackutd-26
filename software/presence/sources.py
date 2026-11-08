@@ -43,7 +43,20 @@ def parse_frame(line):
 
 
 async def stdin_frames():
-    while line := await asyncio.to_thread(sys.stdin.readline):
+    # A daemon thread, not asyncio.to_thread: a read blocked on an idle pipe must not keep the program from exiting.
+    loop = asyncio.get_running_loop()
+    lines = asyncio.Queue()
+
+    def read():
+        try:
+            for line in sys.stdin:
+                loop.call_soon_threadsafe(lines.put_nowait, line)
+            loop.call_soon_threadsafe(lines.put_nowait, None)
+        except RuntimeError:  # the event loop is gone: the program is quitting
+            pass
+
+    threading.Thread(target=read, daemon=True).start()
+    while (line := await lines.get()) is not None:
         if line.strip() and (frame := parse_frame(line)):
             yield frame
     log.info("stdin closed, no more frames")
