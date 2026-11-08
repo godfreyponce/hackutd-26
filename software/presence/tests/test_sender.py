@@ -200,3 +200,67 @@ def test_a_bad_hub_url_exits_even_when_stdin_is_idle(tmp_path):
             proc.stdin.close()
     assert returncode != 0
     assert "InvalidURI" in err.read_text()
+
+
+def test_a_hub_that_comes_up_gets_presence_at_once_and_a_fresh_fall_hint():
+    # A fall_hint dropped while the hub is down must not hold back the check-in for the next real event.
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]  # closed again below, so nothing listens there until the hub starts
+    first_done = asyncio.Event()
+    go_on = asyncio.Event()
+
+    def walk_then_still(t0):
+        for i in range(48):  # walk for 2 s, then still for 4 s
+            t = t0 + i / 8
+            cx = 0.1 + 0.1 * (t - t0) if t - t0 < 2 else 0.3
+            yield t, [[cx - 0.1, 0.3, cx + 0.1, 0.7, 0.9]]
+
+    async def frames():
+        for frame in walk_then_still(0):  # its fall_hint is dropped: no hub yet
+            yield frame
+        first_done.set()
+        await go_on.wait()
+        for frame in walk_then_still(6):  # well inside the 60 s cooldown
+            yield frame
+        await asyncio.Event().wait()
+
+    async def scenario():
+        sender = asyncio.create_task(run(f"ws://127.0.0.1:{port}", frames(), Tracker()))
+        await asyncio.wait_for(first_done.wait(), timeout=2)
+        async with running_hub("127.0.0.1", port, 0) as hub:
+            published = asyncio.Queue()
+            hub.listeners.append(published.put_nowait)
+            first = await asyncio.wait_for(published.get(), timeout=3)  # the service retries every 1 s
+            go_on.set()
+            while (await asyncio.wait_for(published.get(), timeout=2))["type"] != "fall_hint":
+                pass
+            sender.cancel()
+            return first
+
+    first = asyncio.run(scenario())
+    assert (first["type"], first.get("state")) == ("presence", "still")
+
+
+def test_the_hub_logs_no_error_when_the_service_exits(tmp_path, caplog):
+    replay = tmp_path / "two_frames.jsonl"
+    replay.write_text('{"t": 0, "boxes": []}\n{"t": 0.1, "boxes": []}\n')
+
+    async def scenario():
+        async with running_hub("127.0.0.1", 0, 0) as hub:
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", "software.presence", "--replay", str(replay),
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                env={**os.environ, "HUB_URL": f"ws://127.0.0.1:{hub.ws_port}"},
+            )
+            try:
+                assert await asyncio.wait_for(proc.wait(), timeout=10) == 0  # a guess: it exits in about 1 s
+            finally:
+                if proc.returncode is None:
+                    proc.kill()
+            while hub.clients:  # the hub handles the close after the process is gone
+                await asyncio.sleep(0.01)
+
+    with caplog.at_level(logging.INFO, logger="websockets.server"):
+        asyncio.run(asyncio.wait_for(scenario(), timeout=15))
+    assert [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR] == []

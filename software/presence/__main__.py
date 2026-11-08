@@ -18,7 +18,7 @@ RETRY_S = 1.0  # same retry as the agent
 
 
 class HubLink:
-    """Stays connected to the hub and reads everything it broadcasts. Calls on_reset() for each reset."""
+    """Stays connected to the hub and reads everything it broadcasts. Calls on_reset() on each connect and each reset."""
 
     def __init__(self, url, on_reset):
         self.url = url
@@ -33,6 +33,8 @@ class HubLink:
                     self.ws = ws
                     self.connected.set()
                     log.info("connected to %s", self.url)
+                    # The hub may have restarted, and events made while it was down were dropped.
+                    await self.on_reset()
                     async for raw in ws:
                         if _type(raw) == "reset":
                             await self.on_reset()
@@ -88,6 +90,9 @@ async def run(url, frames, tracker, wait_for_hub=False):
             reader.result()  # a bad HUB_URL raises here instead of waiting forever
         sender.result()
     finally:
+        # A clean close first. A reader cancelled inside connect() closes with 1011, and the hub logs an error.
+        if link.ws is not None:
+            await link.ws.close()
         reader.cancel()
         sender.cancel()
 

@@ -9,7 +9,7 @@ This service watches for a person with the camera and tells the hub what it sees
 
 `fall_hint` is the internal name of the hint that starts a check-in. The service sends it when the person goes from moving to still, at most once per 60 s. The boxes do not show posture, so a person who walks in and then stands or sits still also gets the hint. The agent then asks the person if they are okay. In anything a user sees or hears, call this "no response after an event".
 
-The service is a normal hub client. It reads `HUB_URL` (default `ws://localhost:8765`) and connects again 1 s after the hub drops. When it sees a `reset` on the bus, it sends the current state again at once. A reset also clears the once per 60 s limit on the check-in hint, so the next change from moving to still sends it again.
+The service is a normal hub client. It reads `HUB_URL` (default `ws://localhost:8765`) and connects again 1 s after the hub drops. Each time it connects, and each time it sees a `reset` on the bus, it sends the current state again at once. A connect or a reset also clears the once per 60 s limit on the check-in hint, so the next change from moving to still sends it again.
 
 ## How it decides
 
@@ -43,7 +43,7 @@ Without that line, the pipe below sends nothing to the hub.
 On the Pi, from the repo root:
 
 ```bash
-python3 hardware/vision/posture.py --hub "" --no-window | tee /tmp/boxes.jsonl | HUB_URL=ws://localhost:8765 .venv/bin/python -m software.presence --stdin
+~/land/.venv/bin/python hardware/vision/posture.py --hub "" --no-window | tee /tmp/boxes.jsonl | HUB_URL=ws://localhost:8765 .venv/bin/python -m software.presence --stdin
 ```
 
 - `--hub ""` keeps posture.py off the hub. Only this service sends presence, so the hub never gets two answers. posture.py reads `HUB_URL` when `--hub` is not given, so do not leave it out.
