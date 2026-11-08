@@ -111,8 +111,8 @@ svgEl('path', {
 }, map);
 const homeDot = svgEl('circle', { class: 'node home', cx: HOME.x, cy: HOME.y, r: 4.5, filter: 'url(#glow)' }, map);
 // Left of the dot: the imagery prints BELT LINE RD to the right.
-const hudHome = hudText(map, HOME.x - 18, HOME.y - 4, 'H000', { 'text-anchor': 'end' });
-const hudThisHome = hudText(map, HOME.x - 18, HOME.y + 9, 'THIS HOME', { class: 'hud dim', 'text-anchor': 'end' });
+const hudHome = hudText(map, 0, 0, 'H000', { 'text-anchor': 'end' });
+const hudThisHome = hudText(map, 0, 0, 'THIS HOME', { class: 'hud dim', 'text-anchor': 'end' });
 
 const hudNodes = hudText(map, 6, 254, '');
 const hudHit = hudText(map, 294, 254, '', { 'text-anchor': 'end' });
@@ -129,18 +129,20 @@ const IMAGERY = { x0: -216, y0: -11, x1: -216 + 3 * TILE, y1: -11 + 2 * TILE };
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
 // Grow the 300x260 scope view to the card's shape so the imagery fills it with no letterbox,
-// centered on this home but kept inside the imagery so no black strip shows past the tiles.
+// centered a little right of this home (so the imagery's street labels east of it are not cut)
+// but kept inside the imagery so no black strip shows past the tiles.
 function fitMap() {
   const { width, height } = map.getBoundingClientRect();
   if (!width || !height) return;
   const k = Math.max(300 / width, 260 / height);
   const w = width * k, h = height * k;
-  const x = clamp(HOME.x - w / 2, IMAGERY.x0, IMAGERY.x1 - w), y = clamp(HOME.y - h / 2, IMAGERY.y0, IMAGERY.y1 - h);
+  const x = clamp(HOME.x + w * 0.06 - w / 2, IMAGERY.x0, IMAGERY.x1 - w), y = clamp(HOME.y - h / 2, IMAGERY.y0, IMAGERY.y1 - h);
   map.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
   for (const [k2, v] of Object.entries({ x, y, width: w, height: h })) vignette.setAttribute(k2, v);
-  // HUD text is 1u on screen, never under 13 px so it reads from 2 m at 1280x800.
-  const f = Math.max(13, parseFloat(getComputedStyle(document.body).fontSize)) * k;
+  // HUD text is 1u on screen, never under 16 px so it reads from 2 m at 1280x800.
+  const f = Math.max(16, parseFloat(getComputedStyle(document.body).fontSize)) * k;
   map.style.setProperty('--hud', `${f}px`);
+  for (const el of [hudHome, hudThisHome]) el.setAttribute('x', HOME.x - b - 0.6 * f);
   hudHome.setAttribute('y', HOME.y - 0.36 * f);
   hudThisHome.setAttribute('y', HOME.y + 0.82 * f);
   view = { x, y, w, h, f };
@@ -227,6 +229,7 @@ function drawTrace() {
   const gutter = ctx.measureText('+1 g').width + 10 * dpr;
   const plotW = w - 6 * dpr - gutter;
 
+  ctx.globalAlpha = connected ? 1 : 0.35;
   ctx.strokeStyle = 'rgba(120,170,235,0.18)';
   ctx.lineWidth = dpr;
   ctx.beginPath();
@@ -241,9 +244,20 @@ function drawTrace() {
   ctx.textAlign = 'right';
   ctx.fillText('now', gutter + plotW, h - fs * 0.3);
   ctx.textAlign = 'left';
+  ctx.globalAlpha = 1;
 
   // Offline there is no live signal, so draw no line rather than a flat one that reads as calm.
-  if (!connected) { requestAnimationFrame(drawTrace); return; }
+  if (!connected) {
+    ctx.font = `${Math.max(18, labelPx) * dpr}px system-ui, sans-serif`;
+    ctx.fillStyle = '#8fa6c6';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('No live signal', gutter + plotW / 2, mid);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    requestAnimationFrame(drawTrace);
+    return;
+  }
   const start = now - TRACE_WINDOW_MS;
   const trace = new Path2D();
   const steps = Math.min(w, 1200);
@@ -273,8 +287,10 @@ requestAnimationFrame(drawTrace);
 function renderQuake() {
   const recent = state.quakes.filter((q) => Date.now() - q.at <= TRACE_WINDOW_MS);
   const last = recent.at(-1);
-  $('quake-peak').textContent = last ? `${last.g.toFixed(2)} g` : '';
-  $('quake-sub').textContent = !connected ? 'Live seismic data unavailable' : last ? `Last peak, ${recent.length} event${recent.length > 1 ? 's' : ''} in the last minute` : 'No shaking in the last minute';
+  const peak = document.createElement('small');
+  peak.textContent = 'peak';
+  $('quake-peak').replaceChildren(...(last ? [`${last.g.toFixed(2)} g`, peak] : []));
+  $('quake-sub').textContent = !connected ? 'Live seismic data unavailable' : last ? `${recent.length} event${recent.length > 1 ? 's' : ''} in the last minute` : 'No shaking in the last minute';
 }
 
 // ---------- the rest ----------
@@ -288,12 +304,13 @@ function render() {
   $('word').textContent = word;
   $('detail').textContent = detail;
   $('note').hidden = !note;
-  $('note').textContent = note ?? '';
+  $('note').textContent = note ?? '\u00a0'; // one blank line keeps the hidden note's height
 
-  $('say').textContent = state.say ? `"${state.say.text}"` : 'Nothing yet';
+  const none = connected ? 'Nothing yet' : 'Unknown while offline';
+  $('say').textContent = state.say ? `"${state.say.text}"` : none;
   $('say-try').textContent = state.say?.tryNum ? `try ${state.say.tryNum}` : '';
   const heard = state.heard;
-  $('heard').textContent = heard ? (heard.transcript ? `"${heard.transcript}"` : '') : 'Nothing yet';
+  $('heard').textContent = heard ? (heard.transcript ? `"${heard.transcript}"` : '') : none;
   $('heard-chip').hidden = !heard;
   $('heard-chip').className = `chip ${heard?.answer ?? ''}`;
   $('heard-chip').textContent = heard ? ANSWERS[heard.answer] ?? heard.answer : '';
@@ -313,7 +330,7 @@ function render() {
   $('battery-text').textContent = state.batteryPct == null ? 'On battery' : `On battery, ${state.batteryPct}%`;
 
   $('temp').innerHTML = state.indoorF == null ? '<small>No reading yet</small>' : `${Math.round(state.indoorF)}<small> &deg;F</small>`;
-  $('heat-sub').textContent = !connected ? `${state.indoorF == null ? '' : 'Last known reading. '}Live heat status unavailable`
+  $('heat-sub').textContent = !connected ? `${state.indoorF == null ? '' : 'Last known reading. '}No live heat data`
     : a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : 'No heat alerts';
 
   $('hub').classList.toggle('bad', !connected);

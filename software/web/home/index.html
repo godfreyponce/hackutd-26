@@ -60,7 +60,7 @@
   .pill {
     display: inline-flex; align-items: center; gap: 0.5em;
     border: 1px solid var(--line); border-radius: 999px;
-    padding: 0.35em 0.9em; font-size: calc(var(--u) * 1.05); color: var(--muted);
+    padding: 0.35em 0.9em; font-size: max(18px, calc(var(--u) * 1.05)); color: var(--muted);
     white-space: nowrap;
   }
   .pill[hidden] { display: none; }
@@ -127,12 +127,15 @@
   body[data-link="down"][data-status="PROTECTED"] .shield .g-link { display: inline; }
   body[data-link="down"][data-status="PROTECTED"] .shield .g-ok { display: none; }
   .eyebrow { color: var(--muted); letter-spacing: 0.14em; font-size: max(15px, var(--u)); text-transform: uppercase; }
+  /* The line box and margins use the common word size, so a smaller word does not move the convo below. */
   .word {
-    font-size: min(calc(var(--u) * 6.4), calc((100cqi - var(--shield-w) - var(--hero-gap)) / 7.4)); line-height: 1; font-weight: 800; letter-spacing: 0.03em;
-    color: var(--status); margin: 0.12em 0 0.15em; white-space: nowrap;
+    --word-fs: min(calc(var(--u) * 6.4), calc((100cqi - var(--shield-w) - var(--hero-gap)) / 7.4));
+    font-size: var(--word-fs); line-height: var(--word-fs); font-weight: 800; letter-spacing: 0.03em;
+    color: var(--status); margin: calc(var(--word-fs) * 0.12) 0 calc(var(--word-fs) * 0.15); white-space: nowrap;
   }
-  /* Cap each word to the space right of the shield. CONTACTING HELP is about 9.3 em wide at its tighter tracking, the others at most 7.2 em. */
-  body[data-status="CONTACTING_HELP"] .word { font-size: min(calc(var(--u) * 6.4), calc((100cqi - var(--shield-w) - var(--hero-gap)) / 9.35)); letter-spacing: 0.005em; }
+  /* Cap each word to the space right of the shield. CONTACTING HELP measures 9.2 to 9.28 em at its tighter tracking
+     (the others at most 7.2 em), and keeps 0.6u free before the column edge. */
+  body[data-status="CONTACTING_HELP"] .word { font-size: min(calc(var(--u) * 6.4), calc((100cqi - var(--shield-w) - var(--hero-gap) - var(--u) * 0.6) / 9.3)); letter-spacing: 0.005em; }
   body[data-status="PROTECTED"]:not([data-link="down"]) .word { color: var(--text); }
   .detail { font-size: calc(var(--u) * 1.6); }
   .note {
@@ -140,7 +143,8 @@
     background: rgba(255, 59, 78, 0.16); border: 1px solid rgba(255, 59, 78, 0.55); color: #ffd7db;
     font-size: max(18px, calc(var(--u) * 1.2)); font-weight: 600;
   }
-  .note[hidden] { display: none; }
+  /* A hidden note keeps its box so the hero, and the convo under it, do not move between states. */
+  .note[hidden] { display: inline-block; visibility: hidden; }
   body[data-status="CONTACTING_HELP"] .shield { animation: pulse 1.2s ease-in-out infinite; }
   @keyframes pulse {
     0%, 100% { filter: drop-shadow(0 0 calc(var(--u) * 0.6) var(--status)); }
@@ -159,6 +163,7 @@
   }
   .convo dt { color: var(--muted); font-size: 0.75em; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
   .convo dd { margin: 0; text-wrap: pretty; }
+  body[data-link="down"] .convo dd { color: var(--muted); }
   .convo .try { color: var(--muted); font-size: 0.85em; margin-left: 0.4em; white-space: nowrap; }
   body[data-status="CONTACTING_HELP"] .convo .try { display: none; }
   /* The negative block margin cancels the padding and border so the chip does not grow the row. */
@@ -169,7 +174,7 @@
   .chip.help { color: var(--danger); }
   .chip.no_answer { color: var(--orange); }
 
-  .cards { grid-area: cards; display: grid; grid-template-columns: 1.5fr 1fr; gap: calc(var(--u) * 1.2); min-height: 0; }
+  .cards { grid-area: cards; display: grid; grid-template-columns: 1.8fr 1fr; gap: calc(var(--u) * 1.2); min-height: 0; }
   .card {
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
     padding: calc(var(--u) * 0.9) calc(var(--u) * 1.1);
@@ -180,9 +185,10 @@
   .card-title { font-size: calc(var(--u) * 1.3); font-weight: 650; }
   .card-sub { color: var(--muted); font-size: max(18px, calc(var(--u) * 1.1)); text-wrap: balance; }
   .card-value { margin-left: auto; white-space: nowrap; font-size: calc(var(--u) * 1.6); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .card-value small { font-size: .55em; color: var(--muted); font-weight: 500; margin-left: .3em; }
   .card canvas { flex: 1; width: 100%; min-height: 0; margin-top: 0.6em; }
-  .heat-body { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.3em; padding-bottom: 0.3em; }
-  .temp { font-size: calc(var(--u) * 5.5); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .heat-body { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.3em; padding-bottom: 0.3em; }
+  .temp { font-size: calc(var(--u) * 4); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .temp small { font-size: 0.4em; color: var(--muted); font-weight: 500; }
 
   #map { flex: 1 1 0; width: 100%; height: 0; min-height: 0; margin-top: 0.4em; }
@@ -207,7 +213,6 @@
   .node.hit { fill: var(--danger); }
   .node.ok { fill: var(--ok); }
   body[data-link="down"] .node { opacity: 0.6; }
-  body[data-link="down"] #trace { opacity: 0.35; }
   .wave { fill: none; stroke: var(--danger); stroke-width: 2; opacity: 0; }
   .wave.go { animation: wave 1.6s ease-out forwards; }
   @keyframes wave { from { r: 4; opacity: 0.9; } to { r: 160; opacity: 0; } }
