@@ -1,6 +1,8 @@
 import asyncio
 import json
 import urllib.request
+from html.parser import HTMLParser
+from urllib.parse import urljoin
 
 from websockets.asyncio.client import connect
 
@@ -57,3 +59,34 @@ def test_static_server_serves_web_dir(tmp_path):
             return await asyncio.to_thread(lambda: urllib.request.urlopen(url, timeout=2).read())
 
     assert b"hello hub" in asyncio.run(scenario())
+
+
+class BrandRefs(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.refs = []
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if (tag == "link" and a.get("rel") == "icon") or tag == "img":
+            self.refs.append(a.get("href") or a.get("src"))
+
+
+def test_landing_page_says_land_and_every_brand_file_it_points_to_is_served():
+    def get(url):
+        with urllib.request.urlopen(url, timeout=2) as r:
+            return r.headers["Content-Type"], r.read().decode()
+
+    async def scenario():
+        async with running_hub("127.0.0.1", 0, 0) as hub:
+            root = f"http://127.0.0.1:{hub.http_port}/"
+            _, page = await asyncio.to_thread(get, root)
+            parser = BrandRefs()
+            parser.feed(page)
+            served = [await asyncio.to_thread(get, urljoin(root, ref)) for ref in parser.refs]
+            return page, parser.refs, served
+
+    page, refs, served = asyncio.run(scenario())
+    assert "<title>LAND</title>" in page
+    assert "brand/land-favicon-16.svg" in refs and "brand/land-mark-white.svg" in refs
+    assert all(ctype == "image/svg+xml" and body.startswith("<svg") for ctype, body in served)
