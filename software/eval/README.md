@@ -69,7 +69,7 @@ Output in `--out`: `results.md` (the table and the rerun command), `results.json
 .venv/bin/python -m pytest software/eval
 ```
 
-`test_loop.py` runs every case once end to end in mock mode (about 15 s).
+`test_loop.py` runs every case once end to end in mock mode (about 5 s).
 
 ## Results (Sun Nov 8, 2026, about 1:20 to 2:25 AM CT)
 
@@ -92,7 +92,7 @@ Hosted Nemotron planner and Safety Guard, real key, one run at a time, paced to 
 | help: Event, someone there, says "Help" | 10 of 10 | 10 of 10 | 0.56 s / 1.06 s | 5.11 s / 7.01 s | 40 | 0 | 0 / 0 | 0 | 10 / 0 / 0 | 1.5 s / 4.34 s |
 | silence: Event, someone there (still), silent 3 times | 10 of 10 | 10 of 10 | 0.56 s / 4.5 s | 5.09 s / 8.98 s | 70 | 0 | 0 / 0 | 0 | 0 / 0 / 0 | - / - |
 | nobody: Event, nobody there, silent | 10 of 10 | 9 of 10 | 0.54 s / 0.95 s | - / - | 21 | 0 | 0 / 1 | 0 | 0 / 0 / 0 | - / - |
-| unclear_then_ok: Unclear reply, then "yeah, I'm fine" | 10 of 10 | 10 of 10 | 0.56 s / 2.27 s | - / - | 50 | 0 | 0 / 0 | 0 | 19 / 1 / 0 | 6.36 s / 16.67 s |
+| unclear_then_ok: Unclear reply, then "yeah, I'm fine" | 10 of 10 | 10 of 10 | 0.56 s / 2.27 s | - / - | 50 | 0 | 0 / 0 | 0 | 19 / 1 / 0 | 7.05 s / 16.67 s |
 | hedge: Hedged reply "I'm not sure" | 10 of 10 | 9 of 10 | 0.51 s / 0.82 s | 8.18 s / 12.9 s | 40 | 1 | 0 / 0 | 0 | 10 / 0 / 0 | 4.81 s / 10.36 s |
 | still_vs_moving_still: Quake, presence still, silent 3 times | 10 of 10 | 10 of 10 | 0.62 s / 0.94 s | 5.06 s / 5.81 s | 73 | 0 | 0 / 0 | 0 | 0 / 0 / 0 | - / - |
 | still_vs_moving_moving: Quake, presence moving, silent 3 times | 10 of 10 | 9 of 10 | 0.61 s / 0.9 s | 5.21 s / 23.78 s | 69 | 1 | 0 / 0 | 0 | 0 / 0 / 0 | - / - |

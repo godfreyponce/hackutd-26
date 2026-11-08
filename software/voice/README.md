@@ -15,7 +15,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -r software/voice/requirements
 
 ```bash
 .venv/bin/python -m software.voice            # online if ELEVENLABS_API_KEY is set, else offline
-.venv/bin/python -m software.voice --offline  # Piper speaks, Moonshine listens, no network
+.venv/bin/python -m software.voice --offline  # the offline voice speaks, Moonshine listens, no network
 .venv/bin/python -m software.voice --text     # prints the line, reads a typed answer
 ```
 
@@ -23,7 +23,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -r software/voice/requirements
 
 ## Modes
 
-- **Online:** ElevenLabs text-to-speech (`eleven_v4_turbo`) and speech-to-text (`scribe_v2`). If a request fails, that line falls back to Piper or Moonshine, so cutting the Wi-Fi mid-demo keeps working. With no `ELEVENLABS_API_KEY` it logs `MOCK/OFFLINE: no ELEVENLABS_API_KEY` and runs offline.
+- **Online:** ElevenLabs text-to-speech (`eleven_v4_turbo`) and speech-to-text (`scribe_v2`). If a request fails, that line falls back to the offline voice or Moonshine, so cutting the Wi-Fi mid-demo keeps working. With no `ELEVENLABS_API_KEY` it logs `MOCK/OFFLINE: no ELEVENLABS_API_KEY` and runs offline.
 - **Offline:** Piper or Kokoro speaks, Moonshine (`moonshine/base`) listens. `moonshine/tiny` missed the "help me" fixture.
 
 ## Voice
@@ -56,7 +56,7 @@ Why not Eleven Realtime v1 Mini: it is a speech-to-speech agent. Its docs don't 
 `classify.py` is a keyword match, no LLM. In order:
 1. A help word (help, hurt, emergency, can't get up) is `help`.
 2. Any negation (no, nope, not, never, -n't) is `help`, so "I'm not okay" and "no" never become `ok`.
-3. yes, yeah, yep, okay, ok, fine, alright is `ok`. "Good" is not: room chatter misheard as "Good boy" became `ok` in a live test.
+3. yes, yeah, yep, yup, okay, ok, fine, alright, all right is `ok`. "Good" is not: room chatter misheard as "Good boy" became `ok` in a live test.
 4. Anything else, silence included, is `no_answer`.
 
 ## Microphone
@@ -71,4 +71,4 @@ The listener trims the quiet around the answer before Moonshine reads it. The ga
 .venv/bin/python -m pytest software/voice
 ```
 
-The offline speech-to-text tests use fixtures made with macOS `say` and converted to 16 kHz mono WAV with `afconvert`, plus one real room-noise recording.
+The offline speech-to-text tests use fixtures made with macOS `say` and converted to 16 kHz mono WAV with `afconvert`, plus one ElevenLabs recording (`eleven_long_answer.wav`) and one real room-noise recording.

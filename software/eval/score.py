@@ -80,7 +80,7 @@ def _wrong_lines(case, events):
 
 
 def _heard_to_rule(events):
-    """Seconds from each spoken `heard` to the agent's checkin answer: mostly the Safety Guard check,
+    """Seconds from each spoken `heard` to the agent's checkin answer: it includes the Safety Guard check,
     which runs before the rule. Silence and no_answer replies skip the guard, so they are left out."""
     gaps, spoken_at = [], None
     for t, m in events:

@@ -32,7 +32,7 @@ Each hop writes an `agent` FALLBACK row with the reason. A text reply with no `t
 - An ok answer gets `reply_ok`. A help answer gets `reply_help` before the alarm, and no `escalate`. Replies do not listen.
 - `reply_ok` is refused unless the last answer was ok. `reply_help` is refused unless it was help. If the planner skips a due reply for one turn, code speaks it (VERIFY "Rule override").
 - Safety Guard (`nvidia/llama-3.1-nemotron-safety-guard-8b-v3`) screens every ok or help transcript before the planner sees it. A no_answer transcript is dropped without a guard call (trace: "Safety Guard skipped"). No key: MOCK pass-through row. Guard error: the transcript is withheld.
-- `raise_alarm` always sends `checkin alarm`. It calls `TWILIO_TO` only when all `TWILIO_*` vars are set and `TWILIO_TO` is a full `+1XXXXXXXXXX` number. Never 911.
+- `raise_alarm` always sends `checkin alarm`. It calls `TWILIO_TO` only when all `TWILIO_*` vars are set and `TWILIO_TO` is a full phone number: `+` and 10 to 15 digits. Never 911.
 
 ## Alerts (#36)
 
@@ -45,12 +45,12 @@ The agent stores every hub `alert` (the last one goes into the hand-off facts). 
 
 ## Camera help sign (#46)
 
-The camera sends `help_gesture` when it sees the HELP sign. It starts a check-in at once, like a quake. It asks with `ask_gesture` ("I saw your help sign. Are you okay? Say okay, or help.") whatever `AGENT_ASK_SCRIPT` says. Then the same 3 tries and the same alarm rule apply. The sign alone never raises the alarm.
+The camera sends `help_gesture` when it sees the HELP sign. The camera part is on the pi-integration branch, not on main yet. It starts a check-in at once, like a quake. It asks with `ask_gesture` ("I saw your help sign. Are you okay? Say okay, or help.") whatever `AGENT_ASK_SCRIPT` says. Then the same 3 tries and the same alarm rule apply. The sign alone never raises the alarm.
 
 - The line asks "are you okay", not "do you need help": the voice service hears "yes" as ok.
 - A help sign while a check-in is open, or while the alarm is up, is ignored. Repeats do not stack.
 - A help sign check-in does not start the 300 s alert quiet window. An EQW alert right after it still starts its own check-in.
-- A sign still held after "okay" starts a new check-in when the camera sends it again (about 15 s later).
+- A sign still held after "okay" starts a new check-in when the camera sends it again (about 15 s later, on the pi-integration branch).
 - Simulator key `h` sends it without the camera.
 
 ## Hand-off note and why
