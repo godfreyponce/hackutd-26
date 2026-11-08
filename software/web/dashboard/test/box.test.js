@@ -57,6 +57,19 @@ test('when Rafael lies still and does not answer, his row climbs to the top', ()
   assert.equal(ranks[3], 1);
 });
 
+// The agent (software/agent/checkin.py) and the hub simulator start and reset presence to none.
+test('the real box starts as nobody detected, like the agent, until a presence event arrives', () => {
+  assert.equal(initialBox(0).presence, 'none');
+  assert.equal(boxRankInput(run([{ type: 'quake', peak_g: 0.82 }]), 0).presence, 'none');
+});
+
+test('after reset the real box is nobody detected again, even after a quake with no presence event', () => {
+  const moving = run([{ type: 'presence', state: 'moving' }]);
+  const s = [{ type: 'reset' }, { type: 'quake', peak_g: 0.82 }].reduce((b, m) => applyBoxEvent(b, m, 0), moving);
+  assert.equal(s.presence, 'none');
+  assert.equal(boxRankInput(s, 0).presence, 'none');
+});
+
 test('reset returns the real box to its start state', () => {
   const s = run([{ type: 'presence', state: 'still' }, { type: 'checkin', state: 'alarm', try: 4 }]);
   assert.deepEqual(applyBoxEvent(s, { type: 'reset' }, 7), initialBox(7));
