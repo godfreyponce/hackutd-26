@@ -109,8 +109,8 @@ svgEl('path', {
     `M${HOME.x + sx * b} ${HOME.y + sy * (b - l)}V${HOME.y + sy * b}H${HOME.x + sx * (b - l)}`).join(''),
 }, map);
 const homeDot = svgEl('circle', { class: 'node home', cx: HOME.x, cy: HOME.y, r: 4.5, filter: 'url(#glow)' }, map);
-hudText(map, HOME.x + 18, HOME.y - 5, 'H000');
-hudText(map, HOME.x + 18, HOME.y + 6, 'THIS HOME', { class: 'hud dim' });
+hudText(map, HOME.x + 18, HOME.y - 4, 'H000');
+hudText(map, HOME.x + 18, HOME.y + 9, 'THIS HOME', { class: 'hud dim' });
 
 const hudNodes = hudText(map, 6, 254, '');
 const hudHit = hudText(map, 294, 254, '', { 'text-anchor': 'end' });
@@ -145,7 +145,8 @@ function renderMap() {
   }
   lastWaveAt = last;
   const total = neighborDots.length + 1;
-  const hit = (state.areaHit ? neighborDots.length : 0) + (state.home === 'hit' ? 1 : 0);
+  // A home that answered okay was still hit, so check-in answers never lower the quake count.
+  const hit = state.areaHit ? neighborDots.length + (state.home === 'idle' ? 0 : 1) : state.home === 'hit' ? 1 : 0;
   hudNodes.textContent = `NODES ${total}`;
   hudHit.textContent = `HIT ${hit}`;
   hudHit.classList.toggle('alarm', hit > 0);
@@ -153,7 +154,7 @@ function renderMap() {
   hudLive.classList.toggle('alarm', !connected);
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
   $('map-sub').textContent = !connected ? 'No live data'
-    : state.areaHit ? `Quake hit ${hit} of ${total} homes` : homeNote ? `${homeNote}.` : 'All homes quiet';
+    : state.areaHit ? `Quake hit ${hit} of ${total} homes${state.home === 'ok' ? '. This home answered okay' : ''}` : homeNote ? `${homeNote}.` : 'All homes quiet';
 }
 
 // ---------- seismic trace ----------
@@ -164,7 +165,7 @@ const ctx = canvas.getContext('2d');
 let labelPx = 12;
 function sizeCanvas() {
   const r = canvas.getBoundingClientRect();
-  labelPx = parseFloat(getComputedStyle(document.body).fontSize) * 0.85;
+  labelPx = parseFloat(getComputedStyle(document.body).fontSize);
   canvas.width = Math.max(1, Math.round(r.width * devicePixelRatio));
   canvas.height = Math.max(1, Math.round(r.height * devicePixelRatio));
 }
@@ -188,30 +189,34 @@ function drawTrace() {
   const dpr = devicePixelRatio;
   ctx.clearRect(0, 0, w, h);
   const maxG = Math.max(1, ...state.quakes.map((q) => q.g)) * 1.15;
-  const mid = h / 2;
-  const scale = (h / 2 - 4 * dpr) / maxG;
+  const fs = labelPx * dpr;
+  const plotH = h - fs * 1.4; // the bottom band holds only the time labels
+  const mid = plotH / 2;
+  const scale = (plotH / 2 - fs * 0.6) / maxG;
+  ctx.font = `${fs}px system-ui, sans-serif`;
+  const gutter = ctx.measureText('+1 g').width + 10 * dpr;
+  const plotW = w - 6 * dpr - gutter;
 
   ctx.strokeStyle = 'rgba(120,170,235,0.18)';
   ctx.lineWidth = dpr;
   ctx.beginPath();
-  for (const g of [-1, 0, 1]) { ctx.moveTo(0, mid - g * scale); ctx.lineTo(w, mid - g * scale); }
+  for (const g of [-1, 0, 1]) { ctx.moveTo(gutter, mid - g * scale); ctx.lineTo(w, mid - g * scale); }
   ctx.stroke();
   ctx.fillStyle = 'rgba(143,166,198,0.9)';
-  const fs = labelPx * dpr;
-  ctx.font = `${fs}px system-ui, sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText('+1 g', 4 * dpr, mid - scale);
+  ctx.fillText('-1 g', 4 * dpr, mid + scale);
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('+1 g', 4 * dpr, mid - scale + fs * 1.1);
-  ctx.fillText('-1 g', 4 * dpr, mid + scale - fs * 0.35);
-  ctx.fillText('60 s ago', 4 * dpr, h - fs * 0.25);
+  ctx.fillText('60 s ago', gutter, h - fs * 0.3);
   ctx.textAlign = 'right';
-  ctx.fillText('now', w - 4 * dpr, h - fs * 0.25);
+  ctx.fillText('now', gutter + plotW, h - fs * 0.3);
   ctx.textAlign = 'left';
 
   const start = now - TRACE_WINDOW_MS;
   const trace = new Path2D();
   const steps = Math.min(w, 1200);
   for (let i = 0; i <= steps; i++) {
-    const x = (i / steps) * w;
+    const x = gutter + (i / steps) * plotW;
     const y = mid - signal(start + (i / steps) * TRACE_WINDOW_MS) * scale;
     i ? trace.lineTo(x, y) : trace.moveTo(x, y);
   }
@@ -221,10 +226,10 @@ function drawTrace() {
   // Only the shaking itself turns red, so the eye goes to the event.
   ctx.strokeStyle = '#ff5a4e';
   for (const q of state.quakes) {
-    const x0 = ((q.at - start) / TRACE_WINDOW_MS) * w;
+    const qx = gutter + ((q.at - start) / TRACE_WINDOW_MS) * plotW;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(x0, 0, ((RING_S * 1000) / TRACE_WINDOW_MS) * w, h);
+    ctx.rect(qx, 0, ((RING_S * 1000) / TRACE_WINDOW_MS) * plotW, h);
     ctx.clip();
     ctx.stroke(trace);
     ctx.restore();
@@ -237,7 +242,7 @@ function renderQuake() {
   const recent = state.quakes.filter((q) => Date.now() - q.at <= TRACE_WINDOW_MS);
   const last = recent.at(-1);
   $('quake-peak').textContent = last ? `${last.g.toFixed(2)} g` : '';
-  $('quake-sub').textContent = last ? `Last peak, ${recent.length} event${recent.length > 1 ? 's' : ''} in the last minute` : 'No shaking in the last minute';
+  $('quake-sub').textContent = !connected ? 'Live seismic data unavailable' : last ? `Last peak, ${recent.length} event${recent.length > 1 ? 's' : ''} in the last minute` : 'No shaking in the last minute';
 }
 
 // ---------- the rest ----------
@@ -260,7 +265,6 @@ function render() {
   $('heard-chip').hidden = !heard;
   $('heard-chip').className = `chip ${heard?.answer ?? ''}`;
   $('heard-chip').textContent = heard ? ANSWERS[heard.answer] ?? heard.answer : '';
-  $('heard-try').textContent = heard?.tryNum ? `try ${heard.tryNum}` : '';
 
   const a = state.alert;
   $('banner').hidden = !a;
@@ -270,13 +274,15 @@ function render() {
     $('alert-event').textContent = [a.event, a.severity].filter(Boolean).join(', ');
     $('alert-headline').textContent = a.headline;
     $('alert-area').textContent = a.area;
+    $('alert-area').hidden = a.headline.includes(a.area);
   }
 
   $('battery').hidden = !state.onBattery;
   $('battery-text').textContent = state.batteryPct == null ? 'On battery' : `On battery, ${state.batteryPct}%`;
 
   $('temp').innerHTML = state.indoorF == null ? '<small>No reading yet</small>' : `${Math.round(state.indoorF)}<small> &deg;F</small>`;
-  $('heat-sub').textContent = a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : 'No heat alerts';
+  $('heat-sub').textContent = !connected ? `${state.indoorF == null ? '' : 'Last known reading. '}Live heat status unavailable`
+    : a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : 'No heat alerts';
 
   $('hub').classList.toggle('bad', !connected);
   $('hub-text').textContent = connected ? 'Hub connected' : 'Hub disconnected';
