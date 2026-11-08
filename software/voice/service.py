@@ -1,6 +1,7 @@
 """Bus client: on `say`, speak; with `listen_s`, listen, classify and send one `heard`.
 A `say` with `tone` "warning" (EQW alert) plays the warning tone first, then the line.
-On `checkin` alarm, play the alarm tone after the line in progress; `reset` stops it.
+On `checkin` alarm, play the alarm tone after the line in progress; `reset` stops it,
+and cuts the line, warning tone or listen in progress.
 
 The agent (#15) owns the tries, the alarm rule and the script text. This client never
 decides an alarm.
@@ -18,11 +19,12 @@ WARNING_TONE = "warning"
 
 
 class VoiceService:
-    def __init__(self, engine, log=print, alarm=None, warning=None):
+    def __init__(self, engine, log=print, alarm=None, warning=None, line_cut=None):
         self.engine = engine
         self.log = log
         self.alarm = alarm  # None in text mode: no speaker
         self.warning = warning  # None in text mode: the log line is the marker
+        self.line_cut = line_cut  # None in text mode: a typed answer in flight is dropped, not cut
         self.alarm_on = False
         self.resets = 0
         self.queue: asyncio.Queue = asyncio.Queue()
@@ -57,6 +59,8 @@ class VoiceService:
             while not self.queue.empty():
                 self.queue.get_nowait()
             self.log("reset: dropped queued and in-flight lines")
+            if self.line_cut:
+                self.line_cut.set()
             if self.alarm_on:
                 self.alarm_on = False
                 self._audio("stop alarm tone", self.alarm.stop)
@@ -64,6 +68,8 @@ class VoiceService:
     async def _work(self, ws):
         while True:
             msg = await self.queue.get()
+            if self.line_cut:
+                self.line_cut.clear()
             if msg.get("type") == "checkin":
                 self.log("ALARM tone (fake alarm, local only, nothing is called)")
                 if self.alarm:
