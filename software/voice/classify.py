@@ -2,6 +2,7 @@
 
 Order matters: a help word wins over everything, then any negation counts as help
 (so "not okay" and "no" never become ok), then an ok word, else no_answer.
+One exception: a leading no right before an ok phrase is dropped first ("no, I'm fine").
 """
 
 import re
@@ -32,11 +33,18 @@ NEGATION = re.compile(
     r"|cant|dont|wont|didnt|doesnt|isnt|wasnt|arent|werent"
     r"|couldnt|wouldnt|shouldnt|havent|hasnt|hadnt|aint)\b|n't\b"
 )
+# "No, I'm fine" answers "did you fall?". The no is dropped only if an ok phrase follows it.
+# Bare "good" is left out so "no good" stays help.
+LEADING_NO = re.compile(
+    r"^ ?((no|nope|nah)\b[,.!]? ?)+"
+    r"(?=(i'?m |i am )(doing |all )?good\b|(i'?m |i am )?(okay|ok|fine|alright|all right|all good|doing good)\b)"
+)
 OK = re.compile(r"\b(yes|yeah|yep|yup|okay|ok|fine|alright|all right|(i'?m|i am)( doing| all)? good|^(all|doing) good)\b")
 
 
 def classify(transcript: str | None) -> str:
     text = re.sub(r"\s+", " ", (transcript or "").lower().replace("’", "'"))
+    text = LEADING_NO.sub("", text, count=1)
     if HELP.search(text) or NEGATION.search(text):
         return "help"
     if OK.search(text):
