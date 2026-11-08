@@ -249,9 +249,13 @@ test('a help sign goes to CHECKING_IN and the status line says the help sign was
   assert.equal(statusText('CHECKING_IN').detail, 'Event detected. Asking if you are okay.');
 });
 
-test('the help sign line stays for its check-in and goes with the next event or a reset', () => {
+test('the help sign line stays for its check-in and goes when the home is okay again or on reset', () => {
   const help = { type: 'help_gesture', source: 'camera' };
+  const ok = { type: 'checkin', state: 'ok', try: 1 };
   assert.equal(run(help, asking(1), quake).helpSign, true);
-  assert.equal(run(help, asking(1), { type: 'checkin', state: 'ok', try: 1 }, quake).helpSign, false);
+  assert.equal(run(help, asking(1), ok, quake).helpSign, false);
+  // An alert or recheck check-in starts with only `checkin asking`, no event message.
+  const later = run(help, asking(1), ok, asking(1));
+  assert.equal(statusText(later.status, { helpSign: later.helpSign }).detail, 'Event detected. Asking if you are okay.');
   assert.equal(run(help, { type: 'reset' }).helpSign, false);
 });

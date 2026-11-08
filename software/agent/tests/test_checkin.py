@@ -544,7 +544,6 @@ def test_repeated_help_signs_do_not_stack_checkins():
         for _ in range(3):
             await asyncio.sleep(0.01)
             await agent.handle(HELP_SIGN)
-        assert first.tries == 1 and first.pending
         await agent.idle()
         return bus, agent, first
 

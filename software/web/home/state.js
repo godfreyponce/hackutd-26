@@ -90,15 +90,13 @@ function raise(state, status) {
 }
 
 function onEvent(state, extra = {}) {
-  // An event on a PROTECTED home starts a new check-in, so an old help sign no longer applies.
-  const helpSign = state.status === 'PROTECTED' ? false : state.helpSign;
-  return { ...state, status: raise(state, 'CHECKING_IN'), home: 'hit', helpSign, ...extra };
+  return { ...state, status: raise(state, 'CHECKING_IN'), home: 'hit', ...extra };
 }
 
 function onCheckin(state, msg) {
   const tryNum = msg.try ?? state.tryNum;
   if (msg.state === 'ok' || msg.state === 'clear') {
-    return { ...state, status: 'PROTECTED', tryNum: null, home: state.home === 'hit' ? 'ok' : state.home };
+    return { ...state, status: 'PROTECTED', tryNum: null, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false };
   }
   const status = CHECKIN_STATUS[msg.state];
   if (!status) return state;
