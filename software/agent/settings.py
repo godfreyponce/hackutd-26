@@ -1,7 +1,10 @@
 import os
 from dataclasses import dataclass
 
-from .scripts import ASK_SCRIPTS
+from .scripts import ASK_SCRIPTS, GESTURE_ASK_SCRIPT
+
+# ask_gesture names the help sign, so only a help sign check-in may use it.
+SETTABLE_ASK_SCRIPTS = tuple(s for s in ASK_SCRIPTS if s != GESTURE_ASK_SCRIPT)
 
 
 @dataclass
@@ -26,8 +29,8 @@ class Settings:
     max_planner_turns: int = 20
 
     def __post_init__(self):
-        if self.ask_script not in ASK_SCRIPTS:
-            raise ValueError(f"AGENT_ASK_SCRIPT must be one of {ASK_SCRIPTS}")
+        if self.ask_script not in SETTABLE_ASK_SCRIPTS:
+            raise ValueError(f"AGENT_ASK_SCRIPT must be one of {SETTABLE_ASK_SCRIPTS}")
 
     @classmethod
     def from_env(cls) -> "Settings":

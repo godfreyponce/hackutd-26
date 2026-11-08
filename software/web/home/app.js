@@ -381,7 +381,7 @@ const timeOf = (at) => new Date(at).toLocaleTimeString([], { hour: 'numeric', mi
 function render() {
   const a = activeAlert(state, Date.now());
   shownAlert = a;
-  const { word, detail, note } = statusText(state.status, { alert: Boolean(a), linked: connected });
+  const { word, detail, note } = statusText(state.status, { alert: Boolean(a), linked: connected, helpSign: state.helpSign });
   document.body.dataset.status = state.status;
   document.body.dataset.link = connected ? 'up' : 'down';
   $('word').textContent = word;

@@ -53,6 +53,14 @@ This list copies #19 and its "Contract addendum v1". The issue wins on any doubt
 
 `fall_hint` means presence went from moving to still. It is a hint, not a diagnosis. Say "no response after an event".
 
+**Camera events.** Sent by the camera on the Pi (`hardware/vision/posture.py`, #46).
+
+```json
+{"type":"help_gesture","source":"camera"}
+```
+
+`help_gesture` means the camera saw the HELP sign. The agent asks at once; the alarm rule decides. The camera sends it again while the sign is held, after a cooldown.
+
 **Check-in.** The agent (#15) sends `checkin` and `say`. The voice service (#14) sends `heard`.
 
 ```json
@@ -148,6 +156,7 @@ The alarm is fake. Nothing calls or texts 911 or any emergency number.
 | `n` | `presence` none |
 | `p` | `power`, toggles mains and battery |
 | `a` | a fake USGS earthquake `alert`: code `EQW`, station `HACKDEMO`, 3 miles away, `demo` true, so level emergency |
+| `h` | `help_gesture` from the camera, as if it saw the HELP sign |
 | `r` | `reset` |
 | Ctrl-C | quit |
 

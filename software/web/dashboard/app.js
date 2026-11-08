@@ -298,6 +298,10 @@ const bus = connectBus(hubUrl(location.search), {
         }
         renderEvent();
         return;
+      case 'help_gesture':
+        box = applyBoxEvent(box, msg, now);
+        renderEvent();
+        return;
       case 'quake':
         startQuake(now, msg.peak_g, 'the box');
         break;
@@ -333,8 +337,9 @@ function alertLine(msg, level) {
 
 function renderEvent() {
   const el = $('event');
-  // The alert leads so its headline is not the part cut off at narrow widths; the full line is the tooltip.
-  const html = [alertHtml && alertHtml.replace(/[.!]?$/, '.'), eventHtml].filter(Boolean).join(' ');
+  // The help sign and the alert lead so they are not the part cut off at narrow widths; the full line is the tooltip.
+  const help = box.helpSign ? '<b>Help sign seen</b> at the box.' : '';
+  const html = [help, alertHtml && alertHtml.replace(/[.!]?$/, '.'), eventHtml].filter(Boolean).join(' ');
   el.innerHTML = html || 'No event yet. Waiting for the box.';
   el.title = el.textContent;
   el.classList.toggle('live', Boolean(html));

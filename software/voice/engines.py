@@ -48,6 +48,7 @@ ELEVEN_TIMEOUT_S = 10  # a guess: long enough for a short line, short enough to 
 ELEVEN_TAGS = {
     "ask_stopped": "[warm]",
     "ask_event": "[warm]",
+    "ask_gesture": "[warm]",
     "ask_retry_2": "[gently]",
     "ask_retry_3": "[concerned]",
     "escalate": "[calm, firm]",

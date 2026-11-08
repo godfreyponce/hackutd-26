@@ -232,3 +232,14 @@ def test_a_note_about_a_demo_alert_must_say_demo():
         "does not say DEMO, not a real alert"
     assert check_note("H000: help after an Earthquake Warning alert. DEMO, not a real alert. Alarm at 14:32.",
                       DEMO_FACTS) is None
+
+
+def test_help_sign_facts_and_template_note_pass_the_check():
+    facts = build_facts(trigger="help_gesture", peak_g=None, presence="still",
+                        answers=[(1, "no_answer", ""), (2, "no_answer", ""), (3, "no_answer", "")],
+                        battery_pct=None, power=None, alert=None,
+                        reason="someone detected + no answer after 3 tries", at="22:58")
+    assert facts["trigger"] == {"event": "camera saw the help sign"}
+    note = template_note(facts, "godfrey")
+    assert check_note(note, facts) is None
+    assert "help sign" in note
