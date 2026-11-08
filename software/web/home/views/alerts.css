@@ -1,0 +1,7 @@
+/* Alerts screen (#52): official alerts at the left, check-ins at the right, both fill the height. */
+#screen-alerts .alerts-grid {
+  flex: 1 1 0; min-height: 0;
+  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: calc(var(--u) * 1.2);
+}
+/* A headline not on the Overview banner reads quieter than the one that is. */
+#screen-alerts .official li:not(.active) > .wide { color: var(--muted); }

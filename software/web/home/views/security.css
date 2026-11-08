@@ -1,0 +1,10 @@
+/* Security screen (#52). Three cards in a row over the events log. */
+#screen-security .sec-cards { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 1.2); }
+#screen-security .sec-cards .card { gap: 0; }
+#screen-security .sec-big {
+  margin-top: calc(var(--u) * 0.5); font-size: calc(var(--u) * 2.6); line-height: 1.1; font-weight: 800;
+  letter-spacing: 0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+#screen-security .sec-big.muted,
+body[data-link="down"] #screen-security .sec-big { color: var(--muted); }
+#screen-security .sec-cards .facts { margin-top: calc(var(--u) * 0.4); }
