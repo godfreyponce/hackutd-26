@@ -30,7 +30,8 @@ python3.12 -m venv .venv && .venv/bin/pip install -r software/voice/requirements
 
 One setting each. Set the env var, or change the default in `engines.py`.
 
-- `OFFLINE_VOICE`: `piper:<voice>` or `kokoro:<voice>`, for example `kokoro:af_heart` or `piper:en_US-ryan-high`. Default `piper:en_US-lessac-medium`. Run `--download` after a change.
+- `OFFLINE_VOICE`: `piper:<voice>` or `kokoro:<voice>`, for example `kokoro:af_heart` or `piper:en_US-ryan-high`. Default `kokoro:am_liam`, picked by Godfrey from 18 samples. Run `--download` after a change.
+- Offline speech plays at 90% speed (`OFFLINE_SPEED` in `engines.py`), the speed of the sample Godfrey picked.
 - `ELEVEN_VOICE_ID`: an ElevenLabs voice id. Default `ljX1ZrXuDIIRVcmiVSyR`, picked by Godfrey from the Voice Library. It must be in the account's My Voices.
 - **Text:** no audio. A timeout counts as silence.
 

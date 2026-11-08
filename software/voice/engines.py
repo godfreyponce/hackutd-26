@@ -17,7 +17,10 @@ import numpy as np
 SAMPLE_RATE = 16000
 MODEL_DIR = Path.home() / ".cache" / "hackutd-voice"
 # The offline voice, one setting: "piper:<voice>" or "kokoro:<voice>". Both run on a Pi 5.
-OFFLINE_VOICE = os.environ.get("OFFLINE_VOICE", "piper:en_US-lessac-medium")
+OFFLINE_VOICE = os.environ.get("OFFLINE_VOICE", "kokoro:am_liam")  # picked by Godfrey from 18 samples
+# Godfrey picked the 90% speed sample. The research target is 130 to 150 words a minute.
+OFFLINE_SPEED = 0.9
+KOKORO_SENTENCE_PAUSE_S = 0.4  # the pause in the sample Godfrey picked; Kokoro's default is 0.25
 KOKORO_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 KOKORO_FILES = ("kokoro-v1.0.int8.onnx", "voices-v1.0.bin")  # int8 is 88 MB, the Pi-sized build
 # moonshine/tiny returned nothing for the "help me" fixture; base got it.
@@ -128,19 +131,20 @@ def require(path: Path) -> Path:
     return path
 
 
-def make_tts(setting: str):
+def make_tts(setting: str, speed: float = OFFLINE_SPEED):
     backend, voice = parse_voice(setting)
-    return PiperTTS(voice) if backend == "piper" else KokoroTTS(voice)
+    return PiperTTS(voice, speed) if backend == "piper" else KokoroTTS(voice, speed)
 
 
 class PiperTTS:
-    def __init__(self, voice: str):
-        from piper import PiperVoice
+    def __init__(self, voice: str, speed: float):
+        from piper import PiperVoice, SynthesisConfig
 
         self.voice = PiperVoice.load(require(MODEL_DIR / f"{voice}.onnx"))
+        self.config = SynthesisConfig(length_scale=1 / speed)
 
     def synthesize(self, text: str) -> tuple[np.ndarray, int]:
-        chunks = list(self.voice.synthesize(text))
+        chunks = list(self.voice.synthesize(text, syn_config=self.config))
         return np.concatenate([c.audio_float_array for c in chunks]), chunks[0].sample_rate
 
     def speak(self, text: str):
@@ -148,16 +152,19 @@ class PiperTTS:
 
 
 class KokoroTTS:
-    def __init__(self, voice: str):
+    def __init__(self, voice: str, speed: float):
         from kokoro_onnx import Kokoro
 
         model, voices = (require(MODEL_DIR / "kokoro" / name) for name in KOKORO_FILES)
         self.kokoro = Kokoro(str(model), str(voices))
         self.voice = voice
+        self.speed = speed
         self.lang = "en-gb" if voice.startswith("b") else "en-us"  # Kokoro names British voices b*
 
     def synthesize(self, text: str) -> tuple[np.ndarray, int]:
-        return self.kokoro.create(text, voice=self.voice, lang=self.lang)
+        return self.kokoro.create(
+            text, voice=self.voice, speed=self.speed, lang=self.lang, sentence_pause=KOKORO_SENTENCE_PAUSE_S
+        )
 
     def speak(self, text: str):
         play(*self.synthesize(text))
