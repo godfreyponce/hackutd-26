@@ -1,2 +1,4 @@
 __pycache__/
 *.pyc
+software/web/incidents/*/
+software/web/incidents/list.json

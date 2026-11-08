@@ -93,6 +93,7 @@
   <span id="power" class="pill">power: mains</span>
   <span id="net" class="pill">internet: ?</span>
   <span id="callPill" class="pill">call: none</span>
+  <a id="recPill" class="pill" href="/incidents/" target="_blank" rel="noopener" style="text-decoration:none">📼 incident reports</a>
 </header>
 
 <div id="map" aria-label="System map: each part lights up when an event passes through it">
@@ -323,6 +324,9 @@ Level ${m.rms_dbfs} dBFS, peak ${m.peak_dbfs} dBFS, voice found: ${m.voice_s} s`
       return row("r-heard", `🎙 mic test (${m.engine}): "${m.transcript}" ${verdict} · ${m.rms_dbfs} dBFS`);
     }
     case "net": return setNet(m);
+    case "recording": $("recPill").textContent = m.state === "on" ? "● recording incident" : "📼 incident saved: open report";
+      $("recPill").className = "pill " + (m.state === "on" ? "off" : "on"); $("recPill").href = `/incidents/?id=${m.id}`;
+      return row(m.state === "on" ? "r-bad" : "", m.state === "on" ? "📼 recording the incident for responders (camera view, timeline, AI summary)" : `📼 incident saved (${m.frames} frames): /incidents/`);
     case "engine": used(m.part, m.name); if (m.part === "ask" && /thinking/.test(m.name)) $("answer").textContent += "\n(on-board model is thinking on the Pi CPU, this takes a while…)";
       if (m.seconds != null) row("", `⚙ ${m.part}: ${m.name} answered in ${m.seconds} s`); return;
     case "system": {

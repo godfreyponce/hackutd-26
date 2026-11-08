@@ -1,0 +1,16 @@
+[Unit]
+Description=LAND incident recorder (camera AI view + timeline + AI hand-off note for responders, /incidents/)
+After=land-hub.service land-camera.service
+Wants=land-hub.service
+
+[Service]
+WorkingDirectory=%h/hackutd-26
+Environment=HUB_URL=ws://localhost:8765
+ExecStart=%h/hackutd-26/.venv/bin/python hardware/vision/recorder.py
+StandardOutput=append:%h/land-logs/recorder.log
+StandardError=append:%h/land-logs/recorder.log
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

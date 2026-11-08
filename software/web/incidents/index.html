@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LAND incident reports</title>
+<style>
+  :root { --bg:#070d1a; --panel:#0f1729; --panel2:#131d33; --line:#22314f; --ink:#eaf1fb; --muted:#8ea0bf;
+          --accent:#38bdf8; --bad:#ef4444; --ok:#22c55e; --mono: ui-monospace, "JetBrains Mono", Menlo, monospace; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 system-ui, -apple-system, sans-serif; }
+  header { display:flex; align-items:center; gap:14px; padding:12px 18px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header b { letter-spacing:.14em; font-size:20px; } header span { color:var(--muted); }
+  .wrap { display:grid; grid-template-columns: 260px minmax(0,1fr); gap:12px; padding:12px 18px; }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; min-width:0; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); margin:0 0 8px; }
+  #list button { display:block; width:100%; text-align:left; font:inherit; color:var(--ink); background:#16223b;
+                 border:1px solid var(--line); border-radius:8px; padding:9px 10px; margin-bottom:6px; cursor:pointer; }
+  #list button.on { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+  #list small { display:block; color:var(--muted); font:12px var(--mono); }
+  .main { display:grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); gap:12px; }
+  @media (max-width: 1200px) { .main { grid-template-columns: 1fr; } }
+  #frame { width:100%; aspect-ratio:16/9; background:#000; border-radius:6px; object-fit:contain; display:block; }
+  .ctl { display:flex; gap:8px; align-items:center; margin-top:8px; }
+  .ctl button { font:inherit; font-weight:650; padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#16223b; color:var(--ink); cursor:pointer; }
+  .ctl input { flex:1; accent-color:var(--accent); } .ctl span { font:13px var(--mono); color:var(--muted); min-width:90px; text-align:right; }
+  .summary { font-size:17px; } .summary p { margin:6px 0; } .who { font:12px var(--mono); color:var(--muted); }
+  #events { font:13.5px/1.5 var(--mono); max-height:420px; overflow:auto; }
+  #events div { padding:3px 8px; border-left:3px solid var(--line); margin-bottom:2px; cursor:pointer; }
+  #events div:hover { background:var(--panel2); } #events .bad { border-color:var(--bad); } #events .t { color:var(--muted); margin-right:8px; }
+  .rec { color:var(--bad); font-weight:700; } .empty { color:var(--muted); }
+</style>
+</head>
+<body>
+<header><b>LAND</b><span>Incident reports for responders: what the box saw, heard and decided. Faces are blurred.</span></header>
+<div class="wrap">
+  <section><h2>Incidents</h2><div id="list" class="empty">Loading…</div></section>
+  <div class="main">
+    <section>
+      <h2 id="title">Replay</h2>
+      <img id="frame" alt="Camera AI view at the selected moment">
+      <div class="ctl">
+        <button id="play" type="button">▶ Play</button>
+        <label class="vh" for="seek" hidden>Position</label><input id="seek" type="range" min="0" max="0" value="0">
+        <span id="pos">0.0 s</span>
+      </div>
+    </section>
+    <div style="display:grid;gap:12px;align-content:start">
+      <section class="summary"><h2>AI summary</h2><div id="summary" class="empty">Pick an incident.</div></section>
+      <section><h2>Timeline (click to jump)</h2><div id="events"></div></section>
+    </div>
+  </div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+let inc = null, idx = 0, timer = null;
+const DESCRIBE = {
+  alert: (e) => `📻 OFFICIAL ALERT ${e.code || ""}: ${e.headline || e.event || ""}${e.demo ? " (DEMO)" : ""}`,
+  quake: (e) => `🌎 shaking, peak ${e.peak_g} g`, fall_hint: () => "🛌 camera: person lying down and still",
+  help_gesture: () => "❌ camera: X sign (help)", ok_gesture: () => "⭕ camera: O sign (okay)",
+  heat: (e) => `🔥 room ${e.temp_f} °F (${e.reason})`, scream: () => "😱 mics: scream / loud sound",
+  say: (e) => `🔊 box: "${e.text}"`, heard: (e) => `👂 heard: ${e.answer}${e.transcript ? ` ("${e.transcript}")` : ""}`,
+  checkin: (e) => `check-in → ${e.state}${e.try ? " (try " + e.try + ")" : ""}`,
+  call: (e) => `📞 call ${e.state}${e.kind ? " (" + e.kind + ")" : ""}`, handoff: (e) => `📋 hand-off note by ${e.by}`,
+  power: (e) => `🔌 power: ${e.state}`, agent: (e) => `🧠 ${e.step}: ${e.text}`, reset: () => "↺ reset",
+};
+const BAD = new Set(["alert", "quake", "fall_hint", "help_gesture", "heat", "scream", "handoff", "call"]);
+async function load() {
+  let rows = [];
+  try { rows = await (await fetch("list.json?" + Date.now())).json(); } catch { /* none yet */ }
+  if (!rows.length) { $("list").textContent = "No incidents recorded yet."; return; }
+  $("list").className = "";
+  $("list").replaceChildren(...rows.map((r) => {
+    const b = document.createElement("button");
+    b.innerHTML = `${r.started}<small>${r.trigger}${r.status === "recording" ? ' · <span class="rec">● recording</span>' : ""}</small>`;
+    b.onclick = () => open(r.id, b); return b; }));
+  const want = new URLSearchParams(location.search).get("id");
+  const first = [...$("list").children][Math.max(0, rows.findIndex((r) => r.id === want))];
+  if (!inc) first.click();
+}
+async function open(id, btn) {
+  document.querySelectorAll("#list button").forEach((b) => b.classList.toggle("on", b === btn));
+  inc = await (await fetch(`${id}/incident.json?` + Date.now())).json();
+  $("title").textContent = `Replay · ${inc.started} · ${inc.trigger}`;
+  $("seek").max = Math.max(0, inc.frames.length - 1); show(0);
+  const h = inc.handoff, s = $("summary"); s.className = ""; s.replaceChildren();
+  const p = (txt, cls) => { const e = document.createElement("p"); if (cls) e.className = cls; e.textContent = txt; s.append(e); };
+  if (h) { p(h.note); (h.why || []).forEach((w) => p("Why: " + w)); p(`Written by ${h.by}${h.contact ? " · contact first: " + h.contact.name : ""}`, "who"); }
+  inc.calls.forEach((c) => p(`Phone (${c.kind}): "${c.text.split(" I repeat.")[0]}"`, "who"));
+  if (!h && !inc.calls.length) p("No alarm in this incident: the person answered, or no one was there.", "who");
+  $("events").replaceChildren(...inc.events.map((e) => {
+    const d = document.createElement("div"); d.className = BAD.has(e.type) ? "bad" : "";
+    const t = document.createElement("span"); t.className = "t"; t.textContent = `+${e.t.toFixed(1)} s`;
+    d.append(t, (DESCRIBE[e.type] || ((x) => x.type))(e));
+    d.onclick = () => show(nearest(e.t)); return d; }));
+}
+function nearest(t) { let best = 0; inc.frames.forEach((ft, i) => { if (Math.abs(ft - t) < Math.abs(inc.frames[best] - t)) best = i; }); return best; }
+function show(i) {
+  if (!inc || !inc.frames.length) { $("frame").removeAttribute("src"); $("pos").textContent = "no video"; return; }
+  idx = Math.min(Math.max(0, i), inc.frames.length - 1);
+  $("frame").src = `${inc.id}/frames/${String(idx).padStart(6, "0")}.jpg`;
+  $("seek").value = idx; $("pos").textContent = `${inc.frames[idx].toFixed(1)} s`;
+}
+$("seek").oninput = () => show(+$("seek").value);
+$("play").onclick = () => {
+  if (timer) { clearInterval(timer); timer = null; $("play").textContent = "▶ Play"; return; }
+  $("play").textContent = "⏸ Pause";
+  timer = setInterval(() => { if (idx >= inc.frames.length - 1) { $("play").click(); return; } show(idx + 1); }, 1000 / (inc.fps || 5));
+};
+load(); setInterval(load, 5000);
+</script>
+</body>
+</html>

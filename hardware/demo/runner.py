@@ -39,7 +39,7 @@ CLOUD_MODEL = os.environ.get("ASSISTANT_MODEL", "nvidia/nemotron-3.5-lightning-3
 LOCAL_URL = os.environ.get("AGENT_OLLAMA_URL", "http://localhost:11434/v1")
 LOCAL_MODEL = os.environ.get("ASSISTANT_LOCAL_MODEL", os.environ.get("AGENT_LOCAL_MODEL", "nemotron-3-nano:4b"))
 NET_EVERY_S, SYSTEM_EVERY_S, NET_DOWN_AFTER = 10, 5, 3
-SERVICES = ("hub", "agent", "voice", "camera", "sensors", "ring", "radio", "scream", "demo")
+SERVICES = ("hub", "agent", "voice", "camera", "sensors", "ring", "radio", "scream", "demo", "recorder")
 ASSISTANT_PROMPT = """You are LAND, a home safety box in the user's home in Richardson, Texas. The person in the room
 is talking to you. Answer in at most 3 short spoken sentences, plain words, no lists, no markdown.
 Facts come ONLY from the event log (official alerts heard on NOAA Weather Radio 162.400 MHz, sensor events, the
