@@ -116,7 +116,7 @@ svgEl('path', {
 svgEl('circle', { class: 'ring escalated', cx: HOME.x, cy: HOME.y, r: 8 }, map);
 svgEl('circle', { class: 'ring real', cx: HOME.x, cy: HOME.y, r: 11 }, map);
 const homeDot = svgEl('circle', { class: 'node home', cx: HOME.x, cy: HOME.y, r: 4.5, filter: 'url(#glow)' }, map);
-const homeLabelBg = svgEl('rect', { class: 'hud-bg' }, map);
+const homeLabelBg = svgEl('rect', { class: 'hud-bg', rx: 2 }, map);
 const hudThisHome = hudText(map, 0, 0, 'THIS HOME', { 'text-anchor': 'middle' });
 
 const hudNodes = hudText(map, 6, 254, '');
@@ -125,7 +125,7 @@ const hudEscalated = hudText(map, 294, 254, 'ESCALATED 1', { 'text-anchor': 'end
 const hudGrid = hudText(map, 6, 14, 'RICHARDSON, TX');
 const hudLive = hudText(map, 294, 14, '', { 'text-anchor': 'end' });
 const backing = (el) => {
-  const bg = svgEl('rect', { class: 'hud-bg' });
+  const bg = svgEl('rect', { class: 'hud-bg', rx: 2 });
   el.before(bg);
   return bg;
 };
@@ -228,10 +228,9 @@ function renderMap() {
   hudNodes.textContent = `NODES ${total}`;
   const escalated = connected && state.status === 'CONTACTING_HELP';
   hudHit.textContent = connected ? `HIT ${hit}` : 'HIT --';
-  // A protected home that was hit reads amber, not alarm red; the dots keep their encoding.
-  const hitAlarm = connected && hit > 0 && state.status !== 'PROTECTED';
-  hudHit.classList.toggle('alarm', hitAlarm);
-  hudHit.classList.toggle('warn', !connected || (hit > 0 && !hitAlarm));
+  // Red only while an event is unresolved; a protected home that was hit reads neutral, like NODES. The dots keep their encoding.
+  hudHit.classList.toggle('alarm', connected && hit > 0 && state.status !== 'PROTECTED');
+  hudHit.classList.toggle('warn', !connected);
   hudEscalated.style.visibility = escalated ? '' : 'hidden';
   hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
   hudLive.classList.toggle('warn', !connected);
@@ -249,22 +248,25 @@ const canvas = $('trace');
 const ctx = canvas.getContext('2d');
 
 let labelPx = 12;
+let unitPx = 12;
 function sizeCanvas() {
   const r = canvas.getBoundingClientRect();
-  labelPx = Math.max(18, parseFloat(getComputedStyle(document.body).fontSize));
+  unitPx = parseFloat(getComputedStyle(document.body).fontSize);
+  labelPx = Math.max(18, unitPx);
   canvas.width = Math.max(1, Math.round(r.width * devicePixelRatio));
   canvas.height = Math.max(1, Math.round(r.height * devicePixelRatio));
 }
 new ResizeObserver(sizeCanvas).observe(canvas);
 
-const RING_S = 6; // how long one quake's wiggle lasts on the trace
+const RING_S = 10; // how long one quake's wiggle lasts on the trace
 
 // Each quake event carries only its peak, so the trace draws a damped wiggle that peaks at that value.
 function signal(t) {
   let g = 0;
   for (const q of state.quakes) {
     const dt = (t - q.at) / 1000;
-    if (dt >= 0 && dt < RING_S) g += q.g * Math.exp(-dt * 1.1) * Math.cos(dt * 2 * Math.PI * 2.2);
+    // The decay scales with RING_S, so the wiggle fades to about 0.1% of its peak by the end of the ring.
+    if (dt >= 0 && dt < RING_S) g += q.g * Math.exp((-dt * 6.6) / RING_S) * Math.cos(dt * 2 * Math.PI * 2.2);
   }
   return g;
 }
@@ -281,7 +283,8 @@ function drawTrace() {
   const scale = (plotH / 2 - fs * 0.6) / maxG;
   ctx.font = `${fs}px system-ui, sans-serif`;
   const gutter = ctx.measureText('+1 g').width + 10 * dpr;
-  const plotW = w - 6 * dpr - gutter;
+  // The trace and "now" stop short of the card's right edge.
+  const plotW = w - unitPx * 1.5 * dpr - gutter;
 
   ctx.globalAlpha = connected ? 1 : 0.35;
   ctx.strokeStyle = 'rgba(120,170,235,0.18)';
@@ -408,7 +411,7 @@ function render() {
   $('scale-mark').hidden = !connected || state.indoorF == null;
   if (state.indoorF != null) $('scale-mark').style.setProperty('--at', clamp((state.indoorF - 50) / 50, 0, 1));
   // With no reading the gauge still shows an empty value at full size, so the card keeps its shape.
-  $('temp').innerHTML = `${state.indoorF == null ? '<span class="no-reading">--</span>' : Math.round(state.indoorF)}<small> &deg;F</small>`;
+  $('temp').innerHTML = `${state.indoorF == null ? '<span class="no-reading">\u2013</span>' : Math.round(state.indoorF)}<small> &deg;F</small>`;
   $('heat-msg').textContent = !connected ? `${state.indoorF == null ? '' : 'Last known reading. '}No live heat data`
     : a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : state.indoorF == null ? 'No reading yet' : 'No heat alerts';
   $('heat-at').hidden = state.indoorAt == null;

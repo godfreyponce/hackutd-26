@@ -154,7 +154,7 @@ test('status text never says "fall" and the alarm note says no emergency number 
     const { word, detail } = statusText(status);
     assert.doesNotMatch(`${word} ${detail}`, /fall/i);
   }
-  assert.equal(statusText('NO_RESPONSE').detail, 'No response after an event');
+  assert.equal(statusText('NO_RESPONSE').detail, 'No response after an event. Asking again.');
   assert.match(statusText('CONTACTING_HELP').note, /demo/i);
   assert.match(statusText('CONTACTING_HELP').note, /no emergency number is called/i);
 });

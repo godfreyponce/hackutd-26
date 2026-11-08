@@ -40,7 +40,7 @@ export function statusText(status, { alert = false, linked = true } = {}) {
     case 'CHECKING_IN':
       return { word: 'CHECKING IN', detail: 'Event detected. Asking if you are okay.' };
     case 'NO_RESPONSE':
-      return { word: 'NO RESPONSE', detail: 'No response after an event' };
+      return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.' };
     case 'CONTACTING_HELP':
       return {
         word: 'CONTACTING HELP',
