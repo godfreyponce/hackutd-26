@@ -26,6 +26,7 @@ export function initialState() {
   return {
     status: 'PROTECTED',
     tryNum: null,
+    asking: false, // the last checkin was asking
     say: null,
     heard: null,
     alert: null,
@@ -82,18 +83,21 @@ export const SAY_HINT = 'Say "okay" or "help".';
 // heard arrives before its checkin, so an okay or help can be in while the try is still open.
 export const tryAnswered = (state) => state.heard != null && state.heard.tryNum === state.tryNum && state.heard.answer !== 'no_answer';
 
-// tryNum is null until the first ask of a check-in. After the last try the rule has already chosen the alarm.
-export function statusText(status, { alert = false, linked = true, helpSign = false, ended = false, tryNum = null, answered = false } = {}) {
+// Any heard for this try closes the question, so the hint goes before its checkin arrives.
+export const questionOpen = (state) => state.asking && state.heard?.tryNum !== state.tryNum;
+
+// After the last try, or an okay or help, the box does not ask again.
+export function statusText(status, { alert = false, linked = true, helpSign = false, ended = false, questionOpen = false, tryNum = null, answered = false } = {}) {
   switch (status) {
     case 'CHECKING_IN': {
       const detail = `${helpSign ? 'Help sign seen' : 'Event detected'}. Asking if you are okay.`;
-      return tryNum != null && !answered ? { word: 'CHECKING IN', detail, note: SAY_HINT } : { word: 'CHECKING IN', detail };
+      return questionOpen ? { word: 'CHECKING IN', detail, note: SAY_HINT } : { word: 'CHECKING IN', detail };
     }
     case 'NO_RESPONSE':
       if (ended) return { word: 'NO RESPONSE', detail: 'Nobody seen at home. No alarm.' };
-      if (tryNum >= MAX_TRIES) return { word: 'NO RESPONSE', detail: 'No response after an event.' };
-      if (tryNum == null || answered) return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.' };
-      return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.', note: SAY_HINT };
+      if (questionOpen) return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.', note: SAY_HINT };
+      if (tryNum >= MAX_TRIES || answered) return { word: 'NO RESPONSE', detail: 'No response after an event.' };
+      return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.' };
     case 'CONTACTING_HELP':
       return {
         word: 'DEMO ALARM',
@@ -136,22 +140,23 @@ function onCheckin(state, msg) {
     const say = state.say ? { ...state.say, tryNum: null } : state.say;
     // With nobody there, the agent sends clear right after a no answer. The check-in is over, but nobody said they were okay.
     if (msg.state === 'clear' && state.status === 'NO_RESPONSE') {
-      return { ...state, ended: true, tryNum: null, say, helpSign: false, trigger: null };
+      return { ...state, ended: true, tryNum: null, asking: false, say, helpSign: false, trigger: null };
     }
-    return { ...state, status: 'PROTECTED', ended: false, tryNum: null, say, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false, trigger: null };
+    return { ...state, status: 'PROTECTED', ended: false, tryNum: null, asking: false, say, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false, trigger: null };
   }
   const status = CHECKIN_STATUS[msg.state];
   if (!status) return state;
+  const asking = msg.state === 'asking';
   // The agent sends asking try 1 only to start a check-in or for the stand-up re-ask after an alarm
   // (software/agent/checkin.py _speak). Its status reset also covers a check-in whose clear this screen missed.
   if (msg.state === 'asking' && msg.try === 1) {
     const standup = state.status === 'CONTACTING_HELP';
     return {
-      ...state, status: standup ? state.status : status, ended: false, tryNum, heard: null, home: 'hit', trigger: null,
+      ...state, status: standup ? state.status : status, ended: false, tryNum, asking, heard: null, home: 'hit', trigger: null,
       helpSign: standup ? state.helpSign : state.trigger === 'help_gesture',
     };
   }
-  return { ...state, status: raise(state, status), ended: false, tryNum, home: 'hit', trigger: null };
+  return { ...state, status: raise(state, status), ended: false, tryNum, asking, home: 'hit', trigger: null };
 }
 
 export function reduce(state, msg, now) {
@@ -168,7 +173,8 @@ export function reduce(state, msg, now) {
     case 'checkin':
       return onCheckin(state, msg);
     case 'say':
-      return { ...state, say: { text: String(msg.text ?? ''), tryNum: state.tryNum } };
+      // Only a question carries listen_s (software/agent/checkin.py). The stand-up question under the alarm asks once.
+      return { ...state, say: { text: String(msg.text ?? ''), tryNum: msg.listen_s != null && state.status !== 'CONTACTING_HELP' ? state.tryNum : null } };
     case 'heard':
       return { ...state, heard: { answer: msg.answer, transcript: String(msg.transcript ?? ''), tryNum: state.tryNum } };
     case 'alert':
