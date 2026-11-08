@@ -170,6 +170,20 @@ def test_stdin_frames_skip_event_lines_and_end_when_stdin_closes(monkeypatch):
     assert asyncio.run(read_all()) == [(0.0, []), (1.0, [])]
 
 
+def test_a_stdin_read_error_stops_the_service_instead_of_hanging(monkeypatch):
+    def lines():
+        yield '{"t": 0, "boxes": []}\n'
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(sys, "stdin", lines())
+
+    async def read_all():
+        return [f async for f in stdin_frames()]
+
+    with pytest.raises(UnicodeDecodeError):
+        asyncio.run(asyncio.wait_for(read_all(), timeout=2))
+
+
 def test_a_bad_hub_url_exits_even_when_stdin_is_idle(tmp_path):
     # A blocked stdin read must not keep the program alive after it fails.
     err = tmp_path / "stderr.txt"

@@ -47,16 +47,25 @@ async def stdin_frames():
     loop = asyncio.get_running_loop()
     lines = asyncio.Queue()
 
-    def read():
+    def put(item):
         try:
-            for line in sys.stdin:
-                loop.call_soon_threadsafe(lines.put_nowait, line)
-            loop.call_soon_threadsafe(lines.put_nowait, None)
+            loop.call_soon_threadsafe(lines.put_nowait, item)
         except RuntimeError:  # the event loop is gone: the program is quitting
             pass
 
+    def read():
+        try:
+            for line in sys.stdin:
+                put(line)
+        except Exception as e:  # passed on, so the service stops instead of waiting for lines that never come
+            put(e)
+            return
+        put(None)
+
     threading.Thread(target=read, daemon=True).start()
     while (line := await lines.get()) is not None:
+        if isinstance(line, Exception):
+            raise line
         if line.strip() and (frame := parse_frame(line)):
             yield frame
     log.info("stdin closed, no more frames")
