@@ -8,7 +8,7 @@ SCRIPTS = {
     "ask_stopped": "I noticed you stopped moving. Are you okay? Please respond.",
     "ask_event": "I've detected a fall. Are you okay? Please respond.",
     "standup_ask": "Are you okay?",
-    "escalate": "Contacting emergency services now",
+    "escalate": "Alerting your emergency contact now.",
 }
 
 ASK_SCRIPTS = ("ask_stopped", "ask_event")
