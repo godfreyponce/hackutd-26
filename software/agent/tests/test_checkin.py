@@ -67,7 +67,7 @@ def test_help_alarms_at_once(kind):
     assert bus.checkins() == [("asking", 1), ("help", 1), ("alarm", 2)]
     assert bus.events() == ["ask_stopped", "help", "reply_help", "alarm"]
     reply = [m for m in bus.sent if m["type"] == "say"][-1]
-    assert reply["text"] == "Okay. I'm getting help now. Stay with me, you're not alone."
+    assert reply["text"] == "Okay. I'm alerting your emergency contact now. Stay with me, you're not alone."
     assert "listen_s" not in reply
     assert not any("override" in r["text"].lower() for r in bus.trace("VERIFY"))
 
@@ -212,7 +212,7 @@ def test_each_try_speaks_its_own_line(ask_script):
     assert [m["script_id"] for m in asks] == [ask_script, "ask_retry_2", "ask_retry_3"]
     assert [m["text"] for m in asks] == [SCRIPTS[ask_script],
                                          "I didn't catch that. Are you okay? Just say okay, or help.",
-                                         "I still can't hear you. If I don't hear from you, I'll get help. Are you okay?"]
+                                         "I still can't hear you. If I don't hear from you, I'll alert your emergency contact. Are you okay?"]
     if ask_script == "ask_stopped":
         assert asks[0]["text"] == "Hey, I noticed you stopped moving. Are you okay?"
 

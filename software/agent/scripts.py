@@ -12,10 +12,10 @@ SCRIPTS = {
     "ask_event": "Something just happened. Are you okay? Please respond.",
     "ask_gesture": "I saw your help sign. Are you okay? Say okay, or help.",
     "ask_retry_2": "I didn't catch that. Are you okay? Just say okay, or help.",
-    "ask_retry_3": "I still can't hear you. If I don't hear from you, I'll get help. Are you okay?",
+    "ask_retry_3": "I still can't hear you. If I don't hear from you, I'll alert your emergency contact. Are you okay?",
     "standup_ask": "Are you okay?",
     "escalate": "I haven't heard back, so I'm alerting your emergency contact now.",
-    "reply_help": "Okay. I'm getting help now. Stay with me, you're not alone.",
+    "reply_help": "Okay. I'm alerting your emergency contact now. Stay with me, you're not alone.",
     "reply_ok": "Good. I'm glad you're okay. I'll check on you again soon.",
     "alert_demo": f"{DEMO_TEXT}.",
 }

@@ -6,6 +6,7 @@ import os
 import select
 import sys
 import termios
+import threading
 import wave
 from pathlib import Path
 
@@ -67,11 +68,44 @@ def mic_blocked_message() -> str:
     )
 
 
-def record(seconds: float, log) -> np.ndarray | None:
+# A reset sets it to cut the line in progress: play() and record() stop early and start nothing.
+# The voice service clears it as it starts the next line.
+line_cut = threading.Event()
+
+# sounddevice has no lock of its own. Two threads in it at once close the stream twice, and a stop
+# from another thread during sd.wait() hung PortAudio on macOS. So every start and stop takes this
+# lock, and only the thread that waits on a sound may stop it while the wait runs.
+_sd_lock = threading.Lock()
+_sound_in_wait = False
+
+
+def _wait_or_cut(seconds: float) -> bool:
+    """Wait for the sound or recording to end. False if a reset cut it."""
+    global _sound_in_wait
     import sounddevice as sd
 
-    audio = sd.rec(int(seconds * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype="float32")
-    sd.wait()
+    try:
+        if line_cut.wait(seconds):
+            with _sd_lock:
+                sd.stop()
+            return False
+        sd.wait()
+        return True
+    finally:
+        _sound_in_wait = False
+
+
+def record(seconds: float, log) -> np.ndarray | None:
+    global _sound_in_wait
+    import sounddevice as sd
+
+    with _sd_lock:
+        if line_cut.is_set():
+            return None
+        audio = sd.rec(int(seconds * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype="float32")
+        _sound_in_wait = True
+    if not _wait_or_cut(seconds):
+        return None
     audio = audio[:, 0]
     if not np.any(audio):
         log(mic_blocked_message())
@@ -80,17 +114,27 @@ def record(seconds: float, log) -> np.ndarray | None:
 
 
 def play(audio: np.ndarray, rate: int, wait: bool = True):
+    global _sound_in_wait
     import sounddevice as sd
 
-    sd.play(audio, rate)
+    with _sd_lock:
+        if line_cut.is_set():
+            return
+        sd.play(audio, rate)
+        if wait:
+            _sound_in_wait = True
     if wait:
-        sd.wait()
+        _wait_or_cut(len(audio) / rate)
 
 
 def stop_audio():
+    """Stop the sound, unless a line, tone or listen is in its wait. That one started after the
+    alarm tone, so it already replaced it, and a reset cuts it on its own thread."""
     import sounddevice as sd
 
-    sd.stop()
+    with _sd_lock:
+        if not _sound_in_wait:
+            sd.stop()
 
 
 class AlarmTone:
