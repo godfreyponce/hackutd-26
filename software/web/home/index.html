@@ -93,6 +93,8 @@
     gap: calc(var(--u) * 1) calc(var(--u) * 1.2);
     padding-top: calc(var(--u) * 1.4);
     --shield-w: calc(var(--u) * 9);
+    --shield-h: calc(var(--u) * 10.2);
+    --word-u: 6.4; /* the word's largest size, in u */
     --hero-gap: calc(var(--u) * 1.8);
   }
   main:has(> .banner[hidden]) {
@@ -125,7 +127,7 @@
   .banner .area { grid-row: 1; grid-column: -2; }
 
   .hero { grid-area: hero; container-type: inline-size; display: flex; align-items: center; gap: var(--hero-gap); padding: calc(var(--u) * 1.2) 0 calc(var(--u) * 0.5); }
-  .shield { width: var(--shield-w); height: calc(var(--u) * 10.2); flex: none; margin-left: calc(var(--shield-w) * -0.075); color: var(--status); filter: drop-shadow(0 0 calc(var(--u) * 0.15) var(--status)); }
+  .shield { width: var(--shield-w); height: var(--shield-h); flex: none; margin-left: calc(var(--shield-w) * -0.075); color: var(--status); filter: drop-shadow(0 0 calc(var(--u) * 0.15) var(--status)); }
   .shield .glyph { display: none; }
   body[data-status="PROTECTED"] .shield .g-ok,
   body[data-status="CHECKING_IN"] .shield .g-ask,
@@ -136,13 +138,13 @@
   .eyebrow { color: var(--muted); letter-spacing: 0.1em; font-size: max(16px, var(--u)); text-transform: uppercase; }
   /* The line box and margins use the common word size, so a smaller word does not move the convo below. */
   .word {
-    --word-fs: min(calc(var(--u) * 6.4), calc((100cqi - var(--shield-w) - var(--hero-gap)) / 7.4));
+    --word-fs: min(calc(var(--u) * var(--word-u)), calc((100cqi - var(--shield-w) - var(--hero-gap)) / 7.4));
     font-size: var(--word-fs); line-height: var(--word-fs); font-weight: 800; letter-spacing: 0.03em;
     color: var(--status); margin: calc(var(--word-fs) * 0.12) 0 calc(var(--word-fs) * 0.15); white-space: nowrap;
   }
   /* Cap each word to the space right of the shield. CONTACTING HELP measures 9.2 to 9.28 em at its tighter tracking
      (the others at most 7.2 em), and keeps 0.6u free before the column edge. */
-  body[data-status="CONTACTING_HELP"] .word { font-size: min(calc(var(--u) * 6.4), calc((100cqi - var(--shield-w) - var(--hero-gap) - var(--u) * 0.6) / 9.3)); letter-spacing: 0.005em; }
+  body[data-status="CONTACTING_HELP"] .word { font-size: min(calc(var(--u) * var(--word-u)), calc((100cqi - var(--shield-w) - var(--hero-gap) - var(--u) * 0.6) / 9.3)); letter-spacing: 0.005em; }
   body[data-status="PROTECTED"]:not([data-link="down"]) .word { color: var(--text); }
   body[data-status="CONTACTING_HELP"] .word { color: #ff5969; }
   .detail { font-size: max(24px, calc(var(--u) * 1.6)); }
@@ -258,6 +260,34 @@
     main:has(> .banner:not([hidden])) .heat-body { padding-top: 10px; }
     main:has(> .banner:not([hidden])) .heat-body::after { min-height: 0; }
     main:has(> .banner:not([hidden])) .temp { font-size: calc(var(--u) * 3.6); }
+  }
+  /* Venue monitors down to 1280x720 (#51): the cards need more room than the page has, so the hero shrinks, the
+     convo drops its spare quote line, the heat card drops its subtitle, and the reading sits beside its caption. */
+  @media (max-height: 820px) {
+    main { --shield-w: calc(var(--u) * 7.2); --shield-h: calc(var(--u) * 8.2); --word-u: 4.8; }
+    /* The smaller shield narrows the label column, so it may grow to fit BOX SAID. */
+    .convo { min-height: auto; grid-template-columns: minmax(calc(var(--shield-w) * 0.925 + var(--hero-gap) - 0.9em), max-content) 1fr; }
+    .card:has(.heat-body) .card-head .card-sub { display: none; }
+    /* The update time is too wide to share the row in the narrow card, so it takes its own line below.
+       Spare height goes between the scale and the reading, so the bar holds the top; the spacers give way first. */
+    .heat-body {
+      display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: end; column-gap: calc(var(--u) * 0.7);
+      grid-template-rows: minmax(0, calc(var(--u) * 2 - 6px)) auto minmax(0, 1fr) auto auto;
+      grid-template-areas: "before before" "scale scale" "after after" "temp msg" "at at";
+    }
+    .heat-body::before { grid-area: before; }
+    .heat-body::after { grid-area: after; }
+    .scale { grid-area: scale; margin-bottom: calc(var(--u) * 0.4); }
+    #heat-sub { display: contents; }
+    #temp { grid-area: temp; margin: 0; font-size: calc(var(--u) * 3); }
+    #heat-msg { grid-area: msg; align-self: center; }
+    #heat-at { grid-area: at; }
+    /* Option E: tighter vertical spacing, so CONTACTING HELP with the banner and a two-line quote still fits. */
+    .app { padding-top: calc(var(--u) * 0.7); padding-bottom: calc(var(--u) * 0.7); }
+    header { padding-bottom: calc(var(--u) * 0.6); }
+    main { padding-top: calc(var(--u) * 0.8); row-gap: calc(var(--u) * 0.6); }
+    .hero, main:has(> .banner:not([hidden])) .hero { padding-top: calc(var(--u) * 0.25); padding-bottom: calc(var(--u) * 0.25); }
+    .convo { padding: calc(var(--u) * 0.4) 0; }
   }
 
   .map-frame { position: relative; flex: 1 1 0; min-height: 0; margin-top: 0.4em; }
