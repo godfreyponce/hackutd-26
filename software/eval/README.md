@@ -104,7 +104,8 @@ Hosted Nemotron planner and Safety Guard, real key, one run at a time, paced to 
 - After "Help": alarm 17.4 s from the event. No answer 3 times: alarm on the 3rd miss at 20.2 s.
 - Speaking time is not simulated, so on the real box add the time to say each line.
 
-The Safety Guard check runs before the rule, so a spoken reply waits for it. That wait was 0.4 to 13.3 s
+The Safety Guard check runs before the rule, so in these runs every spoken reply waited for it.
+Since #65 only an ok or help reply does. That wait was 0.4 to 13.3 s
 (per-case medians), worst 20 s when the guard timed out.
 
 Times are measured from the hub's publish time of the event to the hub's publish time of the

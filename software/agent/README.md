@@ -31,7 +31,7 @@ Each hop writes an `agent` FALLBACK row with the reason. A text reply with no `t
 - After 3 no-answers the box says `escalate` ("I haven't heard back, so I'm alerting your emergency contact now."), then the alarm.
 - An ok answer gets `reply_ok`. A help answer gets `reply_help` before the alarm, and no `escalate`. Replies do not listen.
 - `reply_ok` is refused unless the last answer was ok. `reply_help` is refused unless it was help. If the planner skips a due reply for one turn, code speaks it (VERIFY "Rule override").
-- Safety Guard (`nvidia/llama-3.1-nemotron-safety-guard-8b-v3`) screens every transcript before the planner sees it. No key: MOCK pass-through row. Guard error: the transcript is withheld.
+- Safety Guard (`nvidia/llama-3.1-nemotron-safety-guard-8b-v3`) screens every ok or help transcript before the planner sees it. A no_answer transcript is dropped without a guard call (trace: "Safety Guard skipped"). No key: MOCK pass-through row. Guard error: the transcript is withheld.
 - `raise_alarm` always sends `checkin alarm`. It calls `TWILIO_TO` only when all `TWILIO_*` vars are set and `TWILIO_TO` is a full `+1XXXXXXXXXX` number. Never 911.
 
 ## Alerts (#36)
