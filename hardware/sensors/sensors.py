@@ -43,6 +43,17 @@ def log(*a):
     print(*a, file=sys.stderr, flush=True)
 
 
+def read_retry(bus, addr, reg, n, tries=5):
+    """A breadboard contact drops ~2 % of MPU-6050 reads (measured 2026-11-08): retry, report a run of failures."""
+    for i in range(tries):
+        try:
+            return bus.read_i2c_block_data(addr, reg, n)
+        except OSError:
+            if i == tries - 1:
+                raise
+            time.sleep(0.002)
+
+
 class Mpu:
     def __init__(self, bus):
         self.bus = bus
@@ -53,7 +64,7 @@ class Mpu:
         log(f"MPU-6050 resting |a| = {self.base:.3f} g (subtracted as baseline)")
 
     def mag(self):
-        ax, ay, az = struct.unpack(">hhh", bytes(self.bus.read_i2c_block_data(MPU, 0x3B, 6)))
+        ax, ay, az = struct.unpack(">hhh", bytes(read_retry(self.bus, MPU, 0x3B, 6)))
         time.sleep(1 / SAMPLE_HZ)
         return (ax * ax + ay * ay + az * az) ** 0.5 / 16384
 
@@ -75,7 +86,7 @@ class Bmp:
         bus.write_byte_data(BMP, 0xF4, 0x27)  # temp x1, pressure x1, normal mode
 
     def read(self):
-        r = self.bus.read_i2c_block_data(BMP, 0xF7, 6)
+        r = read_retry(self.bus, BMP, 0xF7, 6)
         adc_p = (r[0] << 12) | (r[1] << 4) | (r[2] >> 4)
         adc_t = (r[3] << 12) | (r[4] << 4) | (r[5] >> 4)
         v1 = (adc_t / 16384 - self.T1 / 1024) * self.T2
