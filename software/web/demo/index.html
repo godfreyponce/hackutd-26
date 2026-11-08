@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LAND demo control</title>
+<style>
+  :root { --bg:#0b1220; --panel:#121b2e; --line:#24324d; --ink:#e6edf7; --muted:#8fa0bd; --accent:#38bdf8;
+          --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --mono: ui-monospace, "JetBrains Mono", Menlo, monospace; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, sans-serif; }
+  header { display:flex; align-items:center; gap:14px; padding:12px 18px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; letter-spacing:.04em; }
+  .pill { font:12px var(--mono); padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  .pill.on { color:var(--ok); border-color:var(--ok); } .pill.off { color:var(--bad); border-color:var(--bad); }
+  main { display:grid; grid-template-columns: minmax(0,1.35fr) minmax(0,1fr); gap:14px; padding:14px 18px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; min-width:0; display:flex; flex-direction:column; gap:8px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0; }
+  #video { width:100%; aspect-ratio:16/9; background:#000; border-radius:6px; object-fit:contain; }
+  #videoNote { font-size:12px; color:var(--muted); }
+  .log { font:12.5px/1.5 var(--mono); overflow:auto; max-height:46vh; min-height:200px; }
+  .row { padding:3px 6px; border-left:3px solid transparent; white-space:pre-wrap; word-break:break-word; }
+  .row .t { color:var(--muted); margin-right:6px; }
+  .PLAN { border-color:#a78bfa; } .ACT { border-color:var(--accent); } .VERIFY { border-color:var(--ok); } .FALLBACK { border-color:var(--warn); }
+  .ev-alarm, .ev-help { border-color:var(--bad); } .ev-say { border-color:var(--accent); } .ev-heard { border-color:var(--ok); }
+  .controls { grid-column: 1 / -1; }
+  .groups { display:flex; flex-wrap:wrap; gap:14px; }
+  .group { display:flex; flex-direction:column; gap:6px; min-width:170px; flex:1; }
+  .group b { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+  button { font:inherit; font-weight:600; padding:10px 12px; border-radius:8px; border:1px solid var(--line);
+           background:#18233b; color:var(--ink); cursor:pointer; text-align:left; }
+  button:hover { border-color:var(--accent); } button:active { transform:translateY(1px); }
+  button.danger { border-color:#7f1d1d; } button.calm { border-color:#14532d; }
+  button small { display:block; font-weight:400; color:var(--muted); font-size:12px; }
+  .sim { font-size:12px; color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>LAND · demo control</h1>
+  <span id="hubPill" class="pill">hub: connecting</span>
+  <span id="statePill" class="pill">state: idle</span>
+  <span class="sim">Buttons send the same bus events the sensors send. The real agent, voice, ring and screens react.</span>
+</header>
+<main>
+  <section>
+    <h2>What the camera sees (Hailo pose on the AI HAT+)</h2>
+    <img id="video" alt="Live camera with pose overlay">
+    <div id="videoNote">Faces are blurred on the box; nothing is recorded.</div>
+  </section>
+  <section>
+    <h2>What the agent is thinking (Nemotron plan → act → verify)</h2>
+    <div id="trace" class="log"></div>
+  </section>
+  <section class="controls">
+    <h2>Stages</h2>
+    <div class="groups">
+      <div class="group"><b>1 · Event</b>
+        <button data-send='{"type":"quake","peak_g":0.82}'>Earthquake<small>quake 0.82 g → check-in</small></button>
+        <button data-seq="fall">Person stops moving<small>presence moving → still + hint</small></button>
+        <button data-send='{"type":"help_gesture","source":"camera"}'>Help sign seen<small>camera help_gesture</small></button>
+        <button data-send='{"type":"alert","source":"noaa","event":"Earthquake Warning","code":"EQW","station":"HACKDEMO","severity":"Severe","urgency":"Immediate","certainty":"Likely","area":"Dallas County, TX; Collin County, TX","headline":"Earthquake Warning for Dallas County, TX; Collin County, TX","demo":true}'>Official alert (NOAA)<small>EQW, demo: true</small></button>
+      </div>
+      <div class="group"><b>2 · Answer (backup if the hall is loud)</b>
+        <button class="calm" data-send='{"type":"heard","answer":"ok","transcript":"(demo button) I am okay"}'>"I'm okay"<small>heard: ok</small></button>
+        <button class="danger" data-send='{"type":"heard","answer":"help","transcript":"(demo button) help me"}'>"Help me"<small>heard: help → alarm</small></button>
+        <button data-send='{"type":"heard","answer":"no_answer","transcript":""}'>No answer<small>heard: no_answer</small></button>
+      </div>
+      <div class="group"><b>3 · Power + room</b>
+        <button class="danger" data-seq="outage">Power outage<small>power: battery, battery drains</small></button>
+        <button class="calm" data-seq="restore">Power restored<small>power: mains</small></button>
+        <button data-send='{"type":"indoor","temp_f":48.0,"temp_c":8.9,"pressure_hpa":1001.0,"source":"demo"}'>Cold room 48 °F<small>indoor (simulated)</small></button>
+      </div>
+      <div class="group"><b>4 · Reset</b>
+        <button data-send='{"type":"reset"}'>Reset everything<small>all services back to start</small></button>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+const qs = new URLSearchParams(location.search);
+const HOST = location.hostname || "localhost";
+const HUB = qs.get("hub") || `ws://${HOST}:8765`;
+document.getElementById("video").src = qs.get("video") || `http://${HOST}:8090/stream.mjpg`;
+document.getElementById("video").onerror = () => document.getElementById("videoNote").textContent =
+  "No video: is land-camera running with --stream-port 8090?";
+const trace = document.getElementById("trace"), hubPill = document.getElementById("hubPill"), statePill = document.getElementById("statePill");
+let ws, drain = null;
+
+function row(cls, text) {
+  const d = document.createElement("div"); d.className = "row " + cls;
+  d.innerHTML = `<span class="t">${new Date().toLocaleTimeString()}</span>`; d.append(text);
+  trace.append(d); trace.scrollTop = trace.scrollHeight;
+  while (trace.children.length > 300) trace.firstChild.remove();
+}
+function show(m) {
+  switch (m.type) {
+    case "agent": return row(m.step || "", `${m.step}${m.tool ? " · " + m.tool : ""}: ${m.text}`);
+    case "say": return row("ev-say", `🔊 box says: "${m.text}"`);
+    case "heard": return row("ev-heard", `👂 heard: ${m.answer}${m.transcript ? ` ("${m.transcript}")` : ""}`);
+    case "checkin": statePill.textContent = "state: " + m.state;
+      return row(m.state === "alarm" || m.state === "help" ? "ev-alarm" : "", `check-in → ${m.state}${m.try ? " (try " + m.try + ")" : ""}`);
+    case "handoff": return row("ev-alarm", `📋 hand-off (${m.by}) to ${m.contact?.name || "?"}: ${m.note}${(m.why || []).map(w => "\n   why: " + w).join("")}`);
+    case "alert": return row("ev-alarm", `⚠ alert ${m.code || ""} level=${m.level || "?"}: ${m.headline || m.event}`);
+    case "quake": return row("ev-alarm", `🌎 quake ${m.peak_g} g`);
+    case "fall_hint": return row("", "↓ no movement after an event (fall_hint)");
+    case "help_gesture": return row("ev-help", "✋ help sign seen by the camera");
+    case "presence": return row("", `presence: ${m.state}`);
+    case "power": return row(m.state === "battery" ? "ev-alarm" : "", `power: ${m.state}`);
+    case "reset": statePill.textContent = "state: idle"; return row("", "reset");
+    case "people": return row("", `people in view: ${m.count}, lying down: ${m.down}`);
+    case "camera_shake": return row("", `camera saw the image shake (${m.frames} frames)`);
+    case "lights": return row("", `lights ${m.state}`);
+  }
+}
+function connect() {
+  ws = new WebSocket(HUB);
+  ws.onopen = () => { hubPill.textContent = "hub: connected"; hubPill.className = "pill on"; };
+  ws.onclose = () => { hubPill.textContent = "hub: offline, retrying"; hubPill.className = "pill off"; setTimeout(connect, 1500); };
+  ws.onmessage = (e) => { try { show(JSON.parse(e.data)); } catch { /* non-JSON frames are not ours to show */ } };
+}
+function send(m) {
+  if (!ws || ws.readyState !== 1) { row("ev-alarm", "not sent: hub offline"); return; }
+  ws.send(JSON.stringify({ source: "demo-ui", ...m }));
+}
+const SEQ = {
+  fall() { send({ type: "presence", state: "moving" }); setTimeout(() => { send({ type: "presence", state: "still" }); send({ type: "fall_hint" }); }, 1500); },
+  outage() {
+    clearInterval(drain); let pct = 100; send({ type: "power", state: "battery" }); send({ type: "heartbeat", battery_pct: pct });
+    drain = setInterval(() => { pct = Math.max(5, pct - 5); send({ type: "heartbeat", battery_pct: pct }); if (pct <= 5) clearInterval(drain); }, 4000);
+  },
+  restore() { clearInterval(drain); send({ type: "power", state: "mains" }); send({ type: "heartbeat", battery_pct: 100 }); },
+};
+document.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+  if (b.dataset.send) send(JSON.parse(b.dataset.send)); else SEQ[b.dataset.seq]();
+  if (b.dataset.send && JSON.parse(b.dataset.send).type === "reset") clearInterval(drain);
+}));
+connect();
+</script>
+</body>
+</html>

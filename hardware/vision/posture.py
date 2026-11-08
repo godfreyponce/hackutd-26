@@ -163,6 +163,51 @@ class Hub:
                 await asyncio.sleep(3)
 
 
+class Mjpeg:
+    """Latest overlay frame as an MJPEG stream (privacy blur already applied). Any browser on the network can watch."""
+
+    def __init__(self, port):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        self.cond, self.jpg = threading.Condition(), None
+        owner = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                if self.path.split("?")[0] != "/stream.mjpg":
+                    self.send_error(404)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                try:
+                    while True:
+                        with owner.cond:
+                            owner.cond.wait(timeout=2)
+                            jpg = owner.jpg
+                        if jpg:
+                            self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n" % len(jpg)
+                                             + jpg + b"\r\n")
+                except (BrokenPipeError, ConnectionResetError):
+                    pass  # viewer closed the page
+
+        srv = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+        srv.daemon_threads = True
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        print(f"MJPEG stream on :{port}/stream.mjpg", file=sys.stderr, flush=True)
+
+    def publish(self, img):
+        ok, buf = cv2.imencode(".jpg", cv2.resize(img, (960, 540)), [cv2.IMWRITE_JPEG_QUALITY, 70])
+        if ok:
+            with self.cond:
+                self.jpg = buf.tobytes()
+                self.cond.notify_all()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--hub", default=os.environ.get("HUB_URL", ""), help="ws://HOST:8765 (empty = no hub)")
@@ -171,11 +216,14 @@ def main():
     ap.add_argument("--no-window", action="store_true")
     ap.add_argument("--boxes", action="store_true",
                     help="print one JSON box line per frame on stdout for software.presence --stdin")
+    ap.add_argument("--stream-port", type=int, default=0,
+                    help="serve the overlay as MJPEG on http://<pi>:PORT/stream.mjpg (0 = off)")
     ap.add_argument("--no-presence", action="store_true",
                     help="do not send presence/fall_hint (software.presence owns them); camera-only events still go out")
     args = ap.parse_args()
 
     hub = Hub(args.hub)
+    stream = Mjpeg(args.stream_port) if args.stream_port else None
     with Hailo(HEF) as hailo:
         mh, mw, _ = hailo.get_input_shape()
         cam = Picamera2()
@@ -321,6 +369,8 @@ def main():
                 cv2.rectangle(img, (0, H - 60), (W, H), (0, 0, 160), -1)
                 cv2.putText(img, "   ".join(alerts), (20, H - 18), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (255, 255, 255), 3)
 
+            if stream and fps_n % 3 == 0:  # ~10 fps to the browser
+                stream.publish(img)
             if not args.no_window:
                 cv2.imshow("LAND camera", cv2.resize(img, (1920, 1080)))  # fill the monitor
                 if cv2.waitKey(1) & 0xFF == ord("q"):
