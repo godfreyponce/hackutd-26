@@ -8,7 +8,7 @@
 
 # LAND
 
-LAND is a safety box for the home. After an earthquake, or when someone in the room stops moving, it asks out loud if they are okay. If they say help, or do not answer, it raises a demo alarm on the dashboard.
+LAND is a safety box for the home. After an earthquake, or when someone in the room stops moving, it asks out loud if they are okay. If they say help, or do not answer three times, it raises a demo alarm on the dashboard.
 
 We call this "no response after an event". The box does not diagnose anything. An event only starts a question.
 
@@ -47,10 +47,10 @@ Real:
 Simulated:
 
 - 499 of the 500 homes on the dashboard. Home H000 is our one real box. The other homes are seeded, with demo weights and simulated check-ins.
-- The quake. It is a 0.82 g test event, sent from the control panel or the hub simulator's `q` key. No accelerometer sends data yet.
-- Presence. In the demo, a control panel sends "moving" and "still" to the hub. The camera is not connected yet.
+- The quake. It is a 0.82 g test event, sent with the hub simulator's `q` key or the same message from our filming control panel (not in this repo). No accelerometer sends data yet.
+- Presence. In the demo, a control panel outside this repo sends the same `presence` messages as the simulator keys `m` and `s`. The camera is not connected yet.
 - Battery and power. They come from the hub's simulator.
-- The alarm. It is a demo alarm. The box plays a siren and the dashboard zooms to the home. No emergency number is called. With Twilio settings, the agent can call or text one teammate's phone. That is off in the demo, and the code never dials a short number like 911.
+- The alarm. It is a demo alarm. The box plays a siren and the dashboard zooms to the home. No emergency number is called. With Twilio settings, the agent can call or text one teammate's phone. It is off unless the `TWILIO_` variables are set, and they are not set in the demo. The code never dials a short number like 911.
 
 ## Run it locally
 
