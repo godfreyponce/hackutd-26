@@ -17,16 +17,31 @@ The camera gives person boxes as fractions of the frame, so a wide or fisheye le
 
 | State | When |
 |---|---|
-| `moving` | The box center moves more than 4% of the frame, or the box area changes more than 15%, within 1 s. This must show in 2 frames in a row. |
+| `moving` | The box center moves more than 4% of the frame, or the box area changes more than 15%, within 1 s. This must show in 2 or more frames of the last second. |
 | `still` | 3 s with no such change. |
 | `none` | No person for 5 s after `moving`, or for 60 s after `still`. A check-in takes about 30 s. The longer wait keeps a person lying down from becoming `none` during a check-in. |
 
 - At start, nothing is sent until the state is known. With nobody in view, that is `none` after 5 s.
 - One or two frames with no person change nothing.
-- One bad box does not make `moving`. The service ignores a frame that is far from the last second of boxes until the next frame is far too. A false `moving` right after `still` looks like a stand-up to the agent.
+- One bad box does not make `moving`. The service does not use a frame that is far from the last second of boxes until a second such frame comes within 1 s. A false `moving` right after `still` looks like a stand-up to the agent.
 - After a longer gap, the 3 s for `still` start again when the person is back. A person who walks out of view and back does not count as still.
 - The service sends each change at once and repeats the current state every 5 s.
 - All the numbers are guesses for the demo. They are constants at the top of `tracker.py`. Tune them on the Pi.
+
+## Run with posture.py (the demo setup)
+
+Rafael's `hardware/vision/posture.py` runs the pose model on the AI HAT+. It prints one frame line per camera frame on stdout, in the `--stdin` format below. This service reads those lines and sends the events to the hub. On the Pi, from the repo root:
+
+```bash
+python3 hardware/vision/posture.py --hub "" --no-window | tee /tmp/boxes.jsonl | HUB_URL=ws://localhost:8765 .venv/bin/python -m software.presence --stdin
+```
+
+- `--hub ""` keeps posture.py off the hub. Only this service sends presence, so the hub never gets two answers. posture.py reads `HUB_URL` when `--hub` is not given, so do not leave it out.
+- posture.py also prints its own events as `EVENT {...}`. This service skips those lines without a log line.
+- `tee /tmp/boxes.jsonl` saves the run. Copy the file to the Mac and play it with `--replay` (see below) to check the events without the camera.
+- Run posture.py the way its README says (the venv and the Wayland lines). Drop `--no-window` to see the overlay.
+
+During the demo, do not press the sim keys `m`, `s` or `n` while the camera is live. They send the same messages as this service and mix two sources.
 
 ## Run on the Pi (camera and AI HAT+)
 
@@ -62,7 +77,7 @@ If the picamera2 source does not work, any detector can feed the service. Print 
 your_detector | .venv/bin/python -m software.presence --stdin
 ```
 
-The service skips a bad line with a log line.
+The service skips a bad line with a log line. A line that starts with `EVENT ` is skipped without one.
 
 ## Run on the Mac (`--replay`)
 

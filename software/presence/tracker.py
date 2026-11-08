@@ -12,7 +12,7 @@ MIN_SCORE = 0.4  # a box below this score is not a person
 MOVE_WINDOW_S = 1.0  # motion is judged against the boxes of the last second
 MOVE_CENTER = 0.04  # center moves more than 4% of the frame: moving
 MOVE_AREA = 0.15  # box area changes more than 15%: moving
-MOVE_MIN_FRAMES = 2  # motion must show in this many frames in a row, so one bad box is not moving
+MOVE_MIN_FRAMES = 2  # motion must show in this many frames of the last second, so one bad box is not moving
 STILL_AFTER_S = 3.0  # no motion for this long: still
 NONE_AFTER_MOVING_S = 5.0  # no person for this long after moving (or at start): none
 NONE_AFTER_STILL_S = 60.0  # longer after still, so a person lying down does not flip to none during a check-in
@@ -47,7 +47,7 @@ class Tracker:
         self.last_seen = None
         self.quiet_since = None
         self.window = deque()  # (t, (center, area)) of the last MOVE_WINDOW_S
-        self.moved_frames = 0
+        self.moved_times = deque()  # t of each frame in the last MOVE_WINDOW_S that showed motion
         self.last_sent = None
         self.last_hint = None
 
@@ -75,9 +75,12 @@ class Tracker:
         self.last_seen = t
         while self.window and self.window[0][0] < t - MOVE_WINDOW_S:
             self.window.popleft()
+        while self.moved_times and self.moved_times[0] < t - MOVE_WINDOW_S:
+            self.moved_times.popleft()
         moved = any(_moved(old, person) for _, old in self.window)
-        self.moved_frames = self.moved_frames + 1 if moved else 0
-        if 0 < self.moved_frames < MOVE_MIN_FRAMES:
+        if moved:
+            self.moved_times.append(t)
+        if moved and len(self.moved_times) < MOVE_MIN_FRAMES:
             # Kept out of the window: if it is a bad box, the next frames must not be judged against it.
             return self.state
         self.window.append((t, person))
@@ -97,6 +100,7 @@ class Tracker:
             return self.state
         self.last_seen = None
         self.window.clear()
+        self.moved_times.clear()
         return "none"
 
     def hub_reset(self):

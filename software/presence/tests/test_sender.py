@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 
 import pytest
 from websockets.asyncio.client import connect
@@ -57,6 +58,12 @@ def test_parse_frame_accepts_the_stdin_format_and_skips_bad_lines():
     assert parse_frame('{"t": 1, "boxes": [[0.1, 0.2, 0.9]]}') is None
 
 
+def test_parse_frame_skips_posture_event_lines_without_a_warning(caplog):
+    with caplog.at_level(logging.WARNING, logger="presence.sources"):
+        assert parse_frame('EVENT {"type": "presence", "state": "still"}') is None
+    assert caplog.records == []
+
+
 def test_person_boxes_reorders_hailo_output_and_keeps_only_people():
     hailo_output = [[[0.2, 0.1, 0.8, 0.4, 0.9]], [[0.0, 0.0, 1.0, 1.0, 0.99]]]
     assert person_boxes(hailo_output) == [[0.1, 0.2, 0.4, 0.8, 0.9]]
@@ -85,6 +92,42 @@ def test_a_hub_reset_gets_the_current_state_back_at_once():
     first, got = asyncio.run(scenario())
     assert first["state"] == "still"
     assert [(m["type"], m.get("state")) for m in got] == [("reset", None), ("presence", "still")]
+
+
+def test_a_hub_reset_lets_the_next_still_send_fall_hint_again():
+    after_reset = asyncio.Event()
+
+    def walk_then_still(t0):
+        for i in range(48):  # walk for 2 s, then still for 4 s
+            t = t0 + i / 8
+            cx = 0.1 + 0.1 * (t - t0) if t - t0 < 2 else 0.3
+            yield t, [[cx - 0.1, 0.3, cx + 0.1, 0.7, 0.9]]
+
+    async def frames():
+        for frame in walk_then_still(0):
+            yield frame
+        await after_reset.wait()
+        for frame in walk_then_still(6):  # well inside the 60 s cooldown
+            yield frame
+
+    async def until_fall_hint(tap):
+        while json.loads(await asyncio.wait_for(tap.recv(), timeout=2))["type"] != "fall_hint":
+            pass
+
+    async def scenario():
+        async with running_hub("127.0.0.1", 0, 0) as hub:
+            url = f"ws://127.0.0.1:{hub.ws_port}"
+            async with connect(url) as tap:
+                sender = asyncio.create_task(run(url, frames(), Tracker()))
+                await until_fall_hint(tap)
+                await tap.send('{"type":"reset"}')
+                while json.loads(await asyncio.wait_for(tap.recv(), timeout=2))["type"] != "reset":
+                    pass
+                after_reset.set()
+                await until_fall_hint(tap)
+                sender.cancel()
+
+    asyncio.run(scenario())
 
 
 def test_a_bad_hub_url_fails_instead_of_hanging():

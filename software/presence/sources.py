@@ -18,6 +18,8 @@ DEFAULT_HEF = "/usr/share/hailo-models/yolov8s_h8.hef"
 # view, scaled to its input size. Unverified: on the 16:9 sensor, 4:3 may cut off the sides.
 MAIN_SIZE = (1280, 960)
 PERSON_CLASS = 0  # COCO class 0 is "person"
+# hardware/vision/posture.py also prints its own hub events on stdout as "EVENT {...}". They are not frames.
+POSTURE_EVENT_PREFIX = "EVENT "
 
 
 def parse_frame(line):
@@ -25,6 +27,8 @@ def parse_frame(line):
 
     "t" is optional. Without it the frame gets the time it arrived.
     """
+    if line.startswith(POSTURE_EVENT_PREFIX):
+        return None
     try:
         msg = json.loads(line)
         t = float(msg["t"]) if "t" in msg else time.monotonic()

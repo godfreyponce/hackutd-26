@@ -67,6 +67,20 @@ def test_two_wide_frames_in_a_row_make_a_still_person_moving():
     assert states(run(tr, 4, 1, two_wide)) == [(4.625, "moving")]
 
 
+def test_two_wide_frames_within_1_s_make_a_still_person_moving():
+    tr = Tracker()
+    run(tr, 0, 4, jitter)  # still at 3.0
+    two_wide = lambda t: [box(w=0.3)] if t in (4.5, 5.25) else jitter(t)
+    assert states(run(tr, 4, 2, two_wide)) == [(5.25, "moving")]
+
+
+def test_two_wide_frames_more_than_1_s_apart_change_nothing():
+    tr = Tracker()
+    run(tr, 0, 4, jitter)  # still at 3.0
+    two_wide = lambda t: [box(w=0.3)] if t in (4.5, 5.625) else jitter(t)
+    assert states(run(tr, 4, 5, two_wide)) == [(8.0, "still")]
+
+
 def test_small_jitter_gives_still_after_3_s():
     events = run(Tracker(), 0, 4, jitter)
     assert states(events) == [(3.0, "still")]
