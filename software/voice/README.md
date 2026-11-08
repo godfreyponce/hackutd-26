@@ -50,7 +50,7 @@ Why not Eleven Realtime v1 Mini: it is a speech-to-speech agent. Its docs don't 
 ## Classifier
 
 `classify.py` is a keyword match, no LLM. In order:
-1. A help word is `help`: help, hurt, emergency, ambulance, bleed or bleeding, chest pain, can't get up, can't breathe, fell or fallen (not "fell asleep" or "fallen asleep"), on the floor, on the ground.
+1. A help word is `help`: help, hurt, emergency, ambulance, bleed or bleeding, blood (not "blood pressure" or "blood sugar"), injured or injury, paramedic, dizzy, can't, can barely or can hardly get up or breathe, fell or fallen (not "fell asleep", "fell back asleep" or "fallen asleep"), on the floor, on the ground, need/get/call a doctor, fire or smoke (not a fire or smoke alarm or detector), pain, chest, faint, stuck, trapped, firefighter, fireman, 911 (also 9-1-1, 9 1 1, nine one one), call someone or somebody, save me, please come. blood, pain, chest, faint, stuck, trapped, fire and smoke match only as whole words or listed forms (pains, painful, fainting, smokes and so on), so "painting", "fireplace", "Chester", "bloody" and "smoking" are not help. "Doctor", "breathe" and "call my" alone are not help, because ok replies use them ("my doctor said I'm fine", "I can breathe", "I'll call my daughter"). A missed help still reaches the alarm after 3 asks.
 2. Any negation (no, nope, nah, not, never, cannot, -n't, and -nt words with no apostrophe such as cant, dont, wont, isnt) is `help`, so "I'm not okay" and "no" never become `ok`.
 3. yes, yeah, yep, okay, ok, fine, alright is `ok`. "Good" is not: room chatter misheard as "Good boy" became `ok` in a live test.
 4. Anything else, silence included, is `no_answer`.

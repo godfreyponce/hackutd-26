@@ -7,11 +7,21 @@ Order matters: a help word wins over everything, then any negation counts as hel
 import re
 
 # "fell asleep" and "fallen asleep" answer about sleep, not a fall.
+# Word edges keep "painting", "fireplace", "Chester" and "smoker" out.
+# doctor, breathe, call, blood and a fire or smoke alarm or detector are narrowed: an ok
+# reply uses them ("my doctor said I'm fine"), and a missed help still reaches the alarm
+# after 3 asks.
 HELP = re.compile(
-    r"\b(help|hurt|emergency|ambulance|bleed|chest pain"
-    r"|(can ?not|can't|cant) (get up|breathe?)"
-    r"|(fell|fallen)\b(?! asleep)"
-    r"|on the (floor|ground))"
+    r"\b(help|hurt|emergency|ambulance|bleed|injur(ed|y)|paramedic|dizzy"
+    r"|(can ?not|can't|cant|can barely|can hardly) (get up|breathe?)"
+    r"|(fell|fallen)\b(?! (back )?asleep)"
+    r"|on the (floor|ground)"
+    r"|(need|get|call) (a |the |my )?doctors?\b"
+    r"|(fires?|smoke)\b(?! alarm| detector)"
+    r"|blood\b(?! pressure| sugar)"
+    r"|(pain(s|ed|ful|killers?)?|chest|faint(s|ed|ing)?|stuck|trapped"
+    r"|firefighters?|fire(man|men)|smok(ed|es|ey))\b"
+    r"|(911|9-1-1|9 1 1|nine one one)\b|call (someone|somebody)|save me|please come)"
 )
 # cant, dont ... aint: -n't words as a transcriber may write them, with no apostrophe.
 NEGATION = re.compile(
