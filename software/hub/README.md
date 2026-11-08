@@ -69,6 +69,14 @@ This list copies #19 and its "Contract addendum v1". The issue wins on any doubt
 {"type":"agent","step":"PLAN|ACT|VERIFY|FALLBACK","text":"...","tool":"get_presence"}
 ```
 
+**Hand-off.** Sent by the agent once, after an alarm. Not in #19 yet.
+
+```json
+{"type":"handoff","home":"H000","note":"...","contact":{"id":"godfrey","name":"Godfrey","role":"family contact, demo"},"by":"nemotron|template","why":["..."],"why_by":"nemotron|template"}
+```
+
+`note` is a short note for responders. `contact` is who to contact first, from a fixed demo list. `why` is at most 3 lines on why the rule raised the alarm. `by` and `why_by` say who wrote each: Nemotron, or the code template when the check failed or the model was down.
+
 **Official alerts.** CAP-shaped.
 
 ```json
@@ -97,7 +105,7 @@ The dashboard enforces the guardrail. A move goes at most 3 places and names a f
 
 **Who owns what.**
 
-- Agent (#15): the alarm rule, the 3 tries, the stand-up re-ask, the script text by id. Sends `checkin`, `say`, `agent`, `rerank`.
+- Agent (#15): the alarm rule, the 3 tries, the stand-up re-ask, the script text by id. Sends `checkin`, `say`, `agent`, `handoff`, `rerank`.
 - Voice (#14): speaks, listens, classifies the answer. Sends `heard`.
 - Home screen (#20): only listens.
 - Dashboard (#16): listens and sends `queue`.

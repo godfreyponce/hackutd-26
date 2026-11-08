@@ -34,6 +34,21 @@ Each hop writes an `agent` FALLBACK row with the reason. A text reply with no `t
 - Safety Guard (`nvidia/llama-3.1-nemotron-safety-guard-8b-v3`) screens every transcript before the planner sees it. No key: MOCK pass-through row. Guard error: the transcript is withheld.
 - `raise_alarm` always sends `checkin alarm`. It calls `TWILIO_TO` only when all `TWILIO_*` vars are set and `TWILIO_TO` is a full `+1XXXXXXXXXX` number. Never 911.
 
+## Hand-off note and why
+
+When the outcome is alarm, the agent asks Nemotron for two things, in parallel:
+
+- A hand-off note for responders, written from facts the code gives it: the trigger (quake peak g, or radar going from moving to still), presence, each answer with its transcript, battery, any active alert, the time. Nemotron also picks who to contact first from `HANDOFF_CONTACTS` in `scripts.py`. Thinking off.
+- A why for the alarm decision, at most 3 lines. Reasoning on. The rule still decides; the why only explains.
+
+Code checks both. Every number must come from the facts. No emergency number. Under 60 words. A check that fails, or a planner that is down, gets a plain template instead. The agent then sends:
+
+```json
+{"type":"handoff","home":"H000","note":"...","contact":{"id":"godfrey","name":"Godfrey","role":"family contact, demo"},"by":"nemotron","why":["...","..."],"why_by":"nemotron"}
+```
+
+`by` and `why_by` are `nemotron` or `template`. The demo contacts are labels only. Nothing texts them.
+
 ## Settings (env)
 
 | Var | Default | Does |

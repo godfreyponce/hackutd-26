@@ -11,6 +11,7 @@ from websockets.exceptions import ConnectionClosed
 
 from .checkin import Agent
 from .guard import SafetyGuard
+from .handoff import HandoffWriter
 from .notify import Notifier
 from .planner import LLMPlanner, MissingKeyPlanner, ScriptPlanner
 from .settings import Settings
@@ -40,10 +41,12 @@ def build_agent(settings, bus, env=os.environ):
         first = LLMPlanner(hosted_label, hosted, settings.planner_model,
                            extra_body={"chat_template_kwargs": {"enable_thinking": False}})
         guard = SafetyGuard(hosted, settings.guard_model, settings.planner_timeout_s)
+        writer = HandoffWriter(hosted, settings.planner_model, settings.planner_timeout_s)
     else:
         log.warning("MOCK: no NVIDIA_API_KEY. Hosted Nemotron and Safety Guard run in mock mode.")
         first = MissingKeyPlanner(hosted_label, "MOCK: no NVIDIA_API_KEY, hosted Nemotron skipped")
         guard = SafetyGuard(None, settings.guard_model, settings.planner_timeout_s)
+        writer = HandoffWriter(None, None, settings.planner_timeout_s)
     local = AsyncOpenAI(base_url=settings.local_base_url, api_key="ollama",
                         max_retries=0, timeout=settings.planner_timeout_s)
     planners = [
@@ -54,7 +57,7 @@ def build_agent(settings, bus, env=os.environ):
     notifier = Notifier(env)
     if notifier.mock:
         log.warning(notifier.mock)
-    return Agent(bus, settings, planners, guard, notifier)
+    return Agent(bus, settings, planners, guard, notifier, writer=writer)
 
 
 async def run(settings):

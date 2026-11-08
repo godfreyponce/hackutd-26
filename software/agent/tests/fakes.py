@@ -79,13 +79,14 @@ class FakeNotifier:
         return "fake sms"
 
 
-def make_agent(bus, planners=None, guard=None, settings=FAST):
+def make_agent(bus, planners=None, guard=None, settings=FAST, writer=None):
     agent = Agent(
         bus=bus,
         settings=settings,
         planners=planners or [ScriptPlanner()],
         guard=guard or FakeGuard(),
         notifier=FakeNotifier(),
+        writer=writer,
     )
     bus.agent = agent
     return agent
@@ -156,3 +157,23 @@ class FakeClient:
             name, args = calls[0]
             return text_reply("```json\n" + json.dumps({"tool": name, "args": args}) + "\n```")
         return tool_reply(*calls, content=None if calls else "Done.")
+
+
+class FakeWriterClient:
+    """Stands in for AsyncOpenAI in the hand-off writer: `why` with thinking on, `note` with it off."""
+
+    def __init__(self, note="", why="", error=None):
+        self.note = note
+        self.why = why
+        self.error = error
+        self.requests = []
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
+
+    async def create(self, **kw):
+        self.requests.append(kw)
+        if self.error:
+            raise self.error
+        thinking = kw["extra_body"]["chat_template_kwargs"]["enable_thinking"]
+        msg = SimpleNamespace(content=self.why if thinking else self.note,
+                              reasoning_content="thinking..." if thinking else None, tool_calls=None)
+        return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
