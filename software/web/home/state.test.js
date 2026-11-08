@@ -279,6 +279,8 @@ test('status text never says "fall" and the alarm note says no emergency number 
     assert.doesNotMatch(`${word} ${detail}`, /fall/i);
   }
   assert.equal(statusText('NO_RESPONSE').detail, 'No response after an event. Asking again.');
+  assert.equal(statusText('CONTACTING_HELP').word, 'DEMO ALARM');
+  assert.equal(statusText('CONTACTING_HELP').detail, 'Your contact would be told.');
   assert.match(statusText('CONTACTING_HELP').note, /demo/i);
   assert.match(statusText('CONTACTING_HELP').note, /no emergency number is called/i);
 });
@@ -296,7 +298,7 @@ test('with the hub link down, a quiet home shows HUB OFFLINE instead of a live-l
 });
 
 test('with the hub link down, an escalation keeps its word', () => {
-  assert.equal(statusText('CONTACTING_HELP', { linked: false }).word, 'CONTACTING HELP');
+  assert.equal(statusText('CONTACTING_HELP', { linked: false }).word, 'DEMO ALARM');
   assert.equal(statusText('NO_RESPONSE', { linked: false }).word, 'NO RESPONSE');
 });
 

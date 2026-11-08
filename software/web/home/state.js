@@ -85,8 +85,8 @@ export function statusText(status, { alert = false, linked = true, helpSign = fa
       return { word: 'NO RESPONSE', detail: ended ? 'Nobody seen at home. No alarm.' : 'No response after an event. Asking again.' };
     case 'CONTACTING_HELP':
       return {
-        word: 'CONTACTING HELP',
-        detail: 'Alerting your emergency contact',
+        word: 'DEMO ALARM',
+        detail: 'Your contact would be told.',
         note: 'Demo alarm. No emergency number is called.',
       };
     default:
