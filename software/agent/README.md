@@ -42,6 +42,14 @@ The agent stores every hub `alert` (the last one goes into the hand-off facts). 
 - The hand-off note uses the alert that started the check-in, not a later one.
 - `demo: true`: the box says `alert_demo` ("DEMO, not a real alert.") before the first ask. Trace rows, the planner brief, the decision row and the hand-off note say it too. A Nemotron note about a demo alert without those words gets the template.
 
+## Camera help sign (#46)
+
+The camera sends `help_gesture` when it sees the HELP sign. It starts a check-in at once, like a quake. It asks with `ask_gesture` ("I saw your help sign. Are you okay? Say okay, or help.") whatever `AGENT_ASK_SCRIPT` says. Then the same 3 tries and the same alarm rule apply. The sign alone never raises the alarm.
+
+- The line asks "are you okay", not "do you need help": the voice service hears "yes" as ok.
+- A help sign while a check-in is open, or while the alarm is up, is ignored. Repeats do not stack.
+- Simulator key `h` sends it without the camera.
+
 ## Hand-off note and why
 
 When the outcome is alarm, the agent asks Nemotron for two things, in parallel:

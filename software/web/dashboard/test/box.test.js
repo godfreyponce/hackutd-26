@@ -72,3 +72,11 @@ test('a handoff for H000 is kept until reset; one for another home is ignored', 
   assert.equal(run([{ ...msg, home: 'H042' }]).handoff, null);
   assert.equal(applyBoxEvent(s, { type: 'reset' }, 0).handoff, null);
 });
+
+test('a help sign is kept for the event line until reset', () => {
+  const help = { type: 'help_gesture', source: 'camera' };
+  assert.equal(initialBox(0).helpSign, false);
+  assert.equal(run([help]).helpSign, true);
+  assert.equal(run([help, { type: 'checkin', state: 'ok', try: 1 }]).helpSign, true);
+  assert.equal(run([help, { type: 'reset' }]).helpSign, false);
+});

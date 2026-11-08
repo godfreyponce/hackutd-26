@@ -14,7 +14,8 @@ from . import rule
 from .handoff import HandoffWriter, build_facts
 from .planner import LLMPlanner, PlannerUnavailable, ScriptPlanner
 from .scripts import (ALARM_CALL_TEXT, ALERT_ASK_SCRIPT, ALERT_DEMO_SCRIPT, ASK_SCRIPTS, DEMO_TEXT,
-                      ESCALATE_SCRIPT, REPLY_SCRIPTS, RETRY_SCRIPTS, SCRIPTS, SMS_TEMPLATES, STANDUP_SCRIPT)
+                      ESCALATE_SCRIPT, GESTURE_ASK_SCRIPT, REPLY_SCRIPTS, RETRY_SCRIPTS, SCRIPTS, SMS_TEMPLATES,
+                      STANDUP_SCRIPT)
 
 log = logging.getLogger("agent")
 
@@ -24,7 +25,7 @@ ALERT_TRIGGER = ("EQW", "emergency")
 # of any check-in start is ignored, so the person is asked once (owner, issue #36).
 ALERT_QUIET_S = 300
 
-SYSTEM_PROMPT = f"""You are the planner inside a home safety box. After an event (an earthquake, or a person who stopped moving) you run a voice check-in by calling tools.
+SYSTEM_PROMPT = f"""You are the planner inside a home safety box. After an event (an earthquake, a person who stopped moving, or a help sign seen by the camera) you run a voice check-in by calling tools.
 Rules you cannot change:
 - The box only says fixed lines by id. Use speak(script_id). Never write what the box says.
 - After each question, call listen. The box asks at most {rule.MAX_TRIES} times and picks the wording for each try.
@@ -137,7 +138,7 @@ class Agent:
         kind = msg.get("type")
         if kind == "presence":
             await self._on_presence(msg.get("state"))
-        elif kind in ("quake", "fall_hint"):
+        elif kind in ("quake", "fall_hint", "help_gesture"):
             self._start_checkin(kind, msg.get("peak_g"))
         elif kind == "heartbeat":
             self.battery_pct = msg.get("battery_pct")
@@ -191,7 +192,12 @@ class Agent:
         if self.incident and self.incident.open:
             log.info("%s while a check-in is open, ignored", trigger)
             return
-        ask = ALERT_ASK_SCRIPT if alert else self.settings.ask_script
+        if alert:
+            ask = ALERT_ASK_SCRIPT
+        elif trigger == "help_gesture":
+            ask = GESTURE_ASK_SCRIPT
+        else:
+            ask = self.settings.ask_script
         self.incident = Incident(trigger, ask, self.clock(), peak_g, alert)
         self._launch("checkin")
 

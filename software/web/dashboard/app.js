@@ -282,6 +282,10 @@ const bus = connectBus(hubUrl(location.search), {
         alertHtml = `Official alert${msg.level ? `, ${esc(msg.level)}` : ''}: ${msg.demo === true ? 'DEMO, not a real alert. ' : ''}${esc(msg.headline || msg.event || 'alert')} (${esc(msg.source ?? 'unknown')}).`;
         renderEvent();
         return;
+      case 'help_gesture':
+        box = applyBoxEvent(box, msg, now);
+        renderEvent();
+        return;
       case 'quake':
         startQuake(now, msg.peak_g, 'the box');
         break;
@@ -308,7 +312,8 @@ function esc(s) {
 
 function renderEvent() {
   const el = $('event');
-  const html = [eventHtml, alertHtml].filter(Boolean).join(' ');
+  const help = box.helpSign ? '<b>Help sign seen</b> at the box.' : '';
+  const html = [eventHtml, help, alertHtml].filter(Boolean).join(' ');
   el.innerHTML = html || 'No event yet. Waiting for the box.';
   el.classList.toggle('live', Boolean(html));
 }

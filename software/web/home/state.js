@@ -35,6 +35,7 @@ export function initialState() {
     quakes: [],
     areaHit: false, // neighborhood dots turn red after a quake
     home: 'idle', // node map dot: idle (white), hit (red), ok (green)
+    helpSign: false, // the camera saw the HELP sign in this check-in
   };
 }
 
@@ -66,10 +67,10 @@ export function sourceLabel(source) {
   return SOURCE_LABELS[source] ?? String(source ?? '').toUpperCase();
 }
 
-export function statusText(status, { alert = false, linked = true } = {}) {
+export function statusText(status, { alert = false, linked = true, helpSign = false } = {}) {
   switch (status) {
     case 'CHECKING_IN':
-      return { word: 'CHECKING IN', detail: 'Event detected. Asking if you are okay.' };
+      return { word: 'CHECKING IN', detail: `${helpSign ? 'Help sign seen' : 'Event detected'}. Asking if you are okay.` };
     case 'NO_RESPONSE':
       return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.' };
     case 'CONTACTING_HELP':
@@ -89,7 +90,9 @@ function raise(state, status) {
 }
 
 function onEvent(state, extra = {}) {
-  return { ...state, status: raise(state, 'CHECKING_IN'), home: 'hit', ...extra };
+  // An event on a PROTECTED home starts a new check-in, so an old help sign no longer applies.
+  const helpSign = state.status === 'PROTECTED' ? false : state.helpSign;
+  return { ...state, status: raise(state, 'CHECKING_IN'), home: 'hit', helpSign, ...extra };
 }
 
 function onCheckin(state, msg) {
@@ -111,6 +114,8 @@ export function reduce(state, msg, now) {
     }
     case 'fall_hint':
       return onEvent(state);
+    case 'help_gesture':
+      return onEvent(state, { helpSign: true });
     case 'checkin':
       return onCheckin(state, msg);
     case 'say':
