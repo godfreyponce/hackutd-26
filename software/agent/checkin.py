@@ -513,7 +513,7 @@ class Agent:
 
     async def _notify_contact(self, inc, turn, args):
         tid = args.get("template_id")
-        if tid not in SMS_TEMPLATES:
+        if not isinstance(tid, str) or tid not in SMS_TEMPLATES:
             return {"error": f"template_id must be one of {list(SMS_TEMPLATES)}"}
         expected = self._contact_template(inc)
         if expected and tid != expected:

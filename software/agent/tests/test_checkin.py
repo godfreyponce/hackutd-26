@@ -1,6 +1,7 @@
 import asyncio
 import re
 from dataclasses import replace
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -8,7 +9,7 @@ import pytest
 from software.agent.planner import LLMPlanner, ScriptPlanner, parse_json_calls
 from software.agent.scripts import SCRIPTS, SMS_TEMPLATES
 
-from .fakes import FAST, FakeBus, FakeClient, FakeGuard, cooperative, last_result, make_agent
+from .fakes import FAST, FakeBus, FakeClient, FakeGuard, cooperative, last_result, make_agent, text_reply
 
 STILL = {"type": "presence", "state": "still"}
 MOVING = {"type": "presence", "state": "moving"}
@@ -366,10 +367,49 @@ def test_reset_clears_everything():
          [("speak", {"script_id": "standup_ask"}), ("listen", {})]),
         ('{"name": "raise_alarm", "arguments": {"reason": "help"}}', [("raise_alarm", {"reason": "help"})]),
         ("All done, nothing else to do.", []),
+        ('{"tool": "speak", "args": "{\'script_id\': \'ask_stopped\'}"}', []),
     ],
 )
 def test_json_mode_parsing(text, expected):
     assert [(c.name, c.args) for c in parse_json_calls(text)] == expected
+
+
+class ReplyClient(FakeClient):
+    """Gives the same raw reply to every request."""
+
+    def __init__(self, reply):
+        super().__init__()
+        self.reply = reply
+
+    async def create(self, **kw):
+        self.requests.append(kw)
+        return self.reply
+
+
+@pytest.mark.parametrize("reply", [
+    text_reply('{"tool": "speak", "args": "{\'script_id\': \'ask_stopped\'}"}'),
+    SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=None, tool_calls=[
+        SimpleNamespace(id="call_0", type="function",
+                        function=SimpleNamespace(name="get_presence", arguments={"x": 1}))]))]),
+], ids=["json_mode_single_quotes", "native_args_not_a_string"])
+def test_a_reply_the_box_cannot_read_still_ends_with_the_fixed_script(reply):
+    bus_bad, agent = go(["no_answer"] * 3, [STILL, FALL_HINT], llm(ReplyClient(reply)))
+    bus_script, _ = go(["no_answer"] * 3, [STILL, FALL_HINT])
+    assert bus_bad.checkins() == bus_script.checkins()
+    assert bus_bad.says() == bus_script.says()
+    assert agent.incident.outcome == "alarm"
+
+
+def test_a_template_id_that_is_not_a_string_is_refused():
+    def policy(messages):
+        if last_result(messages) is None:
+            return [("notify_contact", {"template_id": ["no_response"]})]
+        return cooperative(messages)
+
+    bus, agent = go(["no_answer"] * 3, [STILL, FALL_HINT], llm(FakeClient(policy)))
+    assert agent.notifier.sms == []
+    assert any(r["text"].startswith("Refused notify_contact") for r in bus.trace("VERIFY"))
+    assert bus.states()[-1] == "alarm"
 
 
 # ---- emergency alerts (#36) ----
