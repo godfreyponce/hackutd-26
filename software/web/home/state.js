@@ -2,7 +2,7 @@
 
 export const TRACE_WINDOW_MS = 60_000;
 
-// Higher rank wins until checkin ok/clear or reset, so a re-ask never hides an alarm.
+// Higher rank wins until checkin ok/clear, a new check-in's first ask, or reset, so a re-ask never hides an alarm.
 const RANK = { PROTECTED: 0, CHECKING_IN: 1, NO_RESPONSE: 2, CONTACTING_HELP: 3 };
 
 const CHECKIN_STATUS = {
@@ -36,6 +36,7 @@ export function initialState() {
     areaHit: false, // neighborhood dots turn red after a quake
     home: 'idle', // node map dot: idle (white), hit (red), ok (green)
     helpSign: false, // the camera saw the HELP sign in this check-in
+    trigger: null, // the first event since the last checkin message: the one the agent starts its next check-in on
   };
 }
 
@@ -96,18 +97,27 @@ function raise(state, status) {
   return RANK[status] > RANK[state.status] ? status : state.status;
 }
 
-function onEvent(state, extra = {}) {
-  return { ...state, status: raise(state, 'CHECKING_IN'), home: 'hit', ...extra };
+function onEvent(state, kind, extra = {}) {
+  return { ...state, status: raise(state, 'CHECKING_IN'), home: 'hit', trigger: state.trigger ?? kind, ...extra };
 }
 
 function onCheckin(state, msg) {
   const tryNum = msg.try ?? state.tryNum;
   if (msg.state === 'ok' || msg.state === 'clear') {
-    return { ...state, status: 'PROTECTED', tryNum: null, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false };
+    return { ...state, status: 'PROTECTED', tryNum: null, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false, trigger: null };
   }
   const status = CHECKIN_STATUS[msg.state];
   if (!status) return state;
-  return { ...state, status: raise(state, status), tryNum, home: 'hit' };
+  // The agent sends asking try 1 only to start a check-in or for the stand-up re-ask after an alarm
+  // (software/agent/checkin.py _speak). A check-in that ended at no response with no alarm sends no end message.
+  if (msg.state === 'asking' && msg.try === 1) {
+    const standup = state.status === 'CONTACTING_HELP';
+    return {
+      ...state, status: standup ? state.status : status, tryNum, heard: null, home: 'hit', trigger: null,
+      helpSign: standup ? state.helpSign : state.trigger === 'help_gesture',
+    };
+  }
+  return { ...state, status: raise(state, status), tryNum, home: 'hit', trigger: null };
 }
 
 export function reduce(state, msg, now) {
@@ -115,12 +125,12 @@ export function reduce(state, msg, now) {
   switch (msg.type) {
     case 'quake': {
       const quakes = [...state.quakes, { at: now, g: Number(msg.peak_g) || 0 }].filter((q) => now - q.at <= TRACE_WINDOW_MS);
-      return onEvent(state, { quakes, areaHit: true });
+      return onEvent(state, msg.type, { quakes, areaHit: true });
     }
     case 'fall_hint':
-      return onEvent(state);
+      return onEvent(state, msg.type);
     case 'help_gesture':
-      return onEvent(state, { helpSign: true });
+      return onEvent(state, msg.type, { helpSign: true });
     case 'checkin':
       return onCheckin(state, msg);
     case 'say':
