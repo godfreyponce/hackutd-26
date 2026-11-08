@@ -61,7 +61,26 @@
   .answer { font-size:16px; line-height:1.45; min-height:1.5em; white-space:pre-wrap; }
   .vrow { display:flex; align-items:center; gap:10px; } .vrow input { flex:1; accent-color: var(--accent); }
   .vh { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
-  @media (prefers-reduced-motion: reduce) { .node { transition:none; } }
+  /* AI engines, box health, sensors */
+  .panels { display:grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr); gap:12px; padding:4px 18px 8px; }
+  @media (max-width: 1100px) { .panels { grid-template-columns: 1fr; } }
+  .eng { display:grid; grid-template-columns: minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr); gap:4px 6px; font-size:13.5px; align-items:stretch; }
+  .eng .h { font:11px var(--mono); color:var(--muted); text-transform:uppercase; letter-spacing:.08em; padding:0 6px; }
+  .eng .p { font-weight:650; padding:5px 6px; }
+  .eng .c { padding:5px 8px; border-radius:6px; border:1px solid var(--line); color:var(--muted); font:12.5px/1.3 var(--mono); transition: all .25s; }
+  .eng .c.live { color:var(--ink); border-color:var(--ok); background:#22c55e14; }
+  .eng .c.used { box-shadow:0 0 0 2px var(--accent), 0 0 14px #38bdf855; }
+  .eng .c.dead { opacity:.4; text-decoration:line-through; }
+  .eng .c.na { border-style:dashed; opacity:.5; }
+  .stats { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:6px; }
+  .stat { background:var(--panel2); border-radius:8px; padding:7px 9px; }
+  .stat b { display:block; font:11px var(--mono); color:var(--muted); text-transform:uppercase; letter-spacing:.07em; }
+  .stat span { font:600 18px/1.3 var(--mono); } .stat i { font:12px var(--mono); color:var(--muted); font-style:normal; display:block; }
+  .svcs { display:flex; flex-wrap:wrap; gap:5px; }
+  .svc { font:12px var(--mono); padding:3px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  .svc.active { color:var(--ok); border-color:#22c55e88; } .svc.down { color:#fff; background:var(--bad); border-color:var(--bad); }
+  button.cut { border-color:var(--warn); } button.cut.on { background:var(--warn); color:#111; } button.cut.on small, button.cut.on .tag { color:#111; border-color:#111; }
+  @media (prefers-reduced-motion: reduce) { .node, .eng .c { transition:none; } }
 </style>
 </head>
 <body>
@@ -71,6 +90,7 @@
   <span id="status" class="pill">PROTECTED</span>
   <span id="temp" class="pill">indoor --</span>
   <span id="power" class="pill">power: mains</span>
+  <span id="net" class="pill">internet: ?</span>
 </header>
 
 <div id="map" aria-label="System map: each part lights up when an event passes through it">
@@ -96,6 +116,43 @@
     <div id="trace" aria-live="polite"></div>
   </section>
 </main>
+
+<div class="panels">
+  <section>
+    <h2>AI models: cloud vs on the box <span class="note" id="netNote"></span></h2>
+    <div class="eng" id="eng">
+      <span class="h">part</span><span class="h">cloud (internet)</span><span class="h">on the box (no internet)</span>
+      <span class="p">Ask the box</span><span class="c" data-p="ask" data-k="cloud">Nemotron 30B</span><span class="c" data-p="ask" data-k="box">Nemotron 3 Nano 4B</span>
+      <span class="p">Check-in planner</span><span class="c" data-p="agent" data-k="cloud">Nemotron 30B</span><span class="c" data-p="agent" data-k="box">Nemotron 4B → fixed script</span>
+      <span class="p">Speech to text</span><span class="c" data-p="stt" data-k="cloud">ElevenLabs Scribe</span><span class="c" data-p="stt" data-k="box">Moonshine</span>
+      <span class="p">Voice</span><span class="c" data-p="tts" data-k="cloud">ElevenLabs</span><span class="c" data-p="tts" data-k="box">Kokoro</span>
+      <span class="p">Safety Guard</span><span class="c" data-p="guard" data-k="cloud">Nemotron Guard 8B</span><span class="c na" data-p="guard" data-k="box">skipped: transcript withheld</span>
+      <span class="p">Camera pose</span><span class="c na">not needed</span><span class="c live" data-p="pose" data-k="box">YOLOv8s-pose · Hailo-8</span>
+      <span class="p">Answer + alarm rule</span><span class="c na">not needed</span><span class="c live" data-p="rule" data-k="box">keyword classifier · code rule</span>
+      <span class="p">Radio alerts</span><span class="c na">not needed</span><span class="c live" data-p="radio" data-k="box">RTL-SDR · SAME decoder</span>
+    </div>
+    <div class="note">Green = the model the box uses right now. Blue glow = the model that ran last. Power or internet can fail; the camera, radio and alarm rule never needed the internet.</div>
+  </section>
+  <section>
+    <h2>Box health</h2>
+    <div class="svcs" id="svcs"><span class="svc">waiting for the box…</span></div>
+    <div class="stats">
+      <div class="stat"><b>CPU</b><span id="cpu">--</span><i id="load">load --</i></div>
+      <div class="stat"><b>Memory</b><span id="mem">--</span><i>Pi 5 · AI HAT+</i></div>
+    </div>
+  </section>
+  <section>
+    <h2>Sensors live</h2>
+    <div class="stats">
+      <div class="stat"><b>Indoor temp</b><span id="sTemp">--</span><i id="sTempAge">BMP280</i></div>
+      <div class="stat"><b>Pressure</b><span id="sPres">--</span><i>hPa</i></div>
+      <div class="stat"><b>Last shaking</b><span id="sQuake">none</span><i id="sQuakeAge">MPU-6050</i></div>
+      <div class="stat"><b>Motion (PIR)</b><span id="sPir">none</span><i id="sPirAge">PIR sensor</i></div>
+      <div class="stat"><b>People in view</b><span id="sPeople">--</span><i id="sPose">camera AI</i></div>
+      <div class="stat"><b>Battery</b><span id="sBatt">mains</span><i id="sBattNote">power</i></div>
+    </div>
+  </section>
+</div>
 
 <div class="controls">
   <div class="talk">
@@ -140,9 +197,10 @@
       <button data-send='{"type":"heard","answer":"help","transcript":"(button) help me"}'>"Help me"<small>→ alarm + hand-off</small></button>
       <button data-send='{"type":"heard","answer":"no_answer","transcript":""}'>Silence<small>counts as no answer</small></button>
     </div>
-    <div class="group"><b>Power + reset</b>
-      <button data-seq="outage">🔌 Power outage<span class="tag sim">simulated</span><small>box on battery; battery % drains</small></button>
-      <button data-seq="restore">⚡ Power restored<small>back on mains</small></button>
+    <div class="group"><b>Power, internet, reset</b>
+      <button data-seq="outage">🔌 Power outage<span class="tag sim">simulated</span><small>box on battery, router down: internet cut, battery % drains</small></button>
+      <button data-seq="restore">⚡ Power restored<small>back on mains, internet back</small></button>
+      <button id="cut" class="cut" type="button">✂ Cut the internet<span class="tag real">real switch</span><small>every AI part moves to its on-board model</small></button>
       <button data-send='{"type":"reset"}'>↺ Reset everything<small>all services back to start</small></button>
     </div>
   </div>
@@ -170,6 +228,35 @@ function row(cls, text) {
 }
 function setStatus(text, cls) { $("status").textContent = text; $("status").className = "pill " + (cls || ""); }
 
+// ---- AI models: cloud vs on the box ----
+const DUAL = ["ask", "agent", "stt", "tts", "guard"];
+const cell = (p, k) => document.querySelector(`#eng .c[data-p="${p}"][data-k="${k}"]`);
+function setNet(m) {
+  $("net").textContent = m.online ? "internet: online" : m.cut ? "internet: CUT (demo)" : "internet: LOST";
+  $("net").className = "pill " + (m.online ? "on" : "off");
+  $("netNote").textContent = m.online ? "" : "· running on the box only";
+  $("cut").classList.toggle("on", !!m.cut);
+  $("cut").firstChild.textContent = m.cut ? "🌐 Restore the internet" : "✂ Cut the internet";
+  for (const p of DUAL) {
+    cell(p, "cloud").classList.toggle("live", m.online); cell(p, "cloud").classList.toggle("dead", !m.online);
+    cell(p, "box").classList.toggle("live", !m.online);
+  }
+}
+function used(p, name) {
+  const k = /cloud|hosted/i.test(name) ? "cloud" : "box", c = cell(p, k); if (!c) return;
+  if (name && !/cloud|hosted/i.test(name) && p !== "guard") c.title = name;
+  c.classList.add("used"); clearTimeout(c._t); c._t = setTimeout(() => c.classList.remove("used"), 6000);
+}
+// ---- sensors ----
+const seen = {};
+function stamp(id, text) { $(id).textContent = text; seen[id] = Date.now(); }
+setInterval(() => {
+  for (const [id, at] of Object.entries(seen)) {
+    const s = Math.round((Date.now() - at) / 1000), age = $(id + "Age");
+    if (age) age.textContent = s < 60 ? `${s} s ago` : `${Math.round(s / 60)} min ago`;
+  }
+}, 1000);
+
 function show(m) {
   const quiet = m.type === "indoor" || m.type === "pir" || m.type === "presence" || m.type === "people";
   if (!quiet) light("hub");
@@ -177,18 +264,21 @@ function show(m) {
     case "demo_log": light("radio", "decoding…"); return row("r-radio", "📻 " + m.text);
     case "alert": light("radio", `${m.code || ""} ${m.level || ""}`, true); light("screens", "alert shown", true);
       return row("r-bad", `⚠ OFFICIAL ALERT ${m.code || ""} (${m.level || "?"}${m.demo ? ", DEMO" : ""}): ${m.headline || m.event}`);
-    case "quake": light("sensors", `quake ${m.peak_g} g`, true); return row("r-bad", `🌎 accelerometer: shaking ${m.peak_g} g`);
+    case "quake": stamp("sQuake", `${m.peak_g} g`); light("sensors", `quake ${m.peak_g} g`, true); return row("r-bad", `🌎 accelerometer: shaking ${m.peak_g} g`);
     case "heat": light("sensors", `heat ${m.temp_f} °F`, true); return row("r-bad", `🔥 temperature: ${m.temp_f} °F (${m.reason})`);
-    case "indoor": $("temp").textContent = `indoor ${Math.round(m.temp_f)} °F`; light("sensors", `${m.temp_f} °F · ${m.pressure_hpa} hPa`); return;
-    case "pir": light("sensors", "PIR motion"); return;
-    case "presence": light("camera", `person: ${m.state}`); return;
-    case "people": light("camera", `${m.count} in view, ${m.down} down`, m.down > 0); if (m.down) row("r-bad", `🛌 camera: ${m.down} of ${m.count} people lying down`); return;
+    case "indoor": $("temp").textContent = `indoor ${Math.round(m.temp_f)} °F`; stamp("sTemp", `${m.temp_f} °F`); $("sPres").textContent = m.pressure_hpa; light("sensors", `${m.temp_f} °F · ${m.pressure_hpa} hPa`); return;
+    case "pir": stamp("sPir", "motion"); light("sensors", "PIR motion"); return;
+    case "presence": $("sPose").textContent = "person " + m.state; light("camera", `person: ${m.state}`); return;
+    case "people": $("sPeople").textContent = `${m.count}${m.down ? ` · ${m.down} down` : ""}`; light("camera", `${m.count} in view, ${m.down} down`, m.down > 0); if (m.down) row("r-bad", `🛌 camera: ${m.down} of ${m.count} people lying down`); return;
     case "fall_hint": light("camera", "lying + still", true); return row("r-bad", "🛌 camera AI: person lying down and not moving");
     case "help_gesture": light("camera", "HELP sign", true); return row("r-bad", "🙌 camera AI: help sign seen");
     case "camera_shake": light("camera", "image shook"); return row("", "camera: whole image shook (second quake signal)");
     case "lights": light("camera", `lights ${m.state}`); return row("", `camera: lights ${m.state}`);
     case "scream": light("mics", `loud sound ${m.db} dB`, true); return row("r-bad", `😱 mics: scream / loud sound (${m.db} dBFS)`);
-    case "agent": light("agent", m.step); return row(m.step || "", `🧠 ${m.step}${m.tool ? " · " + m.tool : ""}: ${m.text}`);
+    case "agent":
+      if (m.step === "PLAN") used("agent", m.text.startsWith("hosted") ? "cloud" : "box");
+      if (m.tool === "safety_guard") used("guard", /No internet|MOCK/.test(m.text) ? "box" : "cloud");
+      light("agent", m.step); return row(m.step || "", `🧠 ${m.step}${m.tool ? " · " + m.tool : ""}: ${m.text}`);
     case "say": light("voice", "speaking"); return row("r-say", `🔊 box: "${m.text}"`);
     case "heard": light("mics", `heard: ${m.answer}`); return row("r-heard", `👂 heard: ${m.answer}${m.transcript ? ` — "${m.transcript}"` : ""}`);
     case "checkin": {
@@ -201,11 +291,14 @@ function show(m) {
     }
     case "handoff": light("agent", `hand-off by ${m.by}`, true); light("screens", "hand-off note", true);
       return row("r-bad", `📋 HAND-OFF (${m.by}) → ${m.contact?.name || "?"}: ${m.note}${(m.why || []).map((w) => "\n   why: " + w).join("")}`);
-    case "power": $("power").textContent = "power: " + m.state; $("power").className = "pill " + (m.state === "battery" ? "off" : "");
+    case "power": if (m.state !== "battery") { $("sBatt").textContent = "mains"; $("sBattNote").textContent = "power"; }
+      $("power").textContent = "power: " + m.state; $("power").className = "pill " + (m.state === "battery" ? "off" : "");
       light("sensors", "power " + m.state, m.state === "battery"); return row(m.state === "battery" ? "r-bad" : "", `🔌 power: ${m.state}`);
-    case "heartbeat": if (typeof m.battery_pct === "number") $("power").textContent = `power: ${$("power").className.includes("off") ? "battery" : "mains"} · ${m.battery_pct}%`; return;
+    case "heartbeat": if (typeof m.battery_pct === "number") { $("sBatt").textContent = m.battery_pct + " %"; $("sBattNote").textContent = "on battery (simulated drain)"; }
+      if (typeof m.battery_pct === "number") $("power").textContent = `power: ${$("power").className.includes("off") ? "battery" : "mains"} · ${m.battery_pct}%`; return;
     case "assistant": light("agent", "answering"); $("answer").textContent = `Q: ${m.question}
-A: ${m.answer}`;
+A: ${m.answer}${m.engine ? `
+(${m.engine})` : ""}`;
       return row("r-say", `💬 asked: "${m.question}" → ${m.answer}`);
     case "mic_test": {
       light("mics", m.error ? "no audio" : `${m.rms_dbfs} dBFS`, !!m.error);
@@ -215,6 +308,16 @@ A: ${m.answer}`;
 Level ${m.rms_dbfs} dBFS, peak ${m.peak_dbfs} dBFS, voice found: ${m.voice_s} s`;
       $("micAudio").src = m.wav; $("micAudio").hidden = false;
       return row("r-heard", `🎙 mic test (${m.engine}): "${m.transcript}" ${verdict} · ${m.rms_dbfs} dBFS`);
+    }
+    case "net": return setNet(m);
+    case "engine": used(m.part, m.name); if (m.part === "ask" && /thinking/.test(m.name)) $("answer").textContent += "\n(on-board model is thinking on the Pi CPU, this takes a while…)";
+      if (m.seconds != null) row("", `⚙ ${m.part}: ${m.name} answered in ${m.seconds} s`); return;
+    case "system": {
+      $("cpu").textContent = `${m.cpu_c} °C`; $("load").textContent = `load ${m.load}`; $("mem").textContent = `${m.mem_pct} %`;
+      $("svcs").replaceChildren(...Object.entries(m.services).map(([n, st]) => {
+        const e = document.createElement("span"); e.className = "svc " + (st === "active" ? "active" : "down");
+        e.textContent = (st === "active" ? "● " : "✕ ") + n; e.title = st; return e; }));
+      return;
     }
     case "demo_state": if (m.volume != null) { $("vol").value = Math.round(m.volume * 100); $("volText").textContent = Math.round(m.volume * 100) + " %"; } return;
     case "reset": setStatus("PROTECTED", "ok"); $("trace").textContent = ""; return row("", "↺ reset: all parts back to start");
@@ -234,10 +337,10 @@ const SEQ = {
   fall() { send({ type: "presence", state: "still" }); send({ type: "people", count: 1, down: 1 }); send({ type: "fall_hint", posture: "lying" }); },
   heat() { send({ type: "indoor", temp_f: 96.0, temp_c: 35.6, pressure_hpa: 1000.0 }); send({ type: "heat", temp_f: 96.0, reason: "over 90 F" }); },
   outage() {
-    clearInterval(drain); let pct = 100; send({ type: "power", state: "battery" }); send({ type: "heartbeat", battery_pct: pct });
+    clearInterval(drain); let pct = 100; send({ type: "demo", cmd: "net", online: false }); send({ type: "power", state: "battery" }); send({ type: "heartbeat", battery_pct: pct });
     drain = setInterval(() => { pct = Math.max(5, pct - 5); send({ type: "heartbeat", battery_pct: pct }); if (pct <= 5) clearInterval(drain); }, 4000);
   },
-  restore() { clearInterval(drain); send({ type: "power", state: "mains" }); send({ type: "heartbeat", battery_pct: 100 }); },
+  restore() { clearInterval(drain); send({ type: "demo", cmd: "net", online: true }); send({ type: "power", state: "mains" }); send({ type: "heartbeat", battery_pct: 100 }); },
 };
 document.querySelectorAll("button[data-cmd], button[data-send], button[data-seq]").forEach((b) => b.addEventListener("click", () => {
   if (b.dataset.cmd) { send({ type: "demo", cmd: b.dataset.cmd }); row("r-radio", "📻 starting the radio decoder…"); }
@@ -247,6 +350,7 @@ document.querySelectorAll("button[data-cmd], button[data-send], button[data-seq]
 $("askForm").addEventListener("submit", (e) => { e.preventDefault(); const q = $("askText").value.trim(); if (!q) return;
   $("answer").textContent = `Q: ${q}
 A: thinking…`; send({ type: "demo", cmd: "ask", text: q }); $("askText").value = ""; });
+$("cut").addEventListener("click", () => send({ type: "demo", cmd: "net", online: $("cut").classList.contains("on") }));
 $("askVoice").addEventListener("click", () => { $("answer").textContent = "Listening 5 s for your question…"; send({ type: "demo", cmd: "ask_voice" }); });
 $("micTest").addEventListener("click", () => { $("micResult").textContent = "Recording 5 s… speak now"; send({ type: "demo", cmd: "mic_test", seconds: 5 }); });
 let volTimer; $("vol").addEventListener("input", () => { $("volText").textContent = $("vol").value + " %";

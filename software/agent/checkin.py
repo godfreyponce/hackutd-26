@@ -121,6 +121,7 @@ class Agent:
         self.tools = build_tools()
         self.clock = time.monotonic
         self.presence = "none"
+        self.online = True  # {"type":"net"} from the demo runner: False skips every cloud call at once
         self.battery_pct = None
         self.power = None
         self.alert = None
@@ -152,6 +153,8 @@ class Agent:
             inc = self.incident
             if inc and inc.pending:
                 inc.heard.put_nowait(msg)
+        elif kind == "net":
+            self.online = msg.get("online") is not False
         elif kind == "reset":
             self.reset()
         elif kind == "queue" and self.ranker:
@@ -247,7 +250,9 @@ class Agent:
     # ---- the loop ----
 
     async def _run(self, inc):
-        chain = list(self.planners)
+        chain = [p for p in self.planners if self.online or not getattr(p, "hosted", False)]
+        if len(chain) < len(self.planners):
+            await self.trace("FALLBACK", f"No internet: the cloud planner is skipped. Next: {chain[0].label} (on the box).")
         messages = [{"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": self._brief(inc)}]
         turn = 0
@@ -462,6 +467,10 @@ class Agent:
         """Safety Guard on every transcript before it enters the planner context."""
         if not transcript:
             return ""
+        if not self.online:
+            await self.trace("VERIFY", "No internet: the Safety Guard (cloud) is skipped, so the transcript stays out of "
+                             "the planner. The on-board classifier's answer still counts.", "safety_guard")
+            return "[withheld: no internet for the Safety Guard]"
         safe, note = await self.guard.check(transcript)
         if note.startswith("MOCK"):
             await self.trace("VERIFY", note, "safety_guard")
@@ -497,7 +506,8 @@ class Agent:
                             reason=inc.alarm_reason, at=datetime.now().strftime("%H:%M"))
         await self.trace("ACT", f"write_handoff(home={facts['home']!r})", "write_handoff")
         await self.trace("ACT", "explain_alarm(reasoning='on')", "explain_alarm")
-        h = await self.writer.write(facts)
+        writer = self.writer if self.online else HandoffWriter(None, None, 0, missing="No internet")
+        h = await writer.write(facts)
         for step, text, tool in h.rows:
             await self.trace(step, text, tool)
         await self.send(h.event())

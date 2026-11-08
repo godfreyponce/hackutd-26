@@ -24,6 +24,17 @@ step "hardware venv (.venv-hw): camera, sensors, ring (system picamera2/OpenCV/H
 step "offline voice models (needs internet once)"
 .venv/bin/python -m software.voice --download || fail "voice --download"
 
+step "on-board LLM (Ollama + Nemotron 3 Nano 4B): answers and plans when the internet is down"
+command -v ollama >/dev/null || curl -fsSL https://ollama.com/install.sh | sh || fail "ollama install"
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+printf '[Service]\nEnvironment=OLLAMA_KEEP_ALIVE=-1\n' | sudo tee /etc/systemd/system/ollama.service.d/land.conf >/dev/null
+sudo systemctl daemon-reload && sudo systemctl enable --now ollama && sudo systemctl restart ollama
+ollama pull "${AGENT_LOCAL_MODEL:-nemotron-3-nano:4b}" || fail "ollama pull"
+
+step "Pi screen: the home kiosk starts with the desktop (the judges use the demo page on a laptop)"
+mkdir -p ~/.config/autostart
+cp deploy/pi/land-kiosk.desktop ~/.config/autostart/
+
 step "audio: make the I2S card (Google voiceHAT overlay) the default speaker and mic"
 grep -q '^dtoverlay=googlevoicehat-soundcard' /boot/firmware/config.txt || fail "add dtoverlay=googlevoicehat-soundcard to /boot/firmware/config.txt and reboot"
 # PipeWire names the I2S card "Built-in Audio", so match on the ALSA card name of each node
@@ -56,4 +67,5 @@ systemctl --user --no-pager --plain list-units 'land-*'
 echo
 echo "Screens: http://$(hostname -I | awk '{print $1}'):8080/home/?hub=ws://$(hostname -I | awk '{print $1}'):8765  (iPad)"
 echo "         http://$(hostname -I | awk '{print $1}'):8080/dashboard/?hub=ws://$(hostname -I | awk '{print $1}'):8765  (laptop)"
+echo "Judges:  http://$(hostname -I | awk '{print $1}'):8080/demo/  (laptop: deploy/laptop/LAND-demo.cmd)"
 echo "Logs:    journalctl --user -u land-agent -f"
