@@ -15,7 +15,7 @@ class FakeEngine:
         self.spoken = []
         self.listens = []
 
-    def speak(self, text):
+    def speak(self, text, script_id=None):
         self.spoken.append(text)
 
     def listen(self, seconds):
@@ -56,10 +56,10 @@ async def next_heard(ws, timeout=5):
                 return msg
 
 
-def run_with_service(engine, body):
+def run_with_service(engine, body, alarm=None):
     async def main():
         server, url, clients = await fake_bus()
-        service = VoiceService(engine, log=lambda line: None)
+        service = VoiceService(engine, log=lambda line: None, alarm=alarm)
         task = asyncio.create_task(service.run(url))
         try:
             async with connect(url) as ws:
@@ -127,7 +127,7 @@ class BrokenAudioEngine(FakeEngine):
         super().__init__(transcripts)
         self.broken = broken
 
-    def speak(self, text):
+    def speak(self, text, script_id=None):
         super().speak(text)
         if text in self.broken:
             raise OSError("audio device unplugged")
@@ -144,3 +144,57 @@ def test_audio_error_answers_no_answer_and_keeps_the_worker_alive():
         assert await next_heard(ws) == {"type": "heard", "answer": "ok", "transcript": "yes"}
 
     run_with_service(engine, body)
+
+
+class FakeAlarm:
+    """Records start and stop instead of playing the tone."""
+
+    def __init__(self, events):
+        self.events = events
+
+    def start(self):
+        self.events.append("alarm start")
+
+    def stop(self):
+        self.events.append("alarm stop")
+
+
+class OrderedEngine(FakeEngine):
+    def __init__(self, transcripts, events):
+        super().__init__(transcripts)
+        self.events = events
+
+    def speak(self, text, script_id=None):
+        super().speak(text)
+        self.events.append(f"say {script_id}")
+
+
+def test_alarm_checkin_plays_the_tone_after_the_line_and_reset_stops_it():
+    events = []
+    engine = OrderedEngine(["yes"], events)
+
+    async def body(ws, service):
+        await say(ws, "Okay. I'm getting help now.")
+        await ws.send(json.dumps({"type": "checkin", "state": "alarm", "try": 2}))
+        await wait_for(lambda: "alarm start" in events)
+        assert events == ["say test", "alarm start"]
+        await say(ws, "Are you okay?", listen_s=6)
+        assert await next_heard(ws) == {"type": "heard", "answer": "ok", "transcript": "yes"}
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: "alarm stop" in events)
+
+    run_with_service(engine, body, alarm=FakeAlarm(events))
+    assert events == ["say test", "alarm start", "say test", "alarm stop"]
+
+
+def test_other_checkin_states_play_no_tone():
+    events = []
+
+    async def body(ws, service):
+        for state in ("asking", "help", "no_answer", "ok", "clear"):
+            await ws.send(json.dumps({"type": "checkin", "state": state, "try": 1}))
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 1)
+
+    run_with_service(FakeEngine([]), body, alarm=FakeAlarm(events))
+    assert events == []

@@ -5,6 +5,8 @@ import re
 from dataclasses import dataclass, field
 from itertools import count
 
+from .scripts import REPLY_SCRIPTS
+
 _ids = count(1)
 
 
@@ -122,7 +124,9 @@ class ScriptPlanner:
             return Plan([ToolCall("get_presence")], "Fixed script: check presence.")
         hint = box.next_hint()
         step = hint["next"]
-        if step == "speak":
+        if step == "speak" and hint["script_id"] in REPLY_SCRIPTS.values():
+            calls = [ToolCall("speak", {"script_id": hint["script_id"]})]
+        elif step == "speak":
             calls = [ToolCall("speak", {"script_id": hint["script_id"]}),
                      ToolCall("listen", {"seconds": box.settings.listen_s})]
         elif step == "listen":

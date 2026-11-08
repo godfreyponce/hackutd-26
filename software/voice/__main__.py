@@ -54,10 +54,11 @@ def main(argv: list[str]) -> int:
         log(warning)
     log(f"mode: {mode}")
 
+    from software.voice.engines import AlarmTone
     from software.voice.service import VoiceService
 
     url = os.environ.get("HUB_URL", "ws://localhost:8765")
-    service = VoiceService(build_engine(mode), log)
+    service = VoiceService(build_engine(mode), log, None if mode == "text" else AlarmTone())
     try:
         asyncio.run(service.run(url))
     except KeyboardInterrupt:

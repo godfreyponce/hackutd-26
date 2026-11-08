@@ -1,4 +1,5 @@
 """Bus client: on `say`, speak; with `listen_s`, listen, classify and send one `heard`.
+On `checkin` alarm, play the alarm tone after the line in progress; `reset` stops it.
 
 The agent (#15) owns the tries, the alarm rule and the script text. This client never
 decides an alarm.
@@ -14,9 +15,11 @@ from software.voice.classify import classify
 
 
 class VoiceService:
-    def __init__(self, engine, log=print):
+    def __init__(self, engine, log=print, alarm=None):
         self.engine = engine
         self.log = log
+        self.alarm = alarm  # None in text mode: no speaker
+        self.alarm_on = False
         self.resets = 0
         self.queue: asyncio.Queue = asyncio.Queue()
 
@@ -42,21 +45,33 @@ class VoiceService:
             return
         if msg.get("type") == "say":
             self.queue.put_nowait(msg)
+        elif msg.get("type") == "checkin" and msg.get("state") == "alarm":
+            # Queued, so the tone starts after the line being spoken (the agent's last words).
+            self.queue.put_nowait(msg)
         elif msg.get("type") == "reset":
             self.resets += 1
             while not self.queue.empty():
                 self.queue.get_nowait()
             self.log("reset: dropped queued and in-flight lines")
+            if self.alarm_on:
+                self.alarm_on = False
+                self._audio("stop alarm tone", self.alarm.stop)
 
     async def _work(self, ws):
         while True:
             msg = await self.queue.get()
+            if msg.get("type") == "checkin":
+                self.log("ALARM tone (fake alarm, local only, nothing is called)")
+                if self.alarm:
+                    self.alarm_on = True
+                    self._audio("start alarm tone", self.alarm.start)
+                continue
             reset_mark = self.resets
             text = msg.get("text", "")
             listen_s = msg.get("listen_s")
             self.log(f"SAY [{msg.get('script_id')}] {text}")
             try:
-                await asyncio.to_thread(self.engine.speak, text)
+                await asyncio.to_thread(self.engine.speak, text, msg.get("script_id"))
                 transcript = await asyncio.to_thread(self.engine.listen, listen_s) if listen_s else ""
             except Exception as e:
                 self.log(f"audio error on [{msg.get('script_id')}], worker continues: {e!r}")
@@ -66,3 +81,9 @@ class VoiceService:
             heard = {"type": "heard", "answer": classify(transcript), "transcript": transcript}
             self.log(f"HEARD {heard['answer']}: {transcript!r}")
             await ws.send(json.dumps(heard))
+
+    def _audio(self, what, fn):
+        try:
+            fn()
+        except Exception as e:
+            self.log(f"audio error on {what}, worker continues: {e!r}")

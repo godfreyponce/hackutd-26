@@ -1,4 +1,4 @@
-"""Speak and listen. Each engine has speak(text) and listen(seconds) -> transcript."""
+"""Speak and listen. Each engine has speak(text, script_id) and listen(seconds) -> transcript."""
 
 import io
 import math
@@ -40,9 +40,22 @@ TOKENS_PER_SECOND = 6.5  # Moonshine's own default (core/moonshine-model.cpp); s
 
 ELEVEN_URL = "https://api.elevenlabs.io/v1"
 ELEVEN_VOICE = os.environ.get("ELEVEN_VOICE_ID", "ljX1ZrXuDIIRVcmiVSyR")  # picked by Godfrey from the Voice Library
-ELEVEN_TTS_MODEL = "eleven_flash_v2_5"
+ELEVEN_TTS_MODEL = "eleven_v4_turbo"
 ELEVEN_STT_MODEL = "scribe_v2"
 ELEVEN_TIMEOUT_S = 10  # a guess: long enough for a short line, short enough to fall back fast
+# Audio tags by the agent's script id. Only the ElevenLabs request gets them, so a tag never
+# reaches the bus, the home screen or the offline voice (which would read it out loud).
+ELEVEN_TAGS = {
+    "ask_stopped": "[warm]",
+    "ask_event": "[warm]",
+    "ask_retry_2": "[gently]",
+    "ask_retry_3": "[concerned]",
+    "escalate": "[calm, firm]",
+    "reply_help": "[calm, reassuring]",
+    "reply_ok": "[warm]",
+    "standup_ask": "[warm]",
+}
+ALARM_WAV = Path(__file__).parent / "assets" / "alarm.wav"
 
 
 def mic_blocked_message() -> str:
@@ -65,11 +78,33 @@ def record(seconds: float, log) -> np.ndarray | None:
     return audio
 
 
-def play(audio: np.ndarray, rate: int):
+def play(audio: np.ndarray, rate: int, wait: bool = True):
     import sounddevice as sd
 
     sd.play(audio, rate)
-    sd.wait()
+    if wait:
+        sd.wait()
+
+
+def stop_audio():
+    import sounddevice as sd
+
+    sd.stop()
+
+
+class AlarmTone:
+    """The fake alarm's tone on the box speaker. start() returns at once; stop() cuts it off."""
+
+    def __init__(self, path: Path = ALARM_WAV):
+        with wave.open(str(path)) as w:
+            self.rate = w.getframerate()
+            self.audio = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
+
+    def start(self):
+        play(self.audio, self.rate, wait=False)
+
+    def stop(self):
+        stop_audio()
 
 
 def download_models():
@@ -178,7 +213,7 @@ class OfflineEngine:
         self.tts = make_tts(OFFLINE_VOICE)
         self.stt = MoonshineSTT()
 
-    def speak(self, text: str):
+    def speak(self, text: str, script_id: str | None = None):
         self.tts.speak(text)
 
     def listen(self, seconds: float) -> str:
@@ -208,14 +243,15 @@ class ElevenLabsEngine:
         self.offline = offline
         self.log = log
 
-    def speak(self, text: str):
+    def speak(self, text: str, script_id: str | None = None):
         import requests
 
+        tag = ELEVEN_TAGS.get(script_id)
         try:
             r = self.http.post(
                 f"{ELEVEN_URL}/text-to-speech/{ELEVEN_VOICE}",
                 params={"output_format": f"pcm_{SAMPLE_RATE}"},
-                json={"text": text, "model_id": ELEVEN_TTS_MODEL},
+                json={"text": f"{tag} {text}" if tag else text, "model_id": ELEVEN_TTS_MODEL},
                 timeout=ELEVEN_TIMEOUT_S,
             )
             r.raise_for_status()
@@ -247,7 +283,7 @@ class ElevenLabsEngine:
 class TextEngine:
     """No audio: print the line, read a typed answer. Timeout means silence."""
 
-    def speak(self, text: str):
+    def speak(self, text: str, script_id: str | None = None):
         print(f"\nBOX SAYS: {text}", flush=True)
 
     def listen(self, seconds: float) -> str:
