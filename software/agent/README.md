@@ -15,7 +15,7 @@ Run only one agent per hub. Two agents both answer every event.
 
 ## Planner chain
 
-1. Hosted `nvidia/nemotron-3-nano-30b-a3b` (needs `NVIDIA_API_KEY`). Thinking off, temp 0.6, top_p 0.95.
+1. Hosted `nvidia/nemotron-3.5-lightning-30b-a3b` (needs `NVIDIA_API_KEY`). Thinking off, temp 0.6, top_p 0.95.
 2. Local `nemotron-3-nano:4b` on Ollama (`ollama pull nemotron-3-nano:4b`). Thinking off.
 3. The fixed script. It never fails.
 

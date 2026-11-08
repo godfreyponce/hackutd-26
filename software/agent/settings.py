@@ -9,7 +9,7 @@ class Settings:
     hub_url: str = "ws://localhost:8765"
     nvidia_api_key: str | None = None
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
-    planner_model: str = "nvidia/nemotron-3-nano-30b-a3b"
+    planner_model: str = "nvidia/nemotron-3.5-lightning-30b-a3b"
     guard_model: str = "nvidia/llama-3.1-nemotron-safety-guard-8b-v3"
     local_base_url: str = "http://localhost:11434/v1"
     local_model: str = "nemotron-3-nano:4b"
