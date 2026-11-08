@@ -53,13 +53,15 @@ class VoiceService:
             msg = await self.queue.get()
             reset_mark = self.resets
             text = msg.get("text", "")
-            self.log(f"SAY [{msg.get('script_id')}] {text}")
-            await asyncio.to_thread(self.engine.speak, text)
             listen_s = msg.get("listen_s")
-            if not listen_s:
-                continue
-            transcript = await asyncio.to_thread(self.engine.listen, listen_s)
-            if self.resets != reset_mark:
+            self.log(f"SAY [{msg.get('script_id')}] {text}")
+            try:
+                await asyncio.to_thread(self.engine.speak, text)
+                transcript = await asyncio.to_thread(self.engine.listen, listen_s) if listen_s else ""
+            except Exception as e:
+                self.log(f"audio error on [{msg.get('script_id')}], worker continues: {e!r}")
+                transcript = ""
+            if not listen_s or self.resets != reset_mark:
                 continue
             heard = {"type": "heard", "answer": classify(transcript), "transcript": transcript}
             self.log(f"HEARD {heard['answer']}: {transcript!r}")

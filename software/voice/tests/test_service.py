@@ -120,3 +120,27 @@ def test_reset_drops_the_answer_in_flight():
         assert await next_heard(ws) == {"type": "heard", "answer": "ok", "transcript": "yes"}
 
     run_with_service(engine, body)
+
+
+class BrokenAudioEngine(FakeEngine):
+    def __init__(self, transcripts, broken):
+        super().__init__(transcripts)
+        self.broken = broken
+
+    def speak(self, text):
+        super().speak(text)
+        if text in self.broken:
+            raise OSError("audio device unplugged")
+
+
+def test_audio_error_answers_no_answer_and_keeps_the_worker_alive():
+    engine = BrokenAudioEngine(["yes"], broken={"Contacting emergency services now.", "Can you hear me?"})
+
+    async def body(ws, service):
+        await say(ws, "Contacting emergency services now.")
+        await say(ws, "Can you hear me?", listen_s=6)
+        assert await next_heard(ws) == {"type": "heard", "answer": "no_answer", "transcript": ""}
+        await say(ws, "Are you okay?", listen_s=6)
+        assert await next_heard(ws) == {"type": "heard", "answer": "ok", "transcript": "yes"}
+
+    run_with_service(engine, body)
