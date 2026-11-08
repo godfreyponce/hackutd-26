@@ -7,6 +7,8 @@ Wants=land-hub.service
 WorkingDirectory=%h/hackutd-26
 EnvironmentFile=-%h/.config/land/env
 ExecStart=%h/hackutd-26/.venv/bin/python -m software.agent
+StandardOutput=append:%h/land-logs/agent.log
+StandardError=append:%h/land-logs/agent.log
 Restart=always
 RestartSec=3
 

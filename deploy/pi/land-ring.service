@@ -7,6 +7,8 @@ Wants=land-hub.service
 WorkingDirectory=%h/hackutd-26
 Environment=HUB_URL=ws://localhost:8765
 ExecStart=%h/hackutd-26/.venv-hw/bin/python hardware/ring/ring.py
+StandardOutput=append:%h/land-logs/ring.log
+StandardError=append:%h/land-logs/ring.log
 Restart=always
 RestartSec=3
 

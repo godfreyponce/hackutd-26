@@ -46,7 +46,7 @@ chmod 600 ~/.config/land/env
 grep -q '^NVIDIA_API_KEY=.\+' ~/.config/land/env || echo "NOTE: NVIDIA_API_KEY is empty: the agent runs its fixed script (MOCK), no live Nemotron"
 
 step "systemd user services (start at boot, restart on failure)"
-mkdir -p ~/.config/systemd/user
+mkdir -p ~/.config/systemd/user ~/land-logs
 cp deploy/pi/land-*.service ~/.config/systemd/user/
 loginctl enable-linger "$USER"
 systemctl --user daemon-reload
