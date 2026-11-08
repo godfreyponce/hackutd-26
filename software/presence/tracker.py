@@ -48,6 +48,7 @@ class Tracker:
         self.quiet_since = None
         self.window = deque()  # (t, (center, area)) of the last MOVE_WINDOW_S
         self.moved_times = deque()  # t of each frame in the last MOVE_WINDOW_S that showed motion
+        self.first_back = None  # (t, (center, area)): the first frame after a gap, until the next one agrees
         self.last_sent = None
         self.last_hint = None
 
@@ -77,6 +78,14 @@ class Tracker:
             self.window.popleft()
         while self.moved_times and self.moved_times[0] < t - MOVE_WINDOW_S:
             self.moved_times.popleft()
+        if not self.window:
+            # Nothing to judge this frame against. If it is a bad box, every frame after it would look like motion.
+            back = self.first_back
+            if back is None or back[0] < t - MOVE_WINDOW_S or _moved(back[1], person):
+                self.first_back = (t, person)
+                return self.state
+            self.window.append(back)
+            self.first_back = None
         moved = any(_moved(old, person) for _, old in self.window)
         if moved:
             self.moved_times.append(t)
@@ -101,6 +110,7 @@ class Tracker:
         self.last_seen = None
         self.window.clear()
         self.moved_times.clear()
+        self.first_back = None
         return "none"
 
     def hub_reset(self):

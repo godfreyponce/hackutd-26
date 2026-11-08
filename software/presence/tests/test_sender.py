@@ -121,7 +121,8 @@ def test_a_hub_reset_lets_the_next_still_send_fall_hint_again():
                 sender = asyncio.create_task(run(url, frames(), Tracker()))
                 await until_fall_hint(tap)
                 await tap.send('{"type":"reset"}')
-                while json.loads(await asyncio.wait_for(tap.recv(), timeout=2))["type"] != "reset":
+                # The service resends its state after it has handled the reset, so the cooldown is clear by then.
+                while json.loads(await asyncio.wait_for(tap.recv(), timeout=2)).get("state") != "still":
                     pass
                 after_reset.set()
                 await until_fall_hint(tap)

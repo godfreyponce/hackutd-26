@@ -23,14 +23,14 @@ The camera gives person boxes as fractions of the frame, so a wide or fisheye le
 
 - At start, nothing is sent until the state is known. With nobody in view, that is `none` after 5 s.
 - One or two frames with no person change nothing.
-- One bad box does not make `moving`. The service does not use a frame that is far from the last second of boxes until a second such frame comes within 1 s. A false `moving` right after `still` looks like a stand-up to the agent.
+- One bad box does not make `moving`. A frame that is far from the last second of boxes counts only when a second such frame comes within 1 s. Until then the service does not compare later frames with it. After a gap, the first box back counts only when the next box agrees with it. A false `moving` right after `still` looks like a stand-up to the agent.
 - After a longer gap, the 3 s for `still` start again when the person is back. A person who walks out of view and back does not count as still.
 - The service sends each change at once and repeats the current state every 5 s.
 - All the numbers are guesses for the demo. They are constants at the top of `tracker.py`. Tune them on the Pi.
 
 ## Run with posture.py (the demo setup)
 
-Rafael's `hardware/vision/posture.py` runs the pose model on the AI HAT+. It prints one frame line per camera frame on stdout, in the `--stdin` format below. This service reads those lines and sends the events to the hub. On the Pi, from the repo root:
+Rafael's `hardware/vision/posture.py` runs the pose model on the AI HAT+. With his next change, it prints one frame line per camera frame on stdout, in the `--stdin` format below. Until that change is on main, the pipe sends no presence to the hub. This service reads those lines and sends the events to the hub. Start the hub first: the service reads no frames until it is connected. On the Pi, from the repo root:
 
 ```bash
 python3 hardware/vision/posture.py --hub "" --no-window | tee /tmp/boxes.jsonl | HUB_URL=ws://localhost:8765 .venv/bin/python -m software.presence --stdin
