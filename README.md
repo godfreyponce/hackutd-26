@@ -1,8 +1,10 @@
+<p align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/brand/land-wordmark-white.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/brand/land-wordmark-navy.svg">
   <img alt="LAND: Life Against Natural Disaster" src="docs/brand/land-wordmark-navy.svg" width="360">
 </picture>
+</p>
 
 # hackutd-26
 HackUTD 26: Zero Day · Sat Nov 7 12:00 PM → Sun Nov 8 12:00 PM · ECSW, UTD
