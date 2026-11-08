@@ -1,0 +1,257 @@
+{
+  "stage": "tiles",
+  "ok": true,
+  "at": "2026-10-27T15:28:51Z",
+  "numbers": {
+    "release_facade_segments": 4570,
+    "release_stale_skipped": 0,
+    "release_features": 2057,
+    "release_contents": 344,
+    "release_totalMB": 16.74,
+    "release_root_bytes": 821628,
+    "release_tiles_in_tree": 344,
+    "release_instances": 9722,
+    "aris_facade_segments": 4570,
+    "aris_stale_skipped": 0,
+    "aris_features": 2057,
+    "aris_contents": 256,
+    "aris_totalMB": 11.91,
+    "aris_root_bytes": 821628,
+    "aris_tiles_in_tree": 256,
+    "aris_instances": 9722,
+    "aris_first_view_bytes": 2376113
+  },
+  "checks": [
+    {
+      "name": "release: tileset.json + report.json exist",
+      "ok": true,
+      "value": null,
+      "threshold": null,
+      "detail": "C:\\Users\\rafam\\aris2-work\\utd-3d\\dist\\tiles"
+    },
+    {
+      "name": "release: no cap violation",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "release: 3D Tiles 1.1, explicit tree",
+      "ok": true,
+      "value": null,
+      "threshold": null,
+      "detail": ""
+    },
+    {
+      "name": "release: every content file present",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "release: content-hashed names match bytes",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "release: fa\u00e7ade segments = producers' sum",
+      "ok": true,
+      "value": 4570,
+      "threshold": 4570,
+      "detail": ""
+    },
+    {
+      "name": "release: every tile's fa\u00e7ade id < segment count",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "release: no _FACADE in root or D-*.L0",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "release: facades.json present",
+      "ok": true,
+      "value": null,
+      "threshold": null,
+      "detail": "../facades.777e03d4.json"
+    },
+    {
+      "name": "release: report lists the tiled features by render folder",
+      "ok": true,
+      "value": null,
+      "threshold": null,
+      "detail": "tiler older than wave C"
+    },
+    {
+      "name": "release: every tiled GLB is in its stage manifest",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "release: root (first view) \u2264 1.5 MB",
+      "ok": true,
+      "value": 821628,
+      "threshold": 1572864,
+      "detail": ""
+    },
+    {
+      "name": "release: no input file skipped mid-run",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": "a producer was rewriting build/render; rerun utd3d tiles"
+    },
+    {
+      "name": "release: search.json has buildings",
+      "ok": true,
+      "value": 203,
+      "threshold": null,
+      "detail": ""
+    },
+    {
+      "name": "release: one label per searchable building",
+      "ok": true,
+      "value": 203,
+      "threshold": 203,
+      "detail": ""
+    },
+    {
+      "name": "aris: tileset.json + report.json exist",
+      "ok": true,
+      "value": null,
+      "threshold": null,
+      "detail": "C:\\Users\\rafam\\aris2-work\\utd-3d\\dist\\aris\\tiles"
+    },
+    {
+      "name": "aris: no cap violation",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "aris: 3D Tiles 1.1, explicit tree",
+      "ok": true,
+      "value": null,
+      "threshold": null,
+      "detail": ""
+    },
+    {
+      "name": "aris: every content file present",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "aris: content-hashed names match bytes",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "aris: fa\u00e7ade segments = producers' sum",
+      "ok": true,
+      "value": 4570,
+      "threshold": 4570,
+      "detail": ""
+    },
+    {
+      "name": "aris: every tile's fa\u00e7ade id < segment count",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "aris: no _FACADE in root or D-*.L0",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "aris: facades.json present",
+      "ok": true,
+      "value": null,
+      "threshold": null,
+      "detail": "../facades.777e03d4.json"
+    },
+    {
+      "name": "aris: report lists the tiled features by render folder",
+      "ok": true,
+      "value": null,
+      "threshold": null,
+      "detail": "tiler older than wave C"
+    },
+    {
+      "name": "aris: every tiled GLB is in its stage manifest",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "aris: root (first view) \u2264 1.5 MB",
+      "ok": true,
+      "value": 821628,
+      "threshold": 1572864,
+      "detail": ""
+    },
+    {
+      "name": "aris: no input file skipped mid-run",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": "a producer was rewriting build/render; rerun utd3d tiles"
+    },
+    {
+      "name": "aris: search.json has buildings",
+      "ok": true,
+      "value": 203,
+      "threshold": null,
+      "detail": ""
+    },
+    {
+      "name": "aris: one label per searchable building",
+      "ok": true,
+      "value": 203,
+      "threshold": 203,
+      "detail": ""
+    },
+    {
+      "name": "aris: subset \u2264 100 MB",
+      "ok": true,
+      "value": 11.91,
+      "threshold": 100,
+      "detail": ""
+    },
+    {
+      "name": "aris: no L2 tiles",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": ""
+    },
+    {
+      "name": "aris: first view \u2264 2.5 MB (uncompressed, as :3500 serves it)",
+      "ok": true,
+      "value": 2376113,
+      "threshold": 2621440,
+      "detail": "app/index-BfNY8DcH.js 1373 KB, tiles/c/root.59b0d5db.glb 802 KB, tiles/tileset.json 63 KB, search.json 46 KB, labels.json 24 KB, app/index-DRlacweV.css 10 KB, index.html 0 KB"
+    }
+  ]
+}
