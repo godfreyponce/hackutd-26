@@ -26,6 +26,8 @@ ALERT_TRIGGER = ("EQW", "emergency")
 # of any check-in start is ignored, so the person is asked once (owner, issue #36).
 # A help sign check-in does not start this window (owner, issue #46).
 ALERT_QUIET_S = 300
+# The camera can flicker between still and moving; ask the stand-up question at most once per this many seconds.
+STANDUP_GAP_S = 45
 # Camera hand signs answer the open question: O (hand on head) = ok, X (arms crossed over the head) = help.
 SIGN_ANSWERS = {"ok_gesture": ("ok", "O sign"), "help_gesture": ("help", "X sign")}
 # The "call emergency services?" answer. "no" wins, so "please don't call" is a no.
@@ -95,6 +97,8 @@ class Incident:
         self.presence_checked = False
         self.run_answered = False
         self.call_offered = False
+        self.ask_id = 0  # id of the question waiting for its answer; a late answer to an older one is dropped
+        self.last_standup = None  # Agent.clock() of the last stand-up re-ask
 
     @property
     def open(self):
@@ -257,6 +261,9 @@ class Agent:
         inc = self.incident
         if not (inc and inc.open and prev == "still" and state == "moving"):
             return
+        if inc.last_standup is not None and self.clock() - inc.last_standup < STANDUP_GAP_S:
+            return  # camera flicker between still and moving: do not re-ask again and again
+        inc.last_standup = self.clock()
         inc.stood_up = True
         await self.trace("VERIFY", "Stand-up: presence sensor went from still to moving. Next question: \"Are you okay?\"")
         if inc.alarm_raised:
@@ -404,11 +411,31 @@ class Agent:
         while not inc.heard.empty():
             inc.heard.get_nowait()
         inc.pending = sid
+        inc.ask_id = self._next_ask_id()
         await self.send({"type": "checkin", "state": "asking", "try": try_n})
         if try_n == 1 and inc.goal == "checkin" and inc.alert and inc.alert.get("demo"):
             await self.send({"type": "say", "script_id": ALERT_DEMO_SCRIPT, "text": SCRIPTS[ALERT_DEMO_SCRIPT]})
-        await self.send({"type": "say", "script_id": sid, "text": SCRIPTS[sid], "listen_s": self.settings.listen_s})
+        await self.send({"type": "say", "script_id": sid, "text": SCRIPTS[sid], "listen_s": self.settings.listen_s,
+                         "ask_id": inc.ask_id})
         return {"spoken": sid, "try": try_n}
+
+    def _next_ask_id(self):
+        self.ask_seq = getattr(self, "ask_seq", 0) + 1
+        return self.ask_seq
+
+    async def _await_answer(self, inc, wait):
+        """The answer to THIS question. A late `heard` for an earlier question (slow speech-to-text) is dropped,
+        so it can never count as the answer to the next try. Buttons and hand signs carry no ask_id: accepted."""
+        end = self.clock() + wait
+        while (left := end - self.clock()) > 0:
+            try:
+                msg = await asyncio.wait_for(inc.heard.get(), left)
+            except TimeoutError:
+                return None
+            if msg.get("ask_id") in (None, inc.ask_id):
+                return msg
+            await self.trace("VERIFY", f"Late answer to an earlier question ({msg.get('answer')}), ignored.", "listen")
+        return None
 
     async def _speak_reply(self, inc, turn, sid):
         if sid != inc.reply_due:
@@ -428,9 +455,8 @@ class Agent:
         if not inc.pending:
             return {"error": "ask a question with speak first"}
         wait = self.settings.listen_s + self.settings.heard_grace_s
-        try:
-            msg = await asyncio.wait_for(inc.heard.get(), wait)
-        except TimeoutError:
+        msg = await self._await_answer(inc, wait)
+        if msg is None:
             await self.trace("VERIFY", f"No answer from the voice service in {wait:g} s. Counting it as no_answer.", "listen")
             msg = {"answer": "no_answer", "transcript": ""}
         inc.pending = None
@@ -545,13 +571,11 @@ class Agent:
         while not inc.heard.empty():
             inc.heard.get_nowait()
         inc.pending = OFFER_CALL_SCRIPT
+        inc.ask_id = self._next_ask_id()
         await self.send({"type": "say", "script_id": OFFER_CALL_SCRIPT, "text": SCRIPTS[OFFER_CALL_SCRIPT],
-                         "listen_s": self.settings.listen_s})
+                         "listen_s": self.settings.listen_s, "ask_id": inc.ask_id})
         wait = self.settings.listen_s + self.settings.heard_grace_s
-        try:
-            msg = await asyncio.wait_for(inc.heard.get(), wait)
-        except TimeoutError:
-            msg = {"answer": "no_answer", "transcript": ""}
+        msg = await self._await_answer(inc, wait) or {"answer": "no_answer", "transcript": ""}
         inc.pending = None
         text = (msg.get("transcript") or "").lower().replace("’", "'")
         if CALL_NO.search(text) or (not text and msg.get("answer") == "ok"):

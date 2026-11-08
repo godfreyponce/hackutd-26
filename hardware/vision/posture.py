@@ -34,6 +34,9 @@ FALL_COOLDOWN_S = 20     # at most one fall_hint per 20 s
 FALL_STILL_S = 5         # lying + still this long sends fall_hint even without a seen fall
 SIGN_HOLD_S = 3.0        # a hand sign must be held this long (Rafael: 3 s, so a stretch or a scratch never counts)
 SIGN_COOLDOWN_S = 10
+SIGN_KP_MIN = 0.25       # keypoint confidence bar for the hand signs (arms over the head blur the wrists)
+SIGN_VOTE_S = 1.0        # a sign counts while it wins >= 40 % of the frames of the last second ...
+SIGN_GRACE_S = 0.8       # ... and survives this long without a vote (jitter must not restart the 3 s)
 SHAKE_PX = 6.0           # whole-frame shift (px at 320x180) that counts as a shake
 SHAKE_FRAMES = 4         # ... for this many frames in the last 10
 DARK_LEVEL = 35          # mean brightness (0-255) below this = dark
@@ -119,22 +122,25 @@ def hand_sign(k):
     """X: both forearms crossed over the head (help, needs two hands).
     O: one or both hands on top of the head, elbow raised (okay).
     Pose keypoints have no fingers, so both signs are whole-arm signs. Front view (wall mount)."""
-    seen = lambda *ids: all(k[i, 2] > KP_MIN for i in ids)  # noqa: E731
-    if not seen(NOSE, L_SH, R_SH):
+    # Arms over the head hide the face and blur the wrists, so the sign keypoints use a lower confidence bar.
+    seen = lambda *ids: all(k[i, 2] > SIGN_KP_MIN for i in ids)  # noqa: E731
+    if not seen(L_SH, R_SH):
         return None
-    nose, ls, rs = k[NOSE, :2], k[L_SH, :2], k[R_SH, :2]
+    ls, rs = k[L_SH, :2], k[R_SH, :2]
     s = max(abs(ls[0] - rs[0]), 1.0)  # shoulder width: the body's own scale
-    if seen(L_WR, R_WR, L_EL, R_EL):
+    # head height: the nose, or (face hidden by the arms) half a shoulder width above the shoulders
+    top = k[NOSE, 1] if k[NOSE, 2] > SIGN_KP_MIN else min(ls[1], rs[1]) - 0.5 * s
+    cx = k[NOSE, 0] if k[NOSE, 2] > SIGN_KP_MIN else (ls[0] + rs[0]) / 2
+    if seen(L_WR, R_WR):
         lw, rw = k[L_WR, :2], k[R_WR, :2]
-        both_up = lw[1] < nose[1] and rw[1] < nose[1] and k[L_EL, 1] < ls[1] and k[R_EL, 1] < rs[1]
-        crossed = (lw[0] - rw[0]) * (ls[0] - rs[0]) < 0 and abs(lw[0] - rw[0]) > 0.1 * s
+        both_up = lw[1] < top and rw[1] < top
+        crossed = (lw[0] - rw[0]) * (ls[0] - rs[0]) < 0 and abs(lw[0] - rw[0]) > 0.08 * s
         if both_up and crossed:
             return "X"
-    for w, e, sh in ((L_WR, L_EL, ls), (R_WR, R_EL, rs)):
-        if seen(w, e):
+    for w in (L_WR, R_WR):
+        if seen(w):
             wr = k[w, :2]
-            on_head = nose[1] - 1.0 * s < wr[1] < nose[1] - 0.1 * s and abs(wr[0] - nose[0]) < 0.75 * s
-            if on_head and k[e, 1] < sh[1]:
+            if top - 1.3 * s < wr[1] < top and abs(wr[0] - cx) < 0.7 * s:
                 return "O"
     return None
 
@@ -269,6 +275,7 @@ def main():
         upright_until = last_fall = last_sign = last_shake = 0.0
         down_since = None                       # someone lying + still since
         sign, sign_since = None, 0.0           # hand sign being held, and since when
+        sign_votes, sign_seen, last_dbg = deque(), 0.0, 0.0
         prev_gray, dark, people_sent = None, False, None
         fps_t, fps_n, fps = time.time(), 0, 0.0
 
@@ -316,10 +323,26 @@ def main():
                 people_sent = (people, down)
 
             signs = [hand_sign(k) for k in kpts]
-            now_sign = "X" if "X" in signs else "O" if "O" in signs else None  # X (help) wins
-            if now_sign != sign:
-                sign, sign_since = now_sign, now
-            held = now - sign_since
+            sign_votes.append((now, "X" if "X" in signs else "O" if "O" in signs else None))
+            while now - sign_votes[0][0] > SIGN_VOTE_S:
+                sign_votes.popleft()
+            votes_now = Counter(v for _, v in sign_votes)
+            cand = next((c for c in ("X", "O") if votes_now[c] >= 0.4 * len(sign_votes)), None)  # X (help) wins
+            if cand:
+                sign_seen = now
+                if cand != sign:
+                    sign, sign_since = cand, now
+            elif sign and now - sign_seen > SIGN_GRACE_S:
+                sign = None
+            held = now - sign_since if sign else 0.0
+            if os.environ.get("SIGN_DEBUG") and now - last_dbg > 0.5 and len(kpts):  # tune on the wall: camera.log
+                k = kpts[int(np.argmax(kpts[:, :, 2].sum(1)))]
+                sw = max(abs(k[L_SH, 0] - k[R_SH, 0]), 1.0)
+                print(f"SIGN frame={signs} votes={dict(votes_now)} sign={sign} held={held:.1f} | conf nose/lw/rw/le/re="
+                    f"{k[NOSE, 2]:.2f}/{k[L_WR, 2]:.2f}/{k[R_WR, 2]:.2f}/{k[L_EL, 2]:.2f}/{k[R_EL, 2]:.2f} | "
+                    f"wrists above shoulders (shoulder widths) L={(k[L_SH, 1] - k[L_WR, 1]) / sw:.2f} "
+                    f"R={(k[R_SH, 1] - k[R_WR, 1]) / sw:.2f} | wrist gap x={(k[L_WR, 0] - k[R_WR, 0]) / sw:+.2f}", file=sys.stderr, flush=True)
+                last_dbg = now
             if sign and held >= SIGN_HOLD_S and now - last_sign > SIGN_COOLDOWN_S:
                 hub.send({"type": SIGN_EVENTS[sign], "sign": sign, "source": "camera"})
                 last_sign = now

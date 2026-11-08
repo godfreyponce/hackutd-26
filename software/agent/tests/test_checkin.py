@@ -675,3 +675,10 @@ def test_alarm_call_says_what_happened(trigger, answers, words):
     for w in words:
         assert w in text, text
     assert "I repeat." in text and "911" in text
+
+
+def test_late_answer_to_an_earlier_question_is_ignored():
+    late = {"type": "heard", "answer": "no_answer", "transcript": "", "ask_id": -1}
+    bus, _ = go([{"answer": "ok", "before": [late]}], [STILL, FALL_HINT])
+    assert bus.checkins()[1] == ("ok", 1)
+    assert any("Late answer" in r["text"] for r in bus.trace("VERIFY"))

@@ -38,7 +38,7 @@ CLOUD_URL = "https://integrate.api.nvidia.com/v1"
 CLOUD_MODEL = os.environ.get("ASSISTANT_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
 LOCAL_URL = os.environ.get("AGENT_OLLAMA_URL", "http://localhost:11434/v1")
 LOCAL_MODEL = os.environ.get("ASSISTANT_LOCAL_MODEL", os.environ.get("AGENT_LOCAL_MODEL", "nemotron-3-nano:4b"))
-NET_EVERY_S, SYSTEM_EVERY_S = 10, 5
+NET_EVERY_S, SYSTEM_EVERY_S, NET_DOWN_AFTER = 10, 5, 3
 SERVICES = ("hub", "agent", "voice", "camera", "sensors", "ring", "radio", "scream", "demo")
 ASSISTANT_PROMPT = """You are LAND, a home safety box in the user's home in Richardson, Texas. The person in the room
 is talking to you. Answer in at most 3 short spoken sentences, plain words, no lists, no markdown.
@@ -110,14 +110,17 @@ class Runner:
         await self.net_status()
 
     async def watch_net(self):
-        """Real internet check: an HTTPS request to the Nemotron API host every NET_EVERY_S."""
+        """Real internet check: an HTTPS request to the Nemotron API host every NET_EVERY_S.
+        A phone hotspot drops single requests, so it takes NET_DOWN_AFTER failures in a row to call it down."""
         import requests
+        fails = 0
         while True:
             try:
-                await asyncio.to_thread(requests.head, "https://integrate.api.nvidia.com", timeout=4)
-                up = True
+                await asyncio.to_thread(requests.head, "https://integrate.api.nvidia.com", timeout=8)
+                fails = 0
             except requests.RequestException:
-                up = False
+                fails += 1
+            up = fails < NET_DOWN_AFTER
             if up != self.internet:
                 self.internet = up
                 await self.say("internet is back" if up else "INTERNET LOST: switching to the on-board models")

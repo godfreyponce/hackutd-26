@@ -49,8 +49,10 @@ class VoiceService:
             # Queued, so the tone starts after the line being spoken (the agent's last words).
             self.queue.put_nowait(msg)
         elif msg.get("type") == "net" and hasattr(self.engine, "online"):
-            self.engine.online = msg.get("online") is not False
-            self.log(f"internet {'up: cloud voice' if self.engine.online else 'down: on-board voice'}")
+            online = msg.get("online") is not False
+            if online != self.engine.online:
+                self.log(f"internet {'up: cloud voice' if online else 'down: on-board voice'}")
+            self.engine.online = online
         elif msg.get("type") == "reset":
             self.resets += 1
             while not self.queue.empty():
@@ -85,6 +87,8 @@ class VoiceService:
             if not listen_s or self.resets != reset_mark:
                 continue
             heard = {"type": "heard", "answer": classify(transcript), "transcript": transcript}
+            if msg.get("ask_id") is not None:  # lets the agent drop a late answer to an older question
+                heard["ask_id"] = msg["ask_id"]
             self.log(f"HEARD {heard['answer']}: {transcript!r}")
             await ws.send(json.dumps(heard))
 
