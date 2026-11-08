@@ -211,15 +211,18 @@ def main():
 
             # --- scene: camera shake (earthquake cross-check) and lights ---
             gray = cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), (320, 180)).astype(np.float32)
-            if prev_gray is not None:
-                (dx, dy), _ = cv2.phaseCorrelate(prev_gray, gray)
-                shifts.append(math.hypot(dx, dy))
+            brightness = float(gray.mean())
+            textured = brightness >= DARK_LEVEL and float(gray.std()) > 12  # black/flat frames give random shifts
+            if prev_gray is not None and textured:
+                (dx, dy), response = cv2.phaseCorrelate(prev_gray, gray)
+                shifts.append(math.hypot(dx, dy) if response > 0.2 else 0.0)  # ignore low-confidence matches
+            elif not textured:
+                shifts.clear()
             prev_gray = gray
             shaking = sum(s > SHAKE_PX for s in shifts) >= SHAKE_FRAMES
             if shaking and now - last_shake > 10:
                 hub.send({"type": "camera_shake", "frames": int(sum(s > SHAKE_PX for s in shifts))})
                 last_shake = now
-            brightness = float(gray.mean())
             if (brightness < DARK_LEVEL) != dark:
                 dark = brightness < DARK_LEVEL
                 hub.send({"type": "lights", "state": "off" if dark else "on", "level": round(brightness)})
