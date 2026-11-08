@@ -1,7 +1,8 @@
-"""Write a demo SAME alert as audio, only for a cable into our own decoder.
+"""Write a demo SAME alert as audio, for our own decoder and the box speaker.
 
-Never transmit it and never play it out loud: 47 CFR 11.45 bans simulated
-EAS tones. Station HACKDEMO marks it as ours.
+Never transmit it over the air: 47 CFR 11.45 bans transmitting simulated EAS
+tones. The demo plays it on the box speaker in the room (Rafael, 2026-11-08).
+Station HACKDEMO marks it as ours, so the box always says it is a demo.
 
     python -m software.same.make_same OUT.wav [--header 'ZCZC-...-HACKDEMO-']
 

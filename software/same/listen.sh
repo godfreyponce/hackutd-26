@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Decode SAME alerts from audio and send them to the hub (HUB_URL).
-# Receive only: never transmit, never play SAME audio out loud (47 CFR 11.45).
+# Receive only: never transmit SAME audio over the air (47 CFR 11.45). The demo plays it on the box speaker only.
 #
 #   listen.sh [--device DEV]   Pi: USB audio input (default: first USB card in `arecord -l`)
 #   listen.sh --file AUDIO     decode a WAV or any file sox reads

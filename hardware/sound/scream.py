@@ -37,7 +37,7 @@ class Mute:
     """Deaf while the box speaks or a check-in is open."""
 
     def __init__(self):
-        self.until, self.open = 0.0, False
+        self.until, self.open, self.radio = 0.0, False, False
 
     def on(self, m):
         t = m.get("type")
@@ -47,11 +47,15 @@ class Mute:
             self.open = m.get("state") in ("asking", "no_answer", "alarm", "help")
             if m.get("state") == "alarm":
                 self.until = max(self.until, time.monotonic() + 6)  # siren
+        elif t == "radio_live":  # NOAA audio on the box speaker
+            self.radio = m.get("on") is True
+        elif t == "speaker":  # anything else the box plays, e.g. the demo alert recording
+            self.until = max(self.until, time.monotonic() + float(m.get("busy_s") or 0))
         elif t == "reset":
-            self.until, self.open = 0.0, False
+            self.until, self.open, self.radio = 0.0, False, False
 
     def deaf(self):
-        return self.open or time.monotonic() < self.until
+        return self.open or self.radio or time.monotonic() < self.until
 
 
 async def hub(url, out, mute, dry):

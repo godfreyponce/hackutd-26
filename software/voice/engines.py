@@ -40,6 +40,9 @@ TOKENS_PER_SECOND = 6.5  # Moonshine's own default (core/moonshine-model.cpp); s
 
 ELEVEN_URL = "https://api.elevenlabs.io/v1"
 ELEVEN_VOICE = os.environ.get("ELEVEN_VOICE_ID", "ljX1ZrXuDIIRVcmiVSyR")  # picked by Godfrey from the Voice Library
+# Optional second voice for "ask the box" answers only (script_id "assistant"), e.g. the Rocky-style persona.
+# Check-in and alarm lines always use ELEVEN_VOICE.
+ASSISTANT_VOICE = os.environ.get("ELEVEN_ASSISTANT_VOICE_ID") or ELEVEN_VOICE
 ELEVEN_TTS_MODEL = "eleven_v4_turbo"
 ELEVEN_STT_MODEL = "scribe_v2"
 ELEVEN_TIMEOUT_S = 10  # a guess: long enough for a short line, short enough to fall back fast
@@ -257,7 +260,7 @@ class ElevenLabsEngine:
         tag = ELEVEN_TAGS.get(script_id)
         try:
             r = self.http.post(
-                f"{ELEVEN_URL}/text-to-speech/{ELEVEN_VOICE}",
+                f"{ELEVEN_URL}/text-to-speech/{ASSISTANT_VOICE if script_id == 'assistant' else ELEVEN_VOICE}",
                 params={"output_format": f"pcm_{SAMPLE_RATE}"},
                 json={"text": f"{tag} {text}" if tag else text, "model_id": ELEVEN_TTS_MODEL},
                 timeout=ELEVEN_TIMEOUT_S,

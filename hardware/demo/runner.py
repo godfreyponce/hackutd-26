@@ -1,8 +1,9 @@
 """Demo runner: runs REAL pipelines when the demo page asks, and narrates them on the bus.
 
 Bus in ({"type":"demo", ...}):
-  {"cmd":"radio_eqw"}            demo EQW recording -> real SAME decoder (multimon-ng -> same_to_alert) -> hub alert.
-                                 A file into the decoder: nothing is played out loud or transmitted (47 CFR 11.45).
+  {"cmd":"radio_eqw"}            demo EQW recording, played on the box speaker AND fed in real time to the real SAME
+                                 decoder (multimon-ng -> same_to_alert) -> hub alert. Never transmitted (47 CFR 11.45).
+  {"cmd":"radio_live","on":true} live NOAA audio from the antenna on the box speaker (hardware/radio/tap.py)
   {"cmd":"volume","value":0.8}   box speaker volume (PipeWire default sink), 0.0-1.5
   {"cmd":"mic_test","seconds":5} record from the box mics through the SAME path as a check-in answer, save it for
                                  playback (/demo/mic_test.wav), transcribe (ElevenLabs, Moonshine fallback), classify
@@ -31,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 URL = os.environ.get("HUB_URL", "ws://localhost:8765")
 MIC_WAV = ROOT / "software/web/demo/mic_test.wav"
-NOISY = {"indoor", "pir", "presence", "people", "heartbeat", "demo_log", "assistant", "mic_test", "demo", "net",
+NOISY = {"shake", "radio_live", "speaker", "indoor", "pir", "presence", "people", "heartbeat", "demo_log", "assistant", "mic_test", "demo", "net",
          "system", "engine", "demo_state"}
 CLOUD_URL = "https://integrate.api.nvidia.com/v1"
 CLOUD_MODEL = os.environ.get("ASSISTANT_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
@@ -41,10 +42,34 @@ NET_EVERY_S, SYSTEM_EVERY_S = 10, 5
 SERVICES = ("hub", "agent", "voice", "camera", "sensors", "ring", "radio", "scream", "demo")
 ASSISTANT_PROMPT = """You are LAND, a home safety box in the user's home in Richardson, Texas. The person in the room
 is talking to you. Answer in at most 3 short spoken sentences, plain words, no lists, no markdown.
-Use ONLY the event log you are given (official alerts heard on NOAA weather radio, sensor events, the check-in,
-the camera). If the log does not say, say you have not heard anything about it. Never invent alerts or numbers.
+Facts come ONLY from the event log (official alerts heard on NOAA Weather Radio 162.400 MHz, sensor events, the
+check-in, the camera). For where, when and who: use the alert's area, issued, expires and sender fields.
+Advice comes ONLY from the safety sheet. If neither says, say you do not know. Never invent alerts, places or numbers.
 If someone may be in danger, tell them to call 911 themselves; you never call emergency services.
 If an alert has demo=true, say it is a demo, not a real alert."""
+# Rafael's idea, Q&A only (the check-in lines stay plain): a friendly alien engineer still learning English.
+STYLES = {
+    "plain": "",
+    "rocky": """Speak like a friendly alien engineer who is still learning English: short sentences, skip small
+words like "the", "a", "is" and "are", say a word three times when you feel strongly ("good good good"), and end
+every question you ask with the word "question" (for example "You safe, question?"). Facts and safety steps stay
+exactly right and easy to follow.""",
+}
+GUIDE = ROOT / "hardware/demo/safety_guide.md"
+# events that bring a section of the safety sheet even without an alert code
+GUIDE_BY_EVENT = {"quake": "QUAKE", "heat": "HEAT", "fall_hint": "FALL", "scream": "FALL"}
+
+
+def guide_for(events):
+    """GENERAL plus the safety-sheet sections that match what the box heard."""
+    want = {"GENERAL"} | {e.get("code") for e in events if e.get("type") == "alert"} \
+        | {GUIDE_BY_EVENT[e["type"]] for e in events if e.get("type") in GUIDE_BY_EVENT}
+    out = []
+    for part in GUIDE.read_text(encoding="utf-8").split("\n## ")[1:]:
+        head, _, body = part.partition("\n")
+        if want & set(head.split()):
+            out.append(body.strip())
+    return "\n".join(out)
 
 
 def log(*a):
@@ -54,7 +79,7 @@ def log(*a):
 class Runner:
     def __init__(self, ws):
         self.ws, self.events, self.latest, self.stt = ws, deque(maxlen=60), {}, None
-        self.internet, self.cut = True, False
+        self.internet, self.cut, self.style = True, False, "rocky"
 
     async def send(self, msg):
         await self.ws.send(json.dumps(msg))
@@ -132,23 +157,61 @@ class Runner:
 
     # ---- radio ----
     async def radio_eqw(self, m):
-        await self.say("RADIO: NOAA weather radio 162.400 MHz, decoding a SAME header (demo recording)")
-        proc = await asyncio.create_subprocess_exec(
-            str(ROOT / "software/same/listen.sh"), "--file", str(ROOT / "software/same/demo_eqw.wav"),
-            cwd=ROOT, env={**os.environ, "HUB_URL": URL}, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-        async for raw in proc.stdout:
+        """The recorded EQW alert as if it aired now: live radio off, the recording plays on the box speaker and
+        goes into the SAME decoder in real time, so the alert fires when the header ends, like a real broadcast.
+        A speaker in the room, never a transmitter (47 CFR 11.45 covers transmitting EAS tones)."""
+        import wave
+        # Made fresh, so the header's issue time is now (the box can answer "when?" correctly).
+        wav = Path.home() / ".cache/land/demo_eqw_now.wav"
+        wav.parent.mkdir(parents=True, exist_ok=True)
+        r = await asyncio.to_thread(subprocess.run, [sys.executable, "-m", "software.same.make_same", str(wav)],
+                                    cwd=ROOT, capture_output=True, text=True)
+        if r.returncode:  # report, then fall back to the recording in the repo
+            await self.say(f"fresh alert not made ({r.stderr.strip()[-160:]}); using the stored recording")
+            wav = ROOT / "software/same/demo_eqw.wav"
+        with wave.open(str(wav)) as w:
+            pcm, secs = w.readframes(w.getnframes()), w.getnframes() / w.getframerate()
+        await self.send({"type": "radio_live", "on": False})
+        await self.send({"type": "speaker", "busy_s": round(secs + 1, 1), "what": "demo alert recording"})
+        await self.say("RADIO: emergency broadcast on NOAA 162.400 MHz (demo recording) -> SAME decoder, live")
+        player = await asyncio.create_subprocess_exec("aplay", "-q", str(wav))
+        dec = await asyncio.create_subprocess_exec(
+            "bash", "-o", "pipefail", "-c", "multimon-ng -q -t raw -a EAS - | software/same/listen.sh --stdin",
+            cwd=ROOT, env={**os.environ, "HUB_URL": URL}, stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+
+        async def feed():  # 0.1 s of audio every 0.1 s: the decoder hears it at broadcast speed
+            step = 22050 * 2 // 10
+            for i in range(0, len(pcm), step):
+                dec.stdin.write(pcm[i:i + step])
+                await dec.stdin.drain()
+                await asyncio.sleep(0.1)
+            dec.stdin.close()
+
+        feeder = asyncio.create_task(feed())
+        async for raw in dec.stdout:
             line = raw.decode(errors="replace").strip()
             if line.startswith("{"):
                 try:
                     a = json.loads(line)
-                    await self.say(f"DECODED: {a.get('code')} {a.get('event')} for {a.get('area')} (station {a.get('station')}) -> hub alert")
+                    await self.say(f"DECODED: {a.get('code')} {a.get('event')} for {a.get('area')} "
+                                   f"(station {a.get('station')}) -> hub alert")
                     continue
                 except ValueError:
                     pass
             if line:
                 await self.say(f"decoder: {line[:160]}")
-        if (rc := await proc.wait()) != 0:
+        await feeder
+        if (rc := await dec.wait()) != 0:
             await self.say(f"decoder exited with code {rc}")
+        if (rc := await player.wait()) != 0:
+            await self.say(f"speaker playback exited with code {rc}")
+
+    async def radio_live(self, m):
+        """Live NOAA audio on the box speaker: hardware/radio/tap.py (inside land-radio) plays it."""
+        on = m.get("on") is not False
+        await self.send({"type": "radio_live", "on": on})
+        await self.say("RADIO LIVE: NOAA 162.400 MHz off our antenna, on the box speaker" if on else "radio live audio off")
 
     # ---- speaker ----
     async def volume(self, m):
@@ -207,11 +270,14 @@ class Runner:
     async def _chat(self, base_url, key, model, question, events, timeout):
         from openai import AsyncOpenAI
         ctx = {"recent_events_oldest_first": events, "latest_sensor_state": self.latest}
+        system = ASSISTANT_PROMPT + ("\n" + STYLES[self.style] if STYLES[self.style] else "")
+        guide = guide_for(list(self.events))
         client = AsyncOpenAI(base_url=base_url, api_key=key, max_retries=0)
         r = await asyncio.wait_for(client.chat.completions.create(
             model=model, temperature=0.3, max_tokens=160,
-            messages=[{"role": "system", "content": ASSISTANT_PROMPT},
-                      {"role": "user", "content": f"Event log JSON:\n{json.dumps(ctx)}\n\nQuestion: {question}"}],
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": f"Event log JSON:\n{json.dumps(ctx)}\n\nSafety sheet:\n{guide}"
+                                                  f"\n\nQuestion: {question}"}],
             extra_body={"chat_template_kwargs": {"enable_thinking": False}, "reasoning_effort": "none"}), timeout)
         return (r.choices[0].message.content or "").strip()
 
@@ -237,6 +303,10 @@ class Runner:
         await self.send({"type": "assistant", "question": question, "answer": text, "engine": engine})
         await self.send({"type": "say", "script_id": "assistant", "text": text})
 
+    async def style(self, m):
+        self.style = m.get("value") if m.get("value") in STYLES else "plain"
+        await self.send({"type": "demo_state", "style": self.style})
+
     async def ask(self, m):
         q = str(m.get("text", "")).strip()
         if q:
@@ -254,7 +324,7 @@ class Runner:
             await self.answer(q)
 
 
-COMMANDS = ("radio_eqw", "volume", "mic_test", "ask", "ask_voice", "net")
+COMMANDS = ("radio_eqw", "radio_live", "volume", "mic_test", "ask", "ask_voice", "net", "style")
 
 
 async def main():

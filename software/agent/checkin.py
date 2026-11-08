@@ -7,15 +7,16 @@ text. The planner can add steps but can never skip an alarm the rule demands.
 import asyncio
 import json
 import logging
+import re
 import time
 from datetime import datetime
 
 from . import rule
 from .handoff import HandoffWriter, build_facts
 from .planner import LLMPlanner, PlannerUnavailable, ScriptPlanner
-from .scripts import (ALARM_CALL_TEXT, ALERT_ASK_SCRIPT, ALERT_DEMO_SCRIPT, ASK_SCRIPTS, DEMO_TEXT,
-                      ESCALATE_SCRIPT, GESTURE_ASK_SCRIPT, REPLY_SCRIPTS, RETRY_SCRIPTS, SCRIPTS, SMS_TEMPLATES,
-                      STANDUP_SCRIPT)
+from .scripts import (ALARM_CALL_TEXT, ALERT_ASK_SCRIPT, ALERT_DEMO_SCRIPT, ASK_SCRIPTS, CALL_DECLINED_SCRIPT,
+                      CALL_NOW_SCRIPT, DEMO_TEXT, ESCALATE_SCRIPT, GESTURE_ASK_SCRIPT, OFFER_CALL_SCRIPT,
+                      REPLY_SCRIPTS, RETRY_SCRIPTS, SCRIPTS, SMS_TEMPLATES, STANDUP_SCRIPT)
 
 log = logging.getLogger("agent")
 
@@ -25,6 +26,11 @@ ALERT_TRIGGER = ("EQW", "emergency")
 # of any check-in start is ignored, so the person is asked once (owner, issue #36).
 # A help sign check-in does not start this window (owner, issue #46).
 ALERT_QUIET_S = 300
+# Camera hand signs answer the open question: O (hand on head) = ok, X (arms crossed over the head) = help.
+SIGN_ANSWERS = {"ok_gesture": ("ok", "O sign"), "help_gesture": ("help", "X sign")}
+# The "call emergency services?" answer. "no" wins, so "please don't call" is a no.
+CALL_NO = re.compile(r"\b(no|nope|nah|don'?t|do not|not now|cancel|stop)\b")
+CALL_YES = re.compile(r"\b(yes|yeah|yep|yup|sure|please|call|do it|okay|ok|help)\b")
 
 SYSTEM_PROMPT = f"""You are the planner inside a home safety box. After an event (an earthquake, a person who stopped moving, or a help sign seen by the camera) you run a voice check-in by calling tools.
 Rules you cannot change:
@@ -88,6 +94,7 @@ class Incident:
         self.outcome = None  # ok | clear | no_alarm | alarm
         self.presence_checked = False
         self.run_answered = False
+        self.call_offered = False
 
     @property
     def open(self):
@@ -139,7 +146,14 @@ class Agent:
 
     async def handle(self, msg):
         kind = msg.get("type")
-        if kind == "presence":
+        inc = self.incident
+        if kind in SIGN_ANSWERS and inc and inc.pending:
+            answer, sign = SIGN_ANSWERS[kind]
+            await self.trace("VERIFY", f"Camera: {sign} held 3 s. Taking it as the answer: {answer}.", "listen")
+            inc.heard.put_nowait({"answer": answer, "transcript": "", "sign": sign})
+        elif kind == "ok_gesture":
+            pass  # an O sign with no open question: nothing to answer
+        elif kind == "presence":
             await self._on_presence(msg.get("state"))
         elif kind in ("quake", "fall_hint", "help_gesture", "heat", "scream"):
             self._start_checkin(kind, msg.get("peak_g"))
@@ -288,6 +302,8 @@ class Agent:
         if isinstance(chain[0], LLMPlanner):
             await self._follow_up(chain[0], messages, inc, turn)
         await self.trace("VERIFY", self._decision_text(inc), "log_decision")
+        if inc.answers and inc.answers[-1] == "help" and not inc.call_offered:
+            await self._offer_call(inc)
         if inc.standup_pending and inc.open:
             inc.standup_pending = False
             self._launch("standup")
@@ -515,6 +531,48 @@ class Agent:
         await self.trace("VERIFY", f"Hand-off note by {h.by.capitalize()}: {h.note} Contact first: {contact['name']} "
                          f"({contact['role']}).", "write_handoff")
         await self.trace("VERIFY", f"Why by {h.why_by.capitalize()}: {' '.join(h.why)}", "explain_alarm")
+
+    async def _offer_call(self, inc):
+        """After a help answer: ask, then ring the stand-in phone (never 911). Yes, X sign or silence = call."""
+        inc.call_offered = True
+        while not inc.heard.empty():
+            inc.heard.get_nowait()
+        inc.pending = OFFER_CALL_SCRIPT
+        await self.send({"type": "say", "script_id": OFFER_CALL_SCRIPT, "text": SCRIPTS[OFFER_CALL_SCRIPT],
+                         "listen_s": self.settings.listen_s})
+        wait = self.settings.listen_s + self.settings.heard_grace_s
+        try:
+            msg = await asyncio.wait_for(inc.heard.get(), wait)
+        except TimeoutError:
+            msg = {"answer": "no_answer", "transcript": ""}
+        inc.pending = None
+        text = (msg.get("transcript") or "").lower().replace("’", "'")
+        if CALL_NO.search(text) or (not text and msg.get("answer") == "ok"):
+            await self.trace("VERIFY", f"Call offer: declined ({text or msg.get('sign') or 'ok'}). No call.", "call")
+            return await self.send({"type": "say", "script_id": CALL_DECLINED_SCRIPT, "text": SCRIPTS[CALL_DECLINED_SCRIPT]})
+        why = "yes" if CALL_YES.search(text) or msg.get("answer") == "help" else "no answer after asking for help"
+        await self.trace("VERIFY", f"Call offer: {why}. Calling the stand-in phone (never 911).", "call")
+        await self.send({"type": "say", "script_id": CALL_NOW_SCRIPT, "text": SCRIPTS[CALL_NOW_SCRIPT]})
+        summary = self._call_summary(inc)
+        await self.send({"type": "call", "state": "dialing", "summary": summary})
+        how = await self.notifier.call(summary)
+        await self.send({"type": "call", "state": "failed" if ("failed" in how or how.startswith("MOCK")) else "placed",
+                         "detail": how, "summary": summary})
+        await self.trace("VERIFY", f"Call: {how}", "call")
+
+    def _call_summary(self, inc):
+        """What LAND says first on the call: 1-2 sentences, only facts the box has, then the hand-off."""
+        alert = inc.alert or self.alert
+        event = {"quake": "The box felt strong shaking", "fall_hint": "The camera saw a person fall and lie still",
+                 "heat": "The room got dangerously hot", "scream": "The microphones heard a scream",
+                 "help_gesture": "The person signaled for help"}.get(inc.trigger, "An emergency alert came in")
+        if alert and alert.get("code") == "EQW":
+            event += " during an earthquake warning" + (" (a demo alert)" if alert.get("demo") else "")
+        silent = inc.answers.count("no_answer")
+        after = f", and the person did not answer {silent} check-ins" if silent else ""
+        now = "They are now up and asking for help" if inc.stood_up else "They asked for help"
+        return (f"This is LAND, a home safety box, calling for the person at home. {event}{after}. {now}. "
+                "Handing the call to the homeowner.")
 
     async def _notify_contact(self, inc, turn, args):
         tid = args.get("template_id")

@@ -3,7 +3,8 @@
 Wiring: hardware/WIRING.md. I2C bus 1: MPU-6050 0x68, BMP280 0x76. PIR DO on GPIO17.
 
 Events (contract #19 + the proposal on #19):
-  {"type":"quake","peak_g":0.42}                       existing contract; the agent starts a check-in
+  {"type":"shake","g":0.31}                            live, every SHAKE_EVERY_S while shaking (the ring's red bar)
+  {"type":"quake","peak_g":0.42,"duration_s":6.1}      when the shaking STOPS; the agent then starts a check-in
   {"type":"indoor","temp_f":73.4,"temp_c":23.0,"pressure_hpa":1000.1}   every INDOOR_EVERY_S
   {"type":"pir","motion":true}                          rising edge of the PIR output
   {"type":"heat","temp_f":92.1,"reason":"over 90 F"}    too hot, or a fast rise (heater, fire); the agent starts a check-in
@@ -25,7 +26,9 @@ SAMPLE_HZ = 100
 QUAKE_G = 0.15          # deviation from the calibrated resting |a| that counts as shaking
 QUAKE_SAMPLES = 5       # ... this many samples over the threshold within QUAKE_WINDOW_S
 QUAKE_WINDOW_S = 0.5
-QUAKE_REPORT_S = 1.5    # collect the peak for this long after the trigger
+QUAKE_QUIET_S = 2.0     # shaking is over after this long with no sample over QUAKE_G
+QUAKE_MAX_S = 60        # ... or after this long anyway (a vibrating table must not hold the check-in back)
+SHAKE_EVERY_S = 0.2
 QUAKE_COOLDOWN_S = 15
 INDOOR_EVERY_S = 15
 PIR_COOLDOWN_S = 3
@@ -131,10 +134,23 @@ async def main():
         if dev > QUAKE_G:
             hits = [t for t in hits if now - t < QUAKE_WINDOW_S] + [now]
             if len(hits) >= QUAKE_SAMPLES and now - last_quake > QUAKE_COOLDOWN_S:
-                peak, end = dev, now + QUAKE_REPORT_S
-                while time.monotonic() < end:
-                    peak = max(peak, await loop.run_in_executor(None, mpu.deviation))
-                emit({"type": "quake", "peak_g": round(peak, 2)})
+                # Shaking: stream the level for the ring until it stops, then send the quake.
+                start = last_over = now
+                peak = window = dev
+                next_shake = now
+                while True:
+                    t = time.monotonic()
+                    d = await loop.run_in_executor(None, mpu.deviation)
+                    peak, window = max(peak, d), max(window, d)
+                    if d > QUAKE_G:
+                        last_over = t
+                    if t >= next_shake:
+                        emit({"type": "shake", "g": round(window, 2)})
+                        window, next_shake = 0.0, t + SHAKE_EVERY_S
+                    if t - last_over > QUAKE_QUIET_S or t - start > QUAKE_MAX_S:
+                        break
+                emit({"type": "shake", "g": 0})
+                emit({"type": "quake", "peak_g": round(peak, 2), "duration_s": round(last_over - start, 1)})
                 last_quake, hits = time.monotonic(), []
         if now >= next_heat:
             f = bmp.read()[0] * 9 / 5 + 32

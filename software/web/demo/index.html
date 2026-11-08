@@ -80,6 +80,7 @@
   .svc { font:12px var(--mono); padding:3px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
   .svc.active { color:var(--ok); border-color:#22c55e88; } .svc.down { color:#fff; background:var(--bad); border-color:var(--bad); }
   button.cut { border-color:var(--warn); } button.cut.on { background:var(--warn); color:#111; } button.cut.on small, button.cut.on .tag { color:#111; border-color:#111; }
+  #radioLive.on { background:#eab308; color:#111; } #radioLive.on small, #radioLive.on .tag { color:#111; border-color:#111; }
   @media (prefers-reduced-motion: reduce) { .node, .eng .c { transition:none; } }
 </style>
 </head>
@@ -91,6 +92,7 @@
   <span id="temp" class="pill">indoor --</span>
   <span id="power" class="pill">power: mains</span>
   <span id="net" class="pill">internet: ?</span>
+  <span id="callPill" class="pill">call: none</span>
 </header>
 
 <div id="map" aria-label="System map: each part lights up when an event passes through it">
@@ -164,6 +166,7 @@
         <button type="button" id="askVoice">🎤 Ask by voice</button>
       </form>
       <div id="answer" class="answer" aria-live="polite"></div>
+      <label class="vrow note"><input type="checkbox" id="rocky" checked style="flex:0"> Rocky talk (answers only; check-in lines stay plain English)</label>
     </div>
     <div class="group"><b>Mic test: hear what the box hears</b>
       <button type="button" id="micTest">🎙 Record 5 s and transcribe<small>same mics, same speech-to-text, same classifier as a check-in</small></button>
@@ -177,10 +180,12 @@
   </div>
   <div class="groups">
     <div class="group"><b>Natural disaster</b>
-      <button class="big" data-cmd="radio_eqw">📻 Radio: earthquake warning received<span class="tag real">real decoder</span>
-        <small>NOAA SAME signal → multimon-ng → alert → whole system reacts</small></button>
-      <button data-send='{"type":"quake","peak_g":0.82}'>🌎 Earthquake shaking<span class="tag sim">simulated</span>
-        <small>same event the accelerometer sends (shake the box for real)</small></button>
+      <button id="radioLive" type="button">📻 Live radio: play NOAA 162.400 on the box<span class="tag real">live antenna</span>
+        <small>what the antenna hears right now, on the box speaker</small></button>
+      <button class="big" data-cmd="radio_eqw">🚨 Emergency broadcast: earthquake warning<span class="tag real">real decoder</span>
+        <small>live radio cuts, the alert plays on the box and the SAME decoder reads it as it airs</small></button>
+      <button data-seq="shake">🌎 Earthquake shaking<span class="tag sim">simulated</span>
+        <small>4 s of shaking (ring fills red by strength), then the check-in (or shake the box for real)</small></button>
       <button data-seq="heat">🔥 Room overheating<span class="tag sim">simulated</span>
         <small>indoor 96 °F → heat check-in</small></button>
     </div>
@@ -189,8 +194,10 @@
         <small>camera: lying down and still (or lie down for real)</small></button>
       <button data-send='{"type":"scream","db":-8.0,"floor_db":-48.0}'>😱 Scream heard<span class="tag sim">simulated</span>
         <small>mics: loud sustained sound (or scream for real)</small></button>
-      <button data-send='{"type":"help_gesture","source":"camera"}'>🙌 Help sign<span class="tag sim">simulated</span>
-        <small>both arms up (or raise them for real)</small></button>
+      <button data-send='{"type":"help_gesture","sign":"X","source":"demo"}'>❌ X sign = help<span class="tag sim">simulated</span>
+        <small>arms crossed over the head, held 3 s (or do it for real)</small></button>
+      <button data-send='{"type":"ok_gesture","sign":"O","source":"demo"}'>⭕ O sign = okay<span class="tag sim">simulated</span>
+        <small>one or both hands on top of the head, held 3 s</small></button>
     </div>
     <div class="group"><b>Person answers</b>
       <button data-send='{"type":"heard","answer":"ok","transcript":"(button) I am okay"}'>"I'm okay"<small>backup if the hall is loud</small></button>
@@ -271,7 +278,13 @@ function show(m) {
     case "presence": $("sPose").textContent = "person " + m.state; light("camera", `person: ${m.state}`); return;
     case "people": $("sPeople").textContent = `${m.count}${m.down ? ` · ${m.down} down` : ""}`; light("camera", `${m.count} in view, ${m.down} down`, m.down > 0); if (m.down) row("r-bad", `🛌 camera: ${m.down} of ${m.count} people lying down`); return;
     case "fall_hint": light("camera", "lying + still", true); return row("r-bad", "🛌 camera AI: person lying down and not moving");
-    case "help_gesture": light("camera", "HELP sign", true); return row("r-bad", "🙌 camera AI: help sign seen");
+    case "help_gesture": light("camera", "X sign: HELP", true); return row("r-bad", "❌ camera AI: X sign held 3 s = help");
+    case "ok_gesture": light("camera", "O sign: okay"); return row("r-heard", "⭕ camera AI: O sign held 3 s = okay");
+    case "shake": if (m.g > 0) { stamp("sQuake", `${m.g} g (live)`); light("sensors", `SHAKING ${m.g} g`, true); light("ring", `red bar ${Math.min(16, Math.max(1, Math.round(16 * m.g / 1.2)))}/16`, true); } return;
+    case "radio_live": $("radioLive").classList.toggle("on", m.on); $("radioLive").firstChild.textContent = m.on ? "📻 Live radio: ON (press to stop)" : "📻 Live radio: play NOAA 162.400 on the box";
+      if (m.on) light("radio", "LIVE audio"); return row("r-radio", m.on ? "📻 live NOAA audio on the box speaker" : "📻 live radio audio off");
+    case "call": light("voice", "CALL " + m.state, m.state !== "failed"); $("callPill").textContent = "call: " + m.state; $("callPill").className = "pill " + (m.state === "failed" ? "off" : "on");
+      return row("r-bad", `📞 call ${m.state}${m.summary && m.state === "dialing" ? ` — LAND will say: "${m.summary}"` : ""}${m.detail ? " · " + m.detail : ""}`);
     case "camera_shake": light("camera", "image shook"); return row("", "camera: whole image shook (second quake signal)");
     case "lights": light("camera", `lights ${m.state}`); return row("", `camera: lights ${m.state}`);
     case "scream": light("mics", `loud sound ${m.db} dB`, true); return row("r-bad", `😱 mics: scream / loud sound (${m.db} dBFS)`);
@@ -319,7 +332,8 @@ Level ${m.rms_dbfs} dBFS, peak ${m.peak_dbfs} dBFS, voice found: ${m.voice_s} s`
         e.textContent = (st === "active" ? "● " : "✕ ") + n; e.title = st; return e; }));
       return;
     }
-    case "demo_state": if (m.volume != null) { $("vol").value = Math.round(m.volume * 100); $("volText").textContent = Math.round(m.volume * 100) + " %"; } return;
+    case "demo_state": if (m.style) $("rocky").checked = m.style === "rocky";
+      if (m.volume != null) { $("vol").value = Math.round(m.volume * 100); $("volText").textContent = Math.round(m.volume * 100) + " %"; } return;
     case "reset": setStatus("PROTECTED", "ok"); $("trace").textContent = ""; return row("", "↺ reset: all parts back to start");
   }
 }
@@ -335,6 +349,11 @@ function send(m) {
 }
 const SEQ = {
   fall() { send({ type: "presence", state: "still" }); send({ type: "people", count: 1, down: 1 }); send({ type: "fall_hint", posture: "lying" }); },
+  shake() {  // what the accelerometer sends: live levels, then the quake once the shaking stops
+    const g = [0.2, 0.45, 0.8, 1.1, 0.9, 1.2, 0.7, 0.95, 0.5, 0.6, 0.3, 0.35, 0.2, 0.18, 0.16];
+    g.forEach((v, i) => setTimeout(() => send({ type: "shake", g: v }), i * 270));
+    setTimeout(() => { send({ type: "shake", g: 0 }); send({ type: "quake", peak_g: 1.2, duration_s: 4.1 }); }, g.length * 270 + 2000);
+  },
   heat() { send({ type: "indoor", temp_f: 96.0, temp_c: 35.6, pressure_hpa: 1000.0 }); send({ type: "heat", temp_f: 96.0, reason: "over 90 F" }); },
   outage() {
     clearInterval(drain); let pct = 100; send({ type: "demo", cmd: "net", online: false }); send({ type: "power", state: "battery" }); send({ type: "heartbeat", battery_pct: pct });
@@ -343,14 +362,16 @@ const SEQ = {
   restore() { clearInterval(drain); send({ type: "demo", cmd: "net", online: true }); send({ type: "power", state: "mains" }); send({ type: "heartbeat", battery_pct: 100 }); },
 };
 document.querySelectorAll("button[data-cmd], button[data-send], button[data-seq]").forEach((b) => b.addEventListener("click", () => {
-  if (b.dataset.cmd) { send({ type: "demo", cmd: b.dataset.cmd }); row("r-radio", "📻 starting the radio decoder…"); }
+  if (b.dataset.cmd) { send({ type: "demo", cmd: b.dataset.cmd }); row("r-radio", "🚨 emergency broadcast starting…"); }
   else if (b.dataset.send) { const m = JSON.parse(b.dataset.send); if (m.type === "reset") clearInterval(drain); send(m); }
   else SEQ[b.dataset.seq]();
 }));
 $("askForm").addEventListener("submit", (e) => { e.preventDefault(); const q = $("askText").value.trim(); if (!q) return;
   $("answer").textContent = `Q: ${q}
 A: thinking…`; send({ type: "demo", cmd: "ask", text: q }); $("askText").value = ""; });
-$("cut").addEventListener("click", () => send({ type: "demo", cmd: "net", online: $("cut").classList.contains("on") }));
+$("radioLive").addEventListener("click", () => send({ type: "demo", cmd: "radio_live", on: !$("radioLive").classList.contains("on") }));
+$("rocky").addEventListener("change", () => send({ type: "demo", cmd: "style", value: $("rocky").checked ? "rocky" : "plain" }));
+$("cut").addEventListener("click",() => send({ type: "demo", cmd: "net", online: $("cut").classList.contains("on") }));
 $("askVoice").addEventListener("click", () => { $("answer").textContent = "Listening 5 s for your question…"; send({ type: "demo", cmd: "ask_voice" }); });
 $("micTest").addEventListener("click", () => { $("micResult").textContent = "Recording 5 s… speak now"; send({ type: "demo", cmd: "mic_test", seconds: 5 }); });
 let volTimer; $("vol").addEventListener("input", () => { $("volText").textContent = $("vol").value + " %";

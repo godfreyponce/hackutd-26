@@ -2,7 +2,8 @@
 
 YOLOv8s-pose on the Hailo, for every person in view:
   posture STANDING / SITTING / LYING, people count, how many are down,
-  person-down timer, HELP gesture (both arms raised), privacy face blur.
+  person-down timer, hand signs (X = arms crossed over the head = help, O = a hand on top of the head = okay),
+  privacy face blur.
 Whole-scene: camera shake (earthquake cross-check) and lights out/on.
 Full-screen overlay + hub events (contract #19; new types proposed on #19).
 
@@ -31,18 +32,20 @@ KP_MIN = 0.4
 HOLD_S = 0.8             # a presence state must hold this long before it is sent
 FALL_COOLDOWN_S = 20     # at most one fall_hint per 20 s
 FALL_STILL_S = 5         # lying + still this long sends fall_hint even without a seen fall
-HELP_HOLD_S = 1.0        # arms up this long = HELP
-HELP_COOLDOWN_S = 15
+SIGN_HOLD_S = 3.0        # a hand sign must be held this long (Rafael: 3 s, so a stretch or a scratch never counts)
+SIGN_COOLDOWN_S = 10
 SHAKE_PX = 6.0           # whole-frame shift (px at 320x180) that counts as a shake
 SHAKE_FRAMES = 4         # ... for this many frames in the last 10
 DARK_LEVEL = 35          # mean brightness (0-255) below this = dark
 # COCO keypoints
 NOSE, L_EYE, R_EYE, L_EAR, R_EAR, L_SH, R_SH = 0, 1, 2, 3, 4, 5, 6
+L_EL, R_EL = 7, 8
 L_WR, R_WR, L_HIP, R_HIP, L_KNEE, R_KNEE = 9, 10, 11, 12, 13, 14
 SKELETON = [(5, 6), (5, 7), (7, 9), (6, 8), (8, 10), (5, 11), (6, 12), (11, 12),
             (11, 13), (13, 15), (12, 14), (14, 16), (0, 5), (0, 6)]
 COLORS = {"STANDING": (0, 200, 0), "SITTING": (0, 200, 255), "LYING": (0, 0, 255),
-          "UNCLEAR": (200, 200, 200), "HELP": (0, 0, 255)}
+          "UNCLEAR": (200, 200, 200), "X": (0, 0, 255), "O": (0, 200, 0)}
+SIGN_EVENTS = {"X": "help_gesture", "O": "ok_gesture"}
 
 
 def sigmoid(x):
@@ -112,10 +115,28 @@ def classify(box, k, mount):
     return "UNCLEAR"
 
 
-def arms_up(k):
-    """Both wrists clearly above the head (nose, or shoulders if no nose)."""
-    ref = k[NOSE, 1] if k[NOSE, 2] > KP_MIN else min(k[L_SH, 1], k[R_SH, 1])
-    return all(k[w, 2] > KP_MIN and k[w, 1] < ref for w in (L_WR, R_WR))
+def hand_sign(k):
+    """X: both forearms crossed over the head (help, needs two hands).
+    O: one or both hands on top of the head, elbow raised (okay).
+    Pose keypoints have no fingers, so both signs are whole-arm signs. Front view (wall mount)."""
+    seen = lambda *ids: all(k[i, 2] > KP_MIN for i in ids)  # noqa: E731
+    if not seen(NOSE, L_SH, R_SH):
+        return None
+    nose, ls, rs = k[NOSE, :2], k[L_SH, :2], k[R_SH, :2]
+    s = max(abs(ls[0] - rs[0]), 1.0)  # shoulder width: the body's own scale
+    if seen(L_WR, R_WR, L_EL, R_EL):
+        lw, rw = k[L_WR, :2], k[R_WR, :2]
+        both_up = lw[1] < nose[1] and rw[1] < nose[1] and k[L_EL, 1] < ls[1] and k[R_EL, 1] < rs[1]
+        crossed = (lw[0] - rw[0]) * (ls[0] - rs[0]) < 0 and abs(lw[0] - rw[0]) > 0.1 * s
+        if both_up and crossed:
+            return "X"
+    for w, e, sh in ((L_WR, L_EL, ls), (R_WR, R_EL, rs)):
+        if seen(w, e):
+            wr = k[w, :2]
+            on_head = nose[1] - 1.0 * s < wr[1] < nose[1] - 0.1 * s and abs(wr[0] - nose[0]) < 0.75 * s
+            if on_head and k[e, 1] < sh[1]:
+                return "O"
+    return None
 
 
 def blur_faces(img, kpts):
@@ -245,9 +266,9 @@ def main():
         shifts = deque(maxlen=10)               # whole-frame shift per frame
         last_seen, presence, posture = 0.0, "none", None
         candidate, candidate_since = "none", 0.0
-        upright_until = last_fall = last_help = last_shake = 0.0
+        upright_until = last_fall = last_sign = last_shake = 0.0
         down_since = None                       # someone lying + still since
-        help_since = None
+        sign, sign_since = None, 0.0           # hand sign being held, and since when
         prev_gray, dark, people_sent = None, False, None
         fps_t, fps_n, fps = time.time(), 0, 0.0
 
@@ -294,15 +315,14 @@ def main():
                 hub.send({"type": "people", "count": people, "down": down})
                 people_sent = (people, down)
 
-            help_now = any(arms_up(k) for k in kpts)
-            if help_now:
-                help_since = help_since or now
-            else:
-                help_since = None
-            helping = help_since is not None and now - help_since >= HELP_HOLD_S
-            if helping and now - last_help > HELP_COOLDOWN_S:
-                hub.send({"type": "help_gesture"})
-                last_help = now
+            signs = [hand_sign(k) for k in kpts]
+            now_sign = "X" if "X" in signs else "O" if "O" in signs else None  # X (help) wins
+            if now_sign != sign:
+                sign, sign_since = now_sign, now
+            held = now - sign_since
+            if sign and held >= SIGN_HOLD_S and now - last_sign > SIGN_COOLDOWN_S:
+                hub.send({"type": SIGN_EVENTS[sign], "sign": sign, "source": "camera"})
+                last_sign = now
 
             if not args.no_blur:
                 blur_faces(img, kpts_px)
@@ -310,8 +330,10 @@ def main():
                 i = int(np.argmax((boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])))  # main person
                 votes.append(labels[i])
                 for j, (bb, kk, lab) in enumerate(zip(boxes_px.astype(int), kpts_px, labels)):
-                    lab = "HELP" if arms_up(kpts[j]) and helping else lab
                     color = COLORS[lab]
+                    if signs[j] and signs[j] == sign:  # show the hold countdown so the person knows to keep it
+                        color = COLORS[sign]
+                        lab = f"{'X = HELP' if sign == 'X' else 'O = OKAY'} {min(held, SIGN_HOLD_S):.1f}/{SIGN_HOLD_S:g} s"
                     cv2.rectangle(img, tuple(bb[:2]), tuple(bb[2:]), color, 3)
                     cv2.putText(img, lab, (bb[0], max(bb[1] - 8, 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
                     for a, c in SKELETON:
@@ -356,9 +378,10 @@ def main():
             if now - fps_t >= 1:
                 fps, fps_t, fps_n = fps_n / (now - fps_t), now, 0
             cv2.rectangle(img, (0, 0), (W, 60), (0, 0, 0), -1)
-            main_label = "HELP!" if helping else (posture or "NO PERSON")
+            shown = sign if sign and held >= SIGN_HOLD_S else None
+            main_label = {"X": "X: HELP!", "O": "O: OKAY"}.get(shown) or posture or "NO PERSON"
             cv2.putText(img, f"{main_label}  |  {presence.upper()}", (20, 43), cv2.FONT_HERSHEY_SIMPLEX, 1.3,
-                        COLORS.get(posture if not helping else "HELP", (255, 255, 255)), 3)
+                        COLORS.get(shown or posture, (255, 255, 255)), 3)
             cv2.putText(img, f"people {people}  down {down}", (640, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
                         (0, 0, 255) if down else (255, 255, 255), 2)
             hub_txt = "hub: off" if not args.hub else ("hub: on" if hub.connected else "hub: retry")

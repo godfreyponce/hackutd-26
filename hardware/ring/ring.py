@@ -5,6 +5,7 @@
 | hub not connected                          | dim blue, slow breathe        |
 | idle / checkin ok or clear / reset         | dim green, steady             |
 | alert level watch / warning                | yellow / orange, steady       |
+| shake (live, while the box shakes)         | red bar: LEDs lit = strength  |
 | quake, fall_hint, help_gesture             | white flash, then check-in    |
 | checkin asking or no_answer                | amber, spinning               |
 | alert level emergency                      | red, slow pulse               |
@@ -25,6 +26,8 @@ import board
 from adafruit_raspberry_pi5_neopixel_write import neopixel_write
 
 N, BRIGHT = 16, 0.25      # keep <= 30 % (power budget in WIRING.md)
+SHAKE_FULL_G = 1.2        # shaking this strong lights all 16 LEDs (a hard shake by hand)
+SHAKE_HOLD_S = 0.6        # the bar holds its last level this long, so the eye can read it
 
 
 class Ring(adafruit_pixelbuf.PixelBuf):
@@ -42,11 +45,16 @@ def log(*a):
 class State:
     def __init__(self):
         self.connected, self.mode, self.flash_until, self.level = False, "idle", 0.0, None
+        self.shake_leds, self.shake_until = 0, 0.0
 
     def on(self, m):
         t = m.get("type")
         if t == "reset":
             self.mode, self.level = "idle", None
+        elif t == "shake":
+            g = float(m.get("g") or 0)
+            self.shake_leds = max(1, min(N, round(N * g / SHAKE_FULL_G))) if g > 0 else 0
+            self.shake_until = time.monotonic() + SHAKE_HOLD_S if g > 0 else 0.0
         elif t in ("quake", "fall_hint", "help_gesture"):
             self.flash_until = time.monotonic() + 1.0
         elif t == "alert":
@@ -60,6 +68,8 @@ class State:
         if not self.connected:
             v = int(40 + 40 * math.sin(now * 1.5))
             return [(0, 0, v)] * N
+        if now < self.shake_until:  # intensity bar, clockwise from LED 0
+            return [(255, 0, 0) if i < self.shake_leds else (0, 0, 0) for i in range(N)]
         if now < self.flash_until:
             return [(255, 255, 255)] * N
         if self.mode == "alarm":

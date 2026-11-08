@@ -38,7 +38,8 @@ def test_timestamp_prefix_from_multimon_t_flag_is_accepted():
 
 
 def test_demo_header_maps_to_the_shared_alert_contract():
-    assert one(DEMO_EQW) == {
+    alert = one(DEMO_EQW)
+    assert alert.items() >= {
         "type": "alert",
         "source": "noaa",
         "event": "Earthquake Warning",
@@ -50,7 +51,10 @@ def test_demo_header_maps_to_the_shared_alert_contract():
         "area": "Dallas County, TX; Collin County, TX",
         "headline": "Earthquake Warning for Dallas County, TX; Collin County, TX",
         "demo": True,
-    }
+    }.items()
+    # added for "when / who" questions to the box: sender, local issue time, minutes valid, expiry
+    assert alert["sender"] == "National Weather Service" and alert["valid_minutes"] > 0
+    assert {"issued", "expires"} <= alert.keys()
 
 
 def test_three_repeats_send_one_alert():

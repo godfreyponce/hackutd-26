@@ -151,7 +151,29 @@ def to_alert(h: Header, area: str) -> dict:
         "area": area,
         "headline": f"{event} for {area}",
         "demo": h.station == DEMO_STATION or h.code == "DMO",
+        **_when(h),
     }
+
+
+SENDERS = {"WXR": "National Weather Service", "CIV": "civil authorities", "EAS": "an EAS participant (broadcaster)",
+           "PEP": "the Primary Entry Point system (national)"}
+
+
+def _when(h: Header) -> dict:
+    """Who sent it, when it was issued (SAME JJJHHMM is UTC day-of-year + time) and how long it is valid."""
+    from datetime import datetime, timedelta, timezone
+    out = {"sender": SENDERS.get(h.org, h.org)}
+    try:
+        now = datetime.now(timezone.utc)
+        issued = datetime(now.year, 1, 1, tzinfo=timezone.utc) + timedelta(
+            days=int(h.issued[:3]) - 1, hours=int(h.issued[3:5]), minutes=int(h.issued[5:7]))
+        valid = timedelta(hours=int(h.duration[:2]), minutes=int(h.duration[2:4]))
+        local = issued.astimezone()
+        out.update(issued=local.strftime("%b %d %I:%M %p %Z"), valid_minutes=int(valid.total_seconds() // 60),
+                   expires=(local + valid).strftime("%I:%M %p %Z"))
+    except (ValueError, IndexError):
+        pass  # a malformed time field: the alert still goes out without it
+    return out
 
 
 def alerts(lines: Iterable[str]) -> Iterator[dict]:

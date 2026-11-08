@@ -13,10 +13,14 @@ SCRIPTS = {
     "ask_gesture": "I saw your help sign. Are you okay? Say okay, or help.",
     "ask_retry_2": "I didn't catch that. Are you okay? Just say okay, or help.",
     "ask_retry_3": "I still can't hear you. If I don't hear from you, I'll get help. Are you okay?",
-    "standup_ask": "Are you okay?",
+    "standup_ask": "I see you're up. Are you okay, and can you talk? If you can't talk, put a hand on your head "
+                   "for okay, or cross your arms over your head for help.",
     "escalate": "I haven't heard back, so I'm alerting your emergency contact now.",
-    "reply_help": "Okay. I'm getting help now. Stay with me, you're not alone.",
-    "reply_ok": "Good. I'm glad you're okay. I'll check on you again soon.",
+    "reply_help": "Okay. I hear you. Stay with me, you're not alone.",
+    "reply_ok": "Good, I'm glad you're okay. I'm here if you need me, and you can call 911 anytime.",
+    "offer_call": "Do you want me to call emergency services? I'll put the call on my speaker so you can talk.",
+    "call_now": "Calling now. Stay with me.",
+    "call_declined": "Okay, no call. I'm right here. Say help anytime.",
     "alert_demo": f"{DEMO_TEXT}.",
 }
 
@@ -34,6 +38,8 @@ STANDUP_SCRIPT = "standup_ask"
 ESCALATE_SCRIPT = "escalate"
 # The reply each answer gets, spoken without listening.
 REPLY_SCRIPTS = {"ok": "reply_ok", "help": "reply_help"}
+# After a help answer: offer the live call (Rafael's demo flow). Code asks it, never the planner.
+OFFER_CALL_SCRIPT, CALL_NOW_SCRIPT, CALL_DECLINED_SCRIPT = "offer_call", "call_now", "call_declined"
 
 # Sent only to TWILIO_TO, a verified teammate phone. Never an emergency number.
 SMS_TEMPLATES = {

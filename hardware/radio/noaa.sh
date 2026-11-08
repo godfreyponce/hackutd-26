@@ -28,10 +28,12 @@ PY
       | sox -t raw -r 22050 -e signed -b 16 -c 1 - "$OUT" trim 0 "$SECS" || true
     echo "saved $OUT"
     ;;
-  decode)  # live SAME/EAS alert decoding; prints ZCZC-... headers when an alert airs
-    FREQ="${2:-$FREQ_DEFAULT}"
+  decode)  # live SAME/EAS alert decoding; prints ZCZC-... headers when an alert airs.
+    # tap.py passes the audio through and also plays it on the box speaker while the demo page asks.
+    FREQ="${2:-$FREQ_DEFAULT}"; HERE="$(cd "$(dirname "$0")" && pwd)"
+    PY="$HERE/../../.venv/bin/python"; [ -x "$PY" ] || PY=python3
     rtl_fm -M fm -f "$FREQ" -s 22050 -g "$GAIN" -E deemp -l 0 2>/dev/null \
-      | multimon-ng -t raw -a EAS -
+      | "$PY" "$HERE/tap.py" | multimon-ng -t raw -a EAS -
     ;;
   fm)  # sanity check: strongest FM broadcast stations
     rtl_power -f 88M:108M:100k -g 30 -i 4 -1 /tmp/fm.csv >/dev/null 2>&1

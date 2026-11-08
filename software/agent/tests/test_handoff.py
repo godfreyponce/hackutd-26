@@ -178,7 +178,7 @@ def test_the_facts_carry_battery_peak_g_alert_and_each_transcript():
 def test_help_sends_a_handoff_and_keeps_reply_help_before_the_alarm():
     bus = run(["help"], [STILL, QUAKE])
     assert [m.get("script_id") or m["state"] for m in bus.sent if m["type"] in ("say", "checkin")
-            and m.get("state") != "asking"] == ["ask_stopped", "help", "reply_help", "alarm"]
+            and m.get("state") != "asking"] [:4] == ["ask_stopped", "help", "reply_help", "alarm"]
     [event] = handoffs(bus)
     assert event["by"] == "template"
     assert "said help" in event["note"]

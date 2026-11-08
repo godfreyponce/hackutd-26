@@ -64,9 +64,9 @@ def test_three_no_answers_then_alarm_on_fourth(kind):
 def test_help_alarms_at_once(kind):
     bus, _ = go(["help"], [STILL, FALL_HINT], PLANNERS[kind]())
     assert bus.checkins() == [("asking", 1), ("help", 1), ("alarm", 2)]
-    assert bus.events() == ["ask_stopped", "help", "reply_help", "alarm"]
-    reply = [m for m in bus.sent if m["type"] == "say"][-1]
-    assert reply["text"] == "Okay. I'm getting help now. Stay with me, you're not alone."
+    assert bus.events() == ["ask_stopped", "help", "reply_help", "alarm", "offer_call", "call_now"]
+    reply = next(m for m in bus.sent if m["type"] == "say" and m["script_id"] == "reply_help")
+    assert reply["text"] == SCRIPTS["reply_help"]
     assert "listen_s" not in reply
     assert not any("override" in r["text"].lower() for r in bus.trace("VERIFY"))
 
@@ -100,7 +100,7 @@ def test_okay_logs_with_no_alarm(kind):
     assert "alarm" not in bus.states()
     assert bus.says() == ["ask_stopped", "reply_ok"]
     reply = [m for m in bus.sent if m["type"] == "say"][-1]
-    assert reply["text"] == "Good. I'm glad you're okay. I'll check on you again soon."
+    assert reply["text"] == SCRIPTS["reply_ok"]
     assert "listen_s" not in reply
     assert any(r.get("tool") == "log_decision" for r in bus.trace())
 
@@ -129,7 +129,7 @@ def test_standup_after_alarm_then_ok_clears(kind):
 
     bus = asyncio.run(scenario())
     assert bus.says()[-2:] == ["standup_ask", "reply_ok"]
-    assert [m for m in bus.sent if m["type"] == "say"][-2]["text"] == "Are you okay?"
+    assert [m for m in bus.sent if m["type"] == "say"][-2]["text"] == SCRIPTS["standup_ask"]
     assert bus.states()[-2:] == ["ok", "clear"]
     assert bus.states().count("alarm") == 1
 
@@ -157,7 +157,7 @@ def test_llm_that_skips_the_alarm_is_overridden():
 
     bus, _ = go(["help"], [STILL, FALL_HINT], llm(FakeClient(skipper)))
     assert bus.states()[-1] == "alarm"
-    assert bus.says() == ["ask_stopped", "reply_help"]
+    assert bus.says()[:2] == ["ask_stopped", "reply_help"]
     assert any("override" in r["text"].lower() for r in bus.trace("VERIFY"))
 
 
@@ -170,7 +170,7 @@ def test_llm_that_skips_the_reply_has_code_speak_it(answer, reply):
         return cooperative(messages)
 
     bus, _ = go([answer], [STILL, FALL_HINT], llm(FakeClient(mute)))
-    assert bus.says() == ["ask_stopped", reply]
+    assert bus.says()[:2] == ["ask_stopped", reply]
     assert any("override" in r["text"].lower() and reply in r["text"] for r in bus.trace("VERIFY"))
 
 
@@ -515,7 +515,7 @@ def test_help_sign_asks_at_once_with_the_ask_gesture_line(kind):
 def test_help_sign_never_alarms_before_the_ask(kind):
     bus, _ = go(["help"], [STILL, HELP_SIGN], PLANNERS[kind]())
     assert bus.checkins()[0] == ("asking", 1)
-    assert bus.events() == ["ask_gesture", "help", "reply_help", "alarm"]
+    assert bus.events() == ["ask_gesture", "help", "reply_help", "alarm", "offer_call", "call_now"]
 
 
 @pytest.mark.parametrize("kind", PLANNERS)
@@ -552,8 +552,9 @@ def test_repeated_help_signs_do_not_stack_checkins():
 
     bus, agent, first = asyncio.run(scenario())
     assert agent.incident is first
-    assert bus.says() == ["ask_gesture", "ask_retry_2", "reply_ok"]
-    assert [s for s, _ in bus.checkins()].count("asking") == 2
+    # Rafael: an X sign held while the box asks IS the answer (help); it never starts a second check-in
+    assert bus.says()[:2] == ["ask_gesture", "reply_help"]
+    assert [s for s, _ in bus.checkins()].count("asking") == 1
 
 
 def test_help_sign_while_an_alarm_is_up_is_ignored():
@@ -638,3 +639,18 @@ def test_offline_skips_cloud_planner_and_guard_at_once():
     assert guard.seen == []
     assert "cloud planner is skipped" in bus.trace("FALLBACK")[0]["text"]
     assert bus.states()[-1] == "alarm"
+
+
+def test_o_sign_answers_ok_and_x_sign_answers_help():
+    for sign, answer in (("ok_gesture", "ok"), ("help_gesture", "help")):
+        bus, _ = go([{"answer": "no_answer", "before": [{"type": sign, "sign": "O"}]}], [STILL, FALL_HINT])
+        assert bus.checkins()[1] == (answer, 1)
+
+
+def test_call_offer_no_declines_and_silence_calls():
+    no = {"answer": "help", "transcript": "no, don't call"}
+    bus, _ = go(["help", no], [STILL, FALL_HINT])
+    assert bus.says()[-2:] == ["offer_call", "call_declined"] and not [m for m in bus.sent if m["type"] == "call"]
+    bus, _ = go(["help"], [STILL, FALL_HINT])
+    calls = [m for m in bus.sent if m["type"] == "call"]
+    assert calls[0]["state"] == "dialing" and "Handing the call to the homeowner." in calls[0]["summary"]
