@@ -77,11 +77,27 @@ This list copies #19 and its "Contract addendum v1". The issue wins on any doubt
 
 `note` is a short note for responders. `contact` is who to contact first, from a fixed demo list. `why` is at most 3 lines on why the rule raised the alarm. `by` and `why_by` say who wrote each: Nemotron, or the code template when the check failed or the model was down.
 
-**Official alerts.** CAP-shaped.
+**Official alerts.** CAP-shaped, with the SAME fields from #35.
 
 ```json
-{"type":"alert","source":"noaa|nws|usgs|gdacs|sensor","event":"Earthquake","severity":"Severe","urgency":"Immediate","certainty":"Observed","area":"Richardson, TX","headline":"..."}
+{"type":"alert","source":"noaa|nws|usgs|gdacs|sensor","event":"Earthquake","severity":"Severe","urgency":"Immediate","certainty":"Observed","area":"Richardson, TX","headline":"...","code":"EQW","station":"HACKDEMO","distance_mi":3,"demo":true,"level":"emergency"}
 ```
+
+- `code`: SAME event code, for example `EQW`, `TOR`, `SVR`, `RWT`. Optional for old senders.
+- `station`: sender id, for example `HACKDEMO` for our demo file, `KEC56` or `KFWD/NWS` for real ones. Optional.
+- `distance_mi`: miles from the home to the event. Optional.
+- `demo`: `true` for our locally made demo alerts and the simulator. The headline stays plain. Screens and speech add "DEMO, not a real alert." when `demo` is true.
+- `level`: `info|watch|warning|emergency`. The hub adds it before the broadcast (`alert_level.py`) and overwrites any value a sender set. Senders do not set it.
+
+| Code | Level |
+|---|---|
+| Tests: `RWT`, `RMT`, `NPT`, `DMO` | info |
+| Watches: code ends in `A` | watch |
+| Other warnings: code ends in `W`, and `SVR` | warning |
+| `EQW`, `TOR`, `CEM`, `CAE`, `EVI`, `SPW` | emergency |
+| Missing or other code | CAP severity: `Extreme` emergency, `Severe` warning, `Moderate` watch, else info |
+
+`distance_mi` over 25 drops the level one step, never below info.
 
 **Reset.** Every piece goes back to its start state. The simulator resets too, whoever sends it.
 
@@ -131,7 +147,7 @@ The alarm is fake. Nothing calls or texts 911 or any emergency number.
 | `s` | `presence` still, then `fall_hint` if the last presence was moving |
 | `n` | `presence` none |
 | `p` | `power`, toggles mains and battery |
-| `a` | a fake USGS earthquake `alert`. Its headline starts with "DEMO ONLY, NOT A REAL ALERT" |
+| `a` | a fake USGS earthquake `alert`: code `EQW`, station `HACKDEMO`, 3 miles away, `demo` true, so level emergency |
 | `r` | `reset` |
 | Ctrl-C | quit |
 
@@ -165,4 +181,4 @@ The ESP32 sends one JSON object per line at 115200 baud (format in #13). The hub
 .venv/bin/python -m pytest software/hub
 ```
 
-The tests cover the key mapping, message parsing, re-broadcast between two clients, static serving, and serial over a fake pty (`os.openpty`).
+The tests cover the key mapping, message parsing, the alert level table, re-broadcast between two clients, static serving, and serial over a fake pty (`os.openpty`).

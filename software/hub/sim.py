@@ -18,7 +18,11 @@ DEMO_ALERT = {
     "urgency": "Immediate",
     "certainty": "Observed",
     "area": "Richardson, TX",
-    "headline": "DEMO ONLY, NOT A REAL ALERT: M5.1 earthquake near Richardson, TX",
+    "headline": "M5.1 earthquake near Richardson, TX",
+    "code": "EQW",
+    "station": "HACKDEMO",
+    "distance_mi": 3,
+    "demo": True,
 }
 
 KEY_HELP = """keys:
