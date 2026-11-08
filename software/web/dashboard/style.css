@@ -63,7 +63,8 @@ ol, ul { list-style: none; }
 .hub[data-status="offline"] { color: #ffe2a8; }
 .hub[data-status="offline"] .led { background: var(--amber); }
 body[data-hub="offline"] #map { filter: grayscale(1) brightness(0.6); }
-body[data-hub="offline"] .legend { opacity: 0.6; }
+body[data-hub="offline"] .legend, body[data-hub="offline"] .counters { opacity: 0.6; }
+body[data-hub="offline"] .stage-steps i { background: var(--line); }
 body[data-hub="offline"] .box-card { border-color: var(--line); box-shadow: none; opacity: 0.6; }
 body[data-hub="offline"] .box-card dd { color: var(--muted); }
 
@@ -253,7 +254,8 @@ kbd {
   flex: none;
 }
 .hint { color: var(--muted); font-size: 12px; }
-.empty { color: var(--muted); padding: 8px 16px; margin: 0; font-size: 13px; }
+.empty { flex: 1; display: grid; place-content: center; text-align: center; max-width: 34ch; margin: 0 auto; padding: 24px; color: var(--muted); font-size: 14px; }
+.rows:empty, .trace-list:empty { display: none; }
 .empty[hidden] { display: none; }
 
 .guard {
