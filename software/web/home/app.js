@@ -1,5 +1,9 @@
-import { initialState, reduce, statusText, activeAlert, alertChip, TRACE_WINDOW_MS } from './state.js';
+import { initialState, reduce, statusText, activeAlert, alertChip, TRACE_WINDOW_MS, initialHistory, record } from './state.js';
 import { HOME_COUNT } from '../dashboard/homes.js';
+import { renderAlerts } from './views/alerts.js';
+import { renderDisasters } from './views/disasters.js';
+import { renderSecurity } from './views/security.js';
+import { renderSystem } from './views/system.js';
 
 // The product name is not settled. Change it here only.
 export const PRODUCT_NAME = 'LAND';
@@ -12,12 +16,13 @@ const hubUrl = new URLSearchParams(location.search).get('hub') || DEFAULT_HUB;
 const $ = (id) => document.getElementById(id);
 
 let state = initialState();
+let history = initialHistory();
 let connected = false;
+let linkAt = null; // when the hub link last opened or closed
 let shownAlert = null;
 let lastWaveAt = null;
 
 document.title = `${PRODUCT_NAME} Home`;
-$('product-name').textContent = PRODUCT_NAME;
 $('hub').title = `Hub ${hubUrl}`;
 
 // ---------- neighborhood map (tactical display) ----------
@@ -100,6 +105,8 @@ svgEl('path', { d: `M${HOME.x} ${HOME.y}L${HOME.x + 124} ${HOME.y}A124 124 0 0 0
 svgEl('line', { x1: HOME.x, y1: HOME.y, x2: HOME.x + 124, y2: HOME.y, class: 'sweep-edge' }, sweep);
 
 const wave = svgEl('circle', { class: 'wave', cx: HOME.x, cy: HOME.y, r: 4 }, map);
+// A hidden Overview restarts its animations when shown, so a finished wave must not keep `go` and replay.
+wave.addEventListener('animationend', () => wave.classList.remove('go'));
 
 const neighborDots = ROOFS.map(([x, y]) => {
   const el = svgEl('circle', { class: 'node', cx: x, cy: y, r: 3.6, filter: 'url(#glow)' }, map);
@@ -427,18 +434,71 @@ function render() {
 
   renderQuake();
   renderMap();
+  renderScreen();
 }
+
+// ---------- side screens (#52): hash routes on one page, so the history and the hub link survive a switch ----------
+
+const SCREENS = { alerts: renderAlerts, disasters: renderDisasters, security: renderSecurity, system: renderSystem };
+const route = () => {
+  const name = location.hash.slice(1);
+  return Object.hasOwn(SCREENS, name) ? name : 'overview';
+};
+
+// The fade under a list says there is more below, so it goes once the list is scrolled to its end.
+const clip = (el) => el.classList.toggle('clipped', el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+// A list can come or go between renders, so its scroll is kept by its card's title, not its place.
+const listKey = (el) => el.closest('.card')?.querySelector('.card-title')?.textContent;
+// What each screen's view last drew. root.innerHTML also carries the `clipped` marks, so it cannot be compared.
+const drawn = {};
+
+function renderScreen() {
+  const name = route();
+  if (name === 'overview') return;
+  const root = $(`screen-${name}`);
+  const now = Date.now();
+  const next = document.createElement('section');
+  SCREENS[name](next, history, { now, connected, linkAt, alert: activeAlert(state, now) });
+  // Swap only on a change, so a touch scroll or a text selection lives through the clock tick.
+  if (next.innerHTML !== drawn[name]) {
+    drawn[name] = next.innerHTML;
+    const scrolls = new Map([...root.querySelectorAll('.log')].map((el) => [listKey(el), el.scrollTop]));
+    root.replaceChildren(...next.childNodes);
+    for (const el of root.querySelectorAll('.log')) el.scrollTop = scrolls.get(listKey(el)) ?? 0;
+  }
+  for (const el of root.querySelectorAll('.log')) clip(el);
+}
+for (const screen of document.querySelectorAll('.screen')) {
+  screen.addEventListener('scroll', (e) => { if (e.target.classList?.contains('log')) clip(e.target); }, true);
+}
+
+function showRoute() {
+  const name = route();
+  document.querySelector('main').hidden = name !== 'overview';
+  for (const el of document.querySelectorAll('.screen')) el.hidden = el.dataset.screen !== name;
+  for (const a of document.querySelectorAll('nav a')) {
+    const on = a.dataset.screen === name;
+    a.classList.toggle('active', on);
+    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  }
+  renderScreen();
+}
+addEventListener('hashchange', showRoute);
 
 function connect() {
   const ws = new WebSocket(hubUrl);
-  ws.onopen = () => { connected = true; render(); };
+  ws.onopen = () => { connected = true; linkAt = Date.now(); render(); };
   ws.onmessage = (ev) => {
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
-    state = reduce(state, msg, Date.now());
+    const now = Date.now();
+    state = reduce(state, msg, now);
+    history = record(history, msg, now);
     render();
   };
   ws.onclose = () => {
+    // Every failed retry closes again; the time stays at when the link was lost. A hub never reached keeps null.
+    if (connected) linkAt = Date.now();
     connected = false;
     render();
     setTimeout(connect, RETRY_MS);
@@ -449,8 +509,10 @@ function tick() {
   $('clock').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   renderQuake();
   if (activeAlert(state, Date.now()) !== shownAlert) render();
+  else renderScreen(); // ages and live or stale states move with the clock
 }
 setInterval(tick, 1000);
 tick();
 render();
+showRoute();
 connect();

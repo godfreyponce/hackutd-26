@@ -108,6 +108,31 @@ class AlarmTone:
         stop_audio()
 
 
+# The EQW alert's warning tone: a few short beeps at one pitch, made in code, so there is no WAV
+# to ship and the tests can check the pitch. Owner rule: never the real EAS tones (853 + 960 Hz,
+# the 1050 Hz NWS tone, SAME bursts at 1562.5 and 2083.3 Hz). 1320 Hz is a pick, far from all of them.
+WARNING_HZ = 1320
+WARNING_BEEPS = 3
+WARNING_BEEP_S = 0.12
+WARNING_GAP_S = 0.08  # also the pause after the last beep, before the line
+WARNING_FADE_S = 0.01  # no click at each beep's edges
+
+
+class WarningTone:
+    """The EQW alert's warning tone, about 0.6 s. play() returns when it ends, so the line comes after."""
+
+    def __init__(self):
+        self.rate = SAMPLE_RATE
+        t = np.arange(int(self.rate * WARNING_BEEP_S)) / self.rate
+        fade = np.minimum(1, np.minimum(t, WARNING_BEEP_S - t) / WARNING_FADE_S)
+        beep = 0.5 * np.sin(2 * np.pi * WARNING_HZ * t) * fade
+        gap = np.zeros(int(self.rate * WARNING_GAP_S))
+        self.audio = np.concatenate([beep, gap] * WARNING_BEEPS).astype(np.float32)
+
+    def play(self):
+        play(self.audio, self.rate)
+
+
 def download_models():
     import urllib.request
 
@@ -257,7 +282,7 @@ class ElevenLabsEngine:
             )
             r.raise_for_status()
         except requests.RequestException as e:
-            self.log(f"FALLBACK: ElevenLabs text-to-speech failed ({e}); Piper speaks this line")
+            self.log(f"FALLBACK: ElevenLabs text-to-speech failed ({e}); the offline voice speaks this line")
             return self.offline.speak(text)
         play(np.frombuffer(r.content, dtype=np.int16).astype(np.float32) / 32768, SAMPLE_RATE)
 

@@ -46,7 +46,7 @@ ol, ul { list-style: none; }
   border-bottom: 1px solid var(--line);
   flex: none;
 }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; }
 .brand .sub { font-weight: 400; color: var(--muted); font-size: 13px; }
 .mark { width: 30px; height: 30px; }
 .event { flex: 1; font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

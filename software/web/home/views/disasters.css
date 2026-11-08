@@ -1,0 +1,8 @@
+/* Disasters screen (#52). Shared side-screen styles are in index.html; these only add what this screen needs. */
+
+#screen-disasters .card .headline {
+  margin: calc(var(--u) * 0.8) 0 0; font-size: max(22px, calc(var(--u) * 1.35)); font-weight: 600; text-wrap: pretty;
+}
+/* Each fact as wide as its words, so a place name or the long peak label stays on one line when it fits. */
+#screen-disasters .facts { display: flex; flex-wrap: wrap; }
+#screen-disasters .facts > div { flex: 1 1 auto; }
