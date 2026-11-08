@@ -3,7 +3,7 @@ import { generateHomes, REAL_BOX_ID } from './homes.js';
 
 // Agent doc section 3: a node silent for more than 5 min is stale.
 export const STALE_MS = 5 * 60 * 1000;
-const SENSOR_TYPES = new Set(['quake', 'presence', 'fall_hint', 'power', 'heartbeat']);
+const SENSOR_TYPES = new Set(['quake', 'presence', 'fall_hint', 'power', 'heartbeat', 'indoor']);
 const PROFILE = generateHomes().find((h) => h.id === REAL_BOX_ID);
 
 export function initialBox(now) {
@@ -19,6 +19,7 @@ export function initialBox(now) {
     event: false,
     power: 'mains',
     battery_pct: null,
+    indoor_f: null,
     handoff: null,
     helpSign: false,
     lastSeen: now,
@@ -47,6 +48,9 @@ export function applyBoxEvent(state, msg, now) {
       return { ...s, power: msg.state };
     case 'heartbeat':
       return { ...s, battery_pct: msg.battery_pct };
+    case 'indoor':
+      // BMP280 on the box (hardware/sensors/sensors.py)
+      return typeof msg.temp_f === 'number' ? { ...s, indoor_f: msg.temp_f } : s;
     case 'handoff':
       if (msg.home !== REAL_BOX_ID) return s;
       return { ...s, handoff: { note: msg.note, contact: msg.contact, by: msg.by, why: msg.why, why_by: msg.why_by } };
@@ -74,6 +78,7 @@ export function boxRankInput(s, now) {
   return {
     ...PROFILE,
     presence: s.presence,
+    indoor_f: s.indoor_f ?? PROFILE.indoor_f,
     stale: now - s.lastSeen > STALE_MS,
     no_answer: s.no_answer,
     said_help: s.said_help,

@@ -45,7 +45,9 @@ def build_facts(*, trigger, peak_g, presence, answers, battery_pct, power, alert
     """answers: (try, answer, transcript) in order. alert: the last `alert` message or None."""
     event = {"quake": "earthquake", "fall_hint": "presence sensor saw the person go from moving to still",
              "recheck": "scheduled recheck", "alert": "emergency alert",
-             "help_gesture": "camera saw the help sign"}.get(trigger, trigger)
+             "help_gesture": "camera saw the help sign",
+             "heat": "indoor temperature passed the heat limit or rose fast",
+             "scream": "the microphones heard a scream or loud crash"}.get(trigger, trigger)
     return {
         "home": HOME_ID,
         "time": at,

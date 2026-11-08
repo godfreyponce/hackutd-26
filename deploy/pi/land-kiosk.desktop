@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=LAND home screen
+Comment=Full-screen home safety screen on the box display (deploy/pi/install.sh puts this in ~/.config/autostart)
+Exec=sh -c 'sleep 8; exec chromium --kiosk --noerrdialogs --disable-session-crashed-bubble --ozone-platform=wayland http://localhost:8080/home/'
+X-GNOME-Autostart-enabled=true

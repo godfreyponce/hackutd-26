@@ -40,6 +40,7 @@ def build_agent(settings, bus, env=os.environ):
                              max_retries=0, timeout=settings.planner_timeout_s)
         first = LLMPlanner(hosted_label, hosted, settings.planner_model,
                            extra_body={"chat_template_kwargs": {"enable_thinking": False}})
+        first.hosted = True  # skipped at once when the box knows it is offline
         guard = SafetyGuard(hosted, settings.guard_model, settings.planner_timeout_s)
         writer = HandoffWriter(hosted, settings.planner_model, settings.planner_timeout_s)
     else:

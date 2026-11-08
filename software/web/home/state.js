@@ -152,7 +152,11 @@ export function reduce(state, msg, now) {
       return { ...state, onBattery: msg.state === 'battery' };
     case 'heartbeat':
       return typeof msg.battery_pct === 'number' ? { ...state, batteryPct: msg.battery_pct } : state;
+    case 'indoor':
+      // the box's own BMP280 reading; it wins over the dashboard's simulated H000 value
+      return typeof msg.temp_f === 'number' ? { ...state, indoorF: msg.temp_f, indoorAt: now, indoorLive: true } : state;
     case 'queue': {
+      if (state.indoorLive) return state;
       const home = Array.isArray(msg.homes) && msg.homes.find((h) => h && h.id === 'H000');
       const f = home?.factors?.indoor_f;
       return typeof f === 'number' ? { ...state, indoorF: f, indoorAt: now } : state;
