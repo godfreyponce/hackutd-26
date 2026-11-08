@@ -115,13 +115,13 @@
   .banner svg { width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); flex: none; color: var(--lvl); }
   .banner .src { font-size: max(16px, var(--u)); font-weight: 800; letter-spacing: 0.08em; border: 1px solid var(--lvl); color: var(--lvl); border-radius: 6px; padding: 0.15em 0.6em; white-space: nowrap; }
   .banner .what { font-size: max(24px, calc(var(--u) * 1.35)); font-weight: 700; white-space: nowrap; }
-  .banner .headline { color: var(--lvl-text); font-size: max(22px, calc(var(--u) * 1.2)); font-weight: 500; }
+  .banner .headline { color: var(--lvl-text); font-size: max(22px, calc(var(--u) * 1.2)); font-weight: 500; text-wrap: pretty; }
   .banner .area { color: var(--muted); white-space: nowrap; margin-left: auto; padding-left: calc(var(--u) * 1.2); font-size: max(16px, var(--u)); }
   /* The headline gets its own row under the event text, the icon spans both rows, and the
      area or received time sits at the right of the first row. */
   .banner { display: grid; grid-template-columns: auto auto 1fr auto; row-gap: 0.15em; }
   .banner svg { grid-row: span 2; }
-  .banner .headline { grid-row: 2; grid-column: 3 / -1; }
+  .banner .headline { grid-row: 2; grid-column: 2 / -1; }
   .banner .area { grid-row: 1; grid-column: -2; }
 
   .hero { grid-area: hero; container-type: inline-size; display: flex; align-items: center; gap: var(--hero-gap); padding: calc(var(--u) * 1.2) 0 calc(var(--u) * 0.5); }

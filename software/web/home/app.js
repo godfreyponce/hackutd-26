@@ -241,7 +241,7 @@ function renderMap() {
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
   // One line in every state, so the map below never moves when the text changes.
   $('map-sub').textContent = !connected ? 'No live data'
-    : state.areaHit ? `Quake hit ${hit} of ${total} nearby` : homeNote ? `${homeNote}.` : 'All homes quiet';
+    : state.areaHit ? (hit === total ? `Quake hit all ${total} nearby` : `Quake hit ${hit} of ${total} nearby`) : homeNote ? `${homeNote}.` : 'All homes quiet';
 }
 
 // ---------- seismic trace ----------
