@@ -79,7 +79,26 @@ def record(seconds: float, log) -> np.ndarray | None:
     if not np.any(audio):
         log(mic_blocked_message())
         return None
-    return audio
+    return clear_voice(audio)
+
+
+def clear_voice(audio: np.ndarray, rate: int = SAMPLE_RATE) -> np.ndarray:
+    """Make a quiet voice clear for speech-to-text (Rafael): cut rumble below 120 Hz (traffic, rubble, fans), then
+    raise the voice to about -20 dBFS, up to +22 dB. Only when there IS a voice well above the room's floor, so
+    plain noise is never boosted. PipeWire's WebRTC noise suppression and echo cancel run before this
+    (deploy/pi/pipewire-land-aec.conf)."""
+    spec = np.fft.rfft(audio)
+    spec[np.fft.rfftfreq(len(audio), 1 / rate) < 120] = 0
+    audio = np.fft.irfft(spec, len(audio)).astype(np.float32)
+    frames = audio[: len(audio) // 320 * 320].reshape(-1, 320)  # 20 ms frames
+    if not len(frames):
+        return audio
+    rms = np.sqrt((frames ** 2).mean(axis=1)) + 1e-9
+    voice = rms[rms > 3 * np.percentile(rms, 20)]  # frames ~10 dB over the floor: speech, not steady noise
+    if voice.size < 10:  # under 0.2 s of voice: leave it alone
+        return audio
+    gain = float(np.clip(0.1 / np.percentile(voice, 70), 1.0, 12.0))
+    return np.tanh(audio * gain).astype(np.float32)  # tanh: a soft limit, no hard clipping
 
 
 def play(audio: np.ndarray, rate: int, wait: bool = True):

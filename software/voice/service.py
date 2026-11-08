@@ -53,6 +53,9 @@ class VoiceService:
             if online != self.engine.online:
                 self.log(f"internet {'up: cloud voice' if online else 'down: on-board voice'}")
             self.engine.online = online
+        elif msg.get("type") == "call" and msg.get("state") == "live" and self.alarm_on:
+            self.alarm_on = False  # live call: the alarm tone must not drown the caller
+            self._audio("stop alarm tone", self.alarm.stop)
         elif msg.get("type") == "reset":
             self.resets += 1
             while not self.queue.empty():

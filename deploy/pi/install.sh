@@ -45,8 +45,20 @@ voicehat_node() {  # $1 = Sinks or Sources
 }
 sink=$(voicehat_node Sinks); src=$(voicehat_node Sources)
 [ -n "$sink" ] && [ -n "$src" ] || fail "voiceHAT sink/source not found in 'wpctl status'"
-wpctl set-default "$sink"; wpctl set-default "$src"
-wpctl set-volume "$sink" 0.35   # loud amp: keep the box voice comfortable
+wpctl set-volume "$sink" 1.0
+# Echo cancel + noise suppression + gain (WebRTC) between the card and every service: land_mic / land_speaker.
+mkdir -p ~/.config/pipewire/pipewire.conf.d
+cp deploy/pi/pipewire-land-aec.conf ~/.config/pipewire/pipewire.conf.d/
+systemctl --user restart pipewire pipewire-pulse wireplumber; sleep 4
+node_id() { wpctl status | grep -E "[0-9]+\. $1 " | grep -oE "[0-9]+\." | head -1 | tr -d .; }
+mic=$(node_id land_mic); spk=$(node_id land_speaker)
+[ -n "$mic" ] && [ -n "$spk" ] || fail "land_mic/land_speaker not created: check ~/.config/pipewire/pipewire.conf.d/pipewire-land-aec.conf"
+wpctl set-default "$mic"; wpctl set-default "$spk"
+
+step "live call: Cloudflare quick tunnel (no account) for the Twilio audio stream"
+command -v cloudflared >/dev/null || { curl -fsSL -o /tmp/cloudflared.deb \
+  https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb \
+  && sudo dpkg -i /tmp/cloudflared.deb; } || fail "cloudflared install"
 
 step "secrets file (~/.config/land/env, mode 600; never in the repo)"
 mkdir -p ~/.config/land
@@ -61,7 +73,7 @@ mkdir -p ~/.config/systemd/user ~/land-logs
 cp deploy/pi/land-*.service ~/.config/systemd/user/
 loginctl enable-linger "$USER"
 systemctl --user daemon-reload
-systemctl --user enable --now land-hub land-agent land-voice land-camera land-sensors land-ring land-radio land-scream land-demo land-recorder
+systemctl --user enable --now land-hub land-agent land-voice land-camera land-sensors land-ring land-radio land-scream land-demo land-recorder land-call
 sleep 5
 systemctl --user --no-pager --plain list-units 'land-*'
 echo

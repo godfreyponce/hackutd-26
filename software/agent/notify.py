@@ -12,6 +12,8 @@ log = logging.getLogger("agent")
 TWILIO_VARS = ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "TWILIO_TO")
 # E.164 with at least 10 digits. Short numbers like 911, 112 or 999 can never match.
 _PHONE = re.compile(r"\+\d{10,15}")
+# A clear US English neural voice for the call (twilio.com/docs/voice/twiml/say/text-speech).
+CALL_VOICE = os.environ.get("TWILIO_VOICE", "Polly.Matthew-Neural")
 
 
 class Notifier:
@@ -26,9 +28,13 @@ class Notifier:
         else:
             self.mock = None
 
-    async def call(self, text):
-        twiml = f"<Response><Say>{escape(text)}</Say></Response>"
-        return await self._post("Calls.json", {"Twiml": twiml}, "call")
+    async def call(self, text, stream_url=None):
+        """Say the text. With stream_url (hardware/call/bridge.py), the call then stays open as a live two-way
+        audio stream through the box speaker and mics."""
+        twiml = f'<Response><Say voice="{CALL_VOICE}">{escape(text)}</Say>'
+        if stream_url:
+            twiml += f'<Connect><Stream url="{escape(stream_url)}"/></Connect>'
+        return await self._post("Calls.json", {"Twiml": twiml + "</Response>"}, "call")
 
     async def send_sms(self, text):
         return await self._post("Messages.json", {"Body": text}, "SMS")

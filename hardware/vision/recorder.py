@@ -27,7 +27,7 @@ STREAM = os.environ.get("CAMERA_STREAM", "http://localhost:8090/stream.mjpg")
 FPS, PRE_S, IDLE_S, MAX_S = 5, 20, 45, 600
 TRIGGERS = {"quake", "fall_hint", "help_gesture", "heat", "scream"}
 QUIET = {"indoor", "pir", "presence", "people", "heartbeat", "system", "net", "engine", "shake", "demo_log",
-         "demo_state", "recording", "radio_live", "speaker", "demo"}
+         "demo_state", "recording", "radio_live", "speaker", "demo", "call_bridge"}
 
 
 def log(*a):

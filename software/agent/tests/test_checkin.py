@@ -682,3 +682,17 @@ def test_late_answer_to_an_earlier_question_is_ignored():
     bus, _ = go([{"answer": "ok", "before": [late]}], [STILL, FALL_HINT])
     assert bus.checkins()[1] == ("ok", 1)
     assert any("Late answer" in r["text"] for r in bus.trace("VERIFY"))
+
+
+def test_help_call_is_live_when_the_bridge_is_up_and_alarm_call_is_not():
+    bridge = {"type": "call_bridge", "url": "wss://x.trycloudflare.com/stream"}
+    bus = FakeBus(["help"])
+    agent = make_agent(bus)
+
+    async def scenario():
+        for e in (bridge, STILL, FALL_HINT):
+            await agent.handle(e)
+        await agent.idle()
+    asyncio.run(scenario())
+    assert agent.notifier.streams == [None, "wss://x.trycloudflare.com/stream"]  # alarm call one-way, help call live
+    assert [m["live_audio"] for m in bus.sent if m["type"] == "call" and m["state"] == "dialing"] == [False, True]

@@ -47,6 +47,8 @@ class Mute:
             self.open = m.get("state") in ("asking", "no_answer", "alarm", "help")
             if m.get("state") == "alarm":
                 self.until = max(self.until, time.monotonic() + 6)  # siren
+        elif t == "call":  # a live call plays a caller on the speaker
+            self.radio = m.get("state") == "live" or (self.radio and m.get("state") not in ("ended", "failed"))
         elif t == "radio_live":  # NOAA audio on the box speaker
             self.radio = m.get("on") is True
         elif t == "speaker":  # anything else the box plays, e.g. the demo alert recording

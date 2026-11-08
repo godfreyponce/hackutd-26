@@ -1,0 +1,17 @@
+[Unit]
+Description=LAND live call bridge (Twilio two-way audio through the box, Cloudflare quick tunnel, live transcript)
+After=land-hub.service network-online.target
+Wants=land-hub.service
+
+[Service]
+WorkingDirectory=%h/hackutd-26
+Environment=HUB_URL=ws://localhost:8765
+EnvironmentFile=-%h/.config/land/env
+ExecStart=%h/hackutd-26/.venv/bin/python hardware/call/bridge.py
+StandardOutput=append:%h/land-logs/call.log
+StandardError=append:%h/land-logs/call.log
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

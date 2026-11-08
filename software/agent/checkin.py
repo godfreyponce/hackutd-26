@@ -28,6 +28,8 @@ ALERT_TRIGGER = ("EQW", "emergency")
 ALERT_QUIET_S = 300
 # The camera can flicker between still and moving; ask the stand-up question at most once per this many seconds.
 STANDUP_GAP_S = 45
+# The call bridge re-announces its tunnel URL every 30 s; older than this, the help call is one-way.
+BRIDGE_FRESH_S = 75
 # Camera hand signs answer the open question: O (hand on head) = ok, X (arms crossed over the head) = help.
 SIGN_ANSWERS = {"ok_gesture": ("ok", "O sign"), "help_gesture": ("help", "X sign")}
 # The "call emergency services?" answer. "no" wins, so "please don't call" is a no.
@@ -137,6 +139,7 @@ class Agent:
         self.power = None
         self.alert = None
         self.trigger_msg = {}  # the bus message that started the check-in (temp, peak, ...) for the phone lines
+        self.bridge = (None, -1e9)  # (wss URL, Agent.clock()) from hardware/call/bridge.py: live two-way help calls
         self.incident = None
         self.quiet_from = None  # Agent.clock() start of the last check-in that mutes EQW alerts
         self.task = None
@@ -158,6 +161,8 @@ class Agent:
             inc.heard.put_nowait({"answer": answer, "transcript": "", "sign": sign})
         elif kind == "ok_gesture":
             pass  # an O sign with no open question: nothing to answer
+        elif kind == "call_bridge":
+            self.bridge = (msg.get("url"), self.clock())
         elif kind == "presence":
             await self._on_presence(msg.get("state"))
         elif kind in ("quake", "fall_hint", "help_gesture", "heat", "scream"):
@@ -593,8 +598,12 @@ class Agent:
             how = "No internet: the phone call cannot go out. On-screen alarm and ring only."
             await self.send({"type": "call", "state": "failed", "kind": kind, "detail": how, "summary": text})
             return how
-        await self.send({"type": "call", "state": "dialing", "kind": kind, "summary": text})
-        how = await self.notifier.call(text)
+        url, seen = self.bridge
+        live = kind == "help" and url and self.clock() - seen < BRIDGE_FRESH_S
+        await self.send({"type": "call", "state": "dialing", "kind": kind, "summary": text, "live_audio": bool(live)})
+        how = await (self.notifier.call(text, url) if live else self.notifier.call(text))
+        if kind == "help" and not live:
+            how += " One-way: the live-call bridge is not up."
         failed = "failed" in how or how.startswith("MOCK")
         await self.send({"type": "call", "state": "failed" if failed else "placed", "kind": kind, "detail": how,
                          "summary": text})

@@ -70,8 +70,9 @@ class FakeNotifier:
         self.calls = []
         self.sms = []
 
-    async def call(self, text):
+    async def call(self, text, stream_url=None):
         self.calls.append(text)
+        self.streams = getattr(self, "streams", []) + [stream_url]
         return "fake call"
 
     async def send_sms(self, text):
