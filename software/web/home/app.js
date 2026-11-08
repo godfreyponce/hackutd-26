@@ -183,14 +183,23 @@ function placeHud() {
     boxes.push(corner.box);
   }
   // While help is contacted the escalation sits directly above the hit count, so both stay readable.
-  const hitBox = corners.find((c) => c.el === hudHit).box;
-  const escalated = hudEscalated.style.display !== 'none';
-  escalatedBg.style.display = escalated ? '' : 'none';
+  // It is placed in every state, so the same dots stay hidden when it shows or hides.
+  const hitCorner = corners.find((c) => c.el === hudHit);
+  hudEscalated.setAttribute('x', x + w - 2 * HUD_PAD);
+  hudEscalated.setAttribute('y', Number(hudHit.getAttribute('y')) - hitCorner.box.height - HUD_PAD);
+  const escBox = fitBacking(escalatedBg, hudEscalated);
+  // The two chips are one stack: the same width and the same edges.
+  const left = Math.min(escBox.x, hitCorner.box.x);
+  const width = Math.max(escBox.x + escBox.width, hitCorner.box.x + hitCorner.box.width) - left;
+  escalatedBg.setAttribute('x', left);
+  escalatedBg.setAttribute('width', width);
+  const escalated = hudEscalated.style.visibility !== 'hidden';
+  escalatedBg.style.visibility = escalated ? '' : 'hidden';
   if (escalated) {
-    hudEscalated.setAttribute('x', x + w - 2 * HUD_PAD);
-    hudEscalated.setAttribute('y', Number(hudHit.getAttribute('y')) - hitBox.height - HUD_PAD);
-    boxes.push(fitBacking(escalatedBg, hudEscalated));
+    hitCorner.bg.setAttribute('x', left);
+    hitCorner.bg.setAttribute('width', width);
   }
+  boxes.push({ ...escBox, x: left, width }, { ...hitCorner.box, x: left, width });
   for (const dot of neighborDots) {
     const cx = dot.cx.baseVal.value, cy = dot.cy.baseVal.value;
     const covered = boxes.some((bb) => cx > bb.x - DOT_CLEAR && cx < bb.x + bb.width + DOT_CLEAR
@@ -223,7 +232,7 @@ function renderMap() {
   const hitAlarm = connected && hit > 0 && state.status !== 'PROTECTED';
   hudHit.classList.toggle('alarm', hitAlarm);
   hudHit.classList.toggle('warn', !connected || (hit > 0 && !hitAlarm));
-  hudEscalated.style.display = escalated ? '' : 'none';
+  hudEscalated.style.visibility = escalated ? '' : 'hidden';
   hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
   hudLive.classList.toggle('warn', !connected);
   $('legend-not-hit').textContent = connected ? 'Not hit' : 'Unknown';
@@ -280,12 +289,12 @@ function drawTrace() {
   ctx.beginPath();
   for (const g of [-1, 1]) { ctx.moveTo(gutter, mid - g * scale); ctx.lineTo(w, mid - g * scale); }
   ctx.stroke();
-  ctx.fillStyle = 'rgba(143,166,198,0.9)';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('+1 g', 4 * dpr, mid - scale);
-  ctx.fillText('-1 g', 4 * dpr, mid + scale);
-  // Offline the middle holds the "No live signal" text instead.
+  // Offline only the faded grid stays, with the "No live signal" text in the middle.
   if (connected) {
+    ctx.fillStyle = 'rgba(143,166,198,0.9)';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('+1 g', 4 * dpr, mid - scale);
+    ctx.fillText('-1 g', 4 * dpr, mid + scale);
     ctx.fillText('0 g', 4 * dpr, mid);
     ctx.save();
     ctx.strokeStyle = 'rgba(120,170,235,0.25)';
@@ -295,12 +304,12 @@ function drawTrace() {
     ctx.lineTo(w, mid);
     ctx.stroke();
     ctx.restore();
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('60 s ago', gutter, h - fs * 0.3);
+    ctx.textAlign = 'right';
+    ctx.fillText('now', gutter + plotW, h - fs * 0.3);
+    ctx.textAlign = 'left';
   }
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText('60 s ago', gutter, h - fs * 0.3);
-  ctx.textAlign = 'right';
-  ctx.fillText('now', gutter + plotW, h - fs * 0.3);
-  ctx.textAlign = 'left';
   ctx.globalAlpha = 1;
 
   // Offline there is no live signal, so draw no line rather than a flat one that reads as calm.
@@ -398,9 +407,10 @@ function render() {
 
   $('scale-mark').hidden = !connected || state.indoorF == null;
   if (state.indoorF != null) $('scale-mark').style.setProperty('--at', clamp((state.indoorF - 50) / 50, 0, 1));
-  $('temp').innerHTML = state.indoorF == null ? '<small class="no-reading">No reading yet</small>' : `${Math.round(state.indoorF)}<small> &deg;F</small>`;
+  // With no reading the gauge still shows an empty value at full size, so the card keeps its shape.
+  $('temp').innerHTML = `${state.indoorF == null ? '<span class="no-reading">--</span>' : Math.round(state.indoorF)}<small> &deg;F</small>`;
   $('heat-msg').textContent = !connected ? `${state.indoorF == null ? '' : 'Last known reading. '}No live heat data`
-    : a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : 'No heat alerts';
+    : a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : state.indoorF == null ? 'No reading yet' : 'No heat alerts';
   $('heat-at').hidden = state.indoorAt == null;
   $('heat-at').textContent = state.indoorAt == null ? '' : `Updated ${timeOf(state.indoorAt)}`;
 
