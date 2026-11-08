@@ -70,11 +70,11 @@ map.innerHTML = `
 
 // USGS The National Map imagery of Richardson, TX (USGSImageryOnly, public domain), saved in map/ so the page works offline.
 // Zoom 16 is the closest zoom the service has here: one view unit is one imagery pixel, about 2 m, so the outer
-// ring spans about 500 m. Offsets put lat 32.9483, lon -96.7299 on HOME.
+// ring spans about 500 m. Offsets put lat 32.9433, lon -96.7215, a block of houses with yards and trees, on HOME.
 const TILE = 256;
-const IMAGERY = { x0: -326, y0: -407, x1: -326 + 3 * TILE, y1: -407 + 4 * TILE };
-for (const [col, x] of [[0, 15157], [1, 15158], [2, 15159]]) {
-  for (const [row, y] of [[0, 26407], [1, 26408], [2, 26409], [3, 26410]]) {
+const IMAGERY = { x0: -204, y0: -174, x1: -204 + 3 * TILE, y1: -174 + 3 * TILE };
+for (const [col, x] of [[0, 15159], [1, 15160], [2, 15161]]) {
+  for (const [row, y] of [[0, 26409], [1, 26410], [2, 26411]]) {
     svgEl('image', { href: `map/16-${x}-${y}.jpg`, x: IMAGERY.x0 + col * TILE, y: IMAGERY.y0 + row * TILE, width: TILE, height: TILE }, map);
   }
 }
@@ -88,10 +88,10 @@ for (let deg = 0; deg < 360; deg += 10) {
   const inner = deg % 30 === 0 ? 116 : 120;
   svgEl('line', {
     x1: HOME.x + Math.sin(a) * inner, y1: HOME.y - Math.cos(a) * inner,
-    x2: HOME.x + Math.sin(a) * 124, y2: HOME.y - Math.cos(a) * 124, class: 'tick',
+    x2: HOME.x + Math.sin(a) * 124, y2: HOME.y - Math.cos(a) * 124, class: deg === 0 ? 'tick north' : 'tick',
   }, scope);
 }
-hudText(scope, HOME.x + 5, HOME.y - 106, 'N');
+const hudNorth = hudText(scope, HOME.x + 7, HOME.y - 106, 'N');
 
 const sweepGroup = svgEl('g', { 'clip-path': 'url(#scope)' }, map);
 const sweep = svgEl('g', { class: 'sweep' }, sweepGroup);
@@ -117,19 +117,22 @@ svgEl('path', {
 svgEl('circle', { class: 'ring escalated', cx: HOME.x, cy: HOME.y, r: 8 }, map);
 svgEl('circle', { class: 'ring real', cx: HOME.x, cy: HOME.y, r: 11 }, map);
 const homeDot = svgEl('circle', { class: 'node home', cx: HOME.x, cy: HOME.y, r: 4.5, filter: 'url(#glow)' }, map);
+const homeLabelBg = svgEl('rect', { class: 'hud-bg' }, map);
 const hudHome = hudText(map, 0, 0, 'H000', { 'text-anchor': 'end' });
 const hudThisHome = hudText(map, 0, 0, 'THIS HOME', { class: 'hud dim', 'text-anchor': 'end' });
 
 const hudNodes = hudText(map, 6, 254, '');
 const hudHit = hudText(map, 294, 254, '', { 'text-anchor': 'end' });
-const hudGrid = hudText(map, 6, 14, 'GRID H000');
+const hudGrid = hudText(map, 6, 14, 'RICHARDSON, TX');
 const hudLive = hudText(map, 294, 14, '', { 'text-anchor': 'end' });
+const backing = (el) => {
+  const bg = svgEl('rect', { class: 'hud-bg' });
+  el.before(bg);
+  return bg;
+};
 const corners = [[hudGrid, false, false], [hudLive, true, false], [hudNodes, false, true], [hudHit, true, true]]
-  .map(([el, right, bottom]) => {
-    const bg = svgEl('rect', { class: 'hud-bg' });
-    el.before(bg);
-    return { el, bg, right, bottom };
-  });
+  .map(([el, right, bottom]) => ({ el, bg: backing(el), right, bottom }));
+const northBg = backing(hudNorth);
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
@@ -143,8 +146,8 @@ function fitMap() {
   const x = clamp(HOME.x - w / 2, IMAGERY.x0, IMAGERY.x1 - w), y = clamp(HOME.y - h / 2, IMAGERY.y0, IMAGERY.y1 - h);
   map.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
   for (const [k2, v] of Object.entries({ x, y, width: w, height: h })) vignette.setAttribute(k2, v);
-  // HUD text is 1u on screen, never under 16 px so it reads from 2 m at 1280x800.
-  const f = Math.max(16, parseFloat(getComputedStyle(document.body).fontSize)) * k;
+  // HUD text is 1u on screen, never under 18 px so it reads from 2 m at 1280x800.
+  const f = Math.max(18, parseFloat(getComputedStyle(document.body).fontSize)) * k;
   map.style.setProperty('--hud', `${f}px`);
   for (const el of [hudHome, hudThisHome]) el.setAttribute('x', HOME.x - b - 0.6 * f);
   hudHome.setAttribute('y', HOME.y - 0.36 * f);
@@ -155,14 +158,30 @@ function fitMap() {
 
 let view = { x: 0, y: 0, w: 300, h: 260, f: 11 };
 const HUD_PAD = 4;
+const DOT_CLEAR = 6; // view units kept between a dot's center and any HUD backing box
+function fitBacking(bg, ...els) {
+  const boxes = els.map((el) => el.getBBox());
+  const x0 = Math.min(...boxes.map((bb) => bb.x)), y0 = Math.min(...boxes.map((bb) => bb.y));
+  const x1 = Math.max(...boxes.map((bb) => bb.x + bb.width)), y1 = Math.max(...boxes.map((bb) => bb.y + bb.height));
+  const box = { x: x0 - HUD_PAD, y: y0, width: x1 - x0 + 2 * HUD_PAD, height: y1 - y0 };
+  for (const [k, v] of Object.entries(box)) bg.setAttribute(k, v);
+  return box;
+}
 // Called again after the corner texts change, since each backing box is sized to its text.
+// A dot under a backing box is hidden, so no dot sits under or touches the HUD text.
 function placeHud() {
   const { x, y, w, h, f } = view;
+  const boxes = [fitBacking(homeLabelBg, hudHome, hudThisHome), fitBacking(northBg, hudNorth)];
   for (const { el, bg, right, bottom } of corners) {
     el.setAttribute('x', right ? x + w - 2 * HUD_PAD : x + 2 * HUD_PAD);
     el.setAttribute('y', bottom ? y + h - HUD_PAD - 0.45 * f : y + HUD_PAD + 1.05 * f);
-    const bb = el.getBBox();
-    for (const [k, v] of Object.entries({ x: bb.x - HUD_PAD, y: bb.y, width: bb.width + 2 * HUD_PAD, height: bb.height })) bg.setAttribute(k, v);
+    boxes.push(fitBacking(bg, el));
+  }
+  for (const dot of neighborDots) {
+    const cx = dot.cx.baseVal.value, cy = dot.cy.baseVal.value;
+    const covered = boxes.some((bb) => cx > bb.x - DOT_CLEAR && cx < bb.x + bb.width + DOT_CLEAR
+      && cy > bb.y - DOT_CLEAR && cy < bb.y + bb.height + DOT_CLEAR);
+    dot.style.visibility = covered ? 'hidden' : '';
   }
 }
 new ResizeObserver(fitMap).observe(map);
@@ -238,12 +257,24 @@ function drawTrace() {
   ctx.strokeStyle = 'rgba(120,170,235,0.18)';
   ctx.lineWidth = dpr;
   ctx.beginPath();
-  for (const g of [-1, 0, 1]) { ctx.moveTo(gutter, mid - g * scale); ctx.lineTo(w, mid - g * scale); }
+  for (const g of [-1, 1]) { ctx.moveTo(gutter, mid - g * scale); ctx.lineTo(w, mid - g * scale); }
   ctx.stroke();
   ctx.fillStyle = 'rgba(143,166,198,0.9)';
   ctx.textBaseline = 'middle';
   ctx.fillText('+1 g', 4 * dpr, mid - scale);
   ctx.fillText('-1 g', 4 * dpr, mid + scale);
+  // Offline the middle holds the "No live signal" text instead.
+  if (connected) {
+    ctx.fillText('0 g', 4 * dpr, mid);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(120,170,235,0.25)';
+    ctx.setLineDash([2 * dpr, 4 * dpr]);
+    ctx.beginPath();
+    ctx.moveTo(gutter, mid);
+    ctx.lineTo(w, mid);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.textBaseline = 'alphabetic';
   ctx.fillText('60 s ago', gutter, h - fs * 0.3);
   ctx.textAlign = 'right';
