@@ -14,6 +14,35 @@ TABLE = [
     ("I can’t get up", "help"),  # curly apostrophe from a transcriber
     ("I'm okay but I need help", "help"),
     ("yes help", "help"),
+    # distress phrases (#68)
+    ("I fell", "help"),
+    ("I fell down", "help"),
+    ("I fell over", "help"),
+    ("I've fallen", "help"),
+    ("I have fallen and I can't get up", "help"),
+    ("I fell but I'm okay", "help"),
+    ("I need an ambulance", "help"),
+    ("call an ambulance", "help"),
+    ("cant breathe", "help"),
+    ("I can't breathe", "help"),
+    ("I cannot breathe", "help"),
+    ("I can not breathe", "help"),
+    ("I cannot get up", "help"),
+    ("I am on the floor", "help"),
+    ("I'm on the floor", "help"),
+    ("I'm on the ground", "help"),
+    ("I'm bleeding", "help"),
+    ("chest pain", "help"),
+    ("I have chest pain", "help"),
+    ("I fell.", "help"),
+    ("cant breath", "help"),  # a transcriber may write the noun
+    ("Chest  pain", "help"),  # extra space from a transcriber
+    ("I'm on the  floor", "help"),
+    ("fellow", "no_answer"),
+    # "fell asleep" is not a fall: it follows the normal order
+    ("I fell asleep", "no_answer"),
+    ("I fell asleep, I'm okay", "ok"),
+    ("I've fallen asleep", "no_answer"),
     # a negated answer must never become ok
     ("I'm not okay", "help"),
     ("not okay", "help"),

@@ -6,13 +6,19 @@ Order matters: a help word wins over everything, then any negation counts as hel
 
 import re
 
-HELP = re.compile(r"\b(help|hurt|emergency|can ?not get up|can't get up|cant get up)")
+# "fell asleep" and "fallen asleep" answer about sleep, not a fall.
+HELP = re.compile(
+    r"\b(help|hurt|emergency|ambulance|bleed|chest pain"
+    r"|(can ?not|can't|cant) (get up|breathe?)"
+    r"|(fell|fallen)\b(?! asleep)"
+    r"|on the (floor|ground))"
+)
 NEGATION = re.compile(r"\b(no|nope|nah|not|never)\b|n't\b")
 OK = re.compile(r"\b(yes|yeah|yep|yup|okay|ok|fine|alright|all right)\b")
 
 
 def classify(transcript: str | None) -> str:
-    text = (transcript or "").lower().replace("’", "'")
+    text = re.sub(r"\s+", " ", (transcript or "").lower().replace("’", "'"))
     if HELP.search(text) or NEGATION.search(text):
         return "help"
     if OK.search(text):
