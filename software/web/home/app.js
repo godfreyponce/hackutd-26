@@ -77,9 +77,10 @@ const vignette = svgEl('rect', { width: 300, height: 260, fill: 'url(#vignette)'
 const scope = svgEl('g', {}, map);
 for (const r of [40, 82, 124]) svgEl('circle', { cx: HOME.x, cy: HOME.y, r, class: 'range' }, scope);
 // One view unit is about 2 m, so the rings sit at about 80, 160 and 250 m. The 80 m ring is left unlabeled:
-// its label would crowd the reticle.
+// its label would crowd the reticle. The others sit at their ring's south-east point, clear of the N tick,
+// THIS HOME and the corner counts.
 const ringLabels = [[82, '160 m'], [124, '250 m']].map(([r, text]) =>
-  hudText(scope, HOME.x + r * 0.71 + 3, HOME.y - r * 0.71 - 2, text, { class: 'hud dim' }));
+  hudText(scope, HOME.x + r * 0.71 + 3, HOME.y + r * 0.71 + 10, text, { class: 'hud dim' }));
 svgEl('path', { d: `M${HOME.x - 124} ${HOME.y}H${HOME.x + 124}M${HOME.x} ${HOME.y - 124}V${HOME.y + 124}`, class: 'cross' }, scope);
 for (let deg = 0; deg < 360; deg += 10) {
   const a = (deg * Math.PI) / 180;
@@ -158,7 +159,7 @@ function fitMap() {
 
 let view = { x: 0, y: 0, w: 300, h: 260, f: 11 };
 const HUD_PAD = 4;
-const DOT_CLEAR = 3; // view units kept between a dot's center and any HUD backing box
+const DOT_CLEAR = 3.6 + 2.5; // a dot's radius plus room for its outline, kept between its center and any HUD backing box
 const DOT_EXTENT = 5; // a dot's radius plus its outline and glow, in view units
 function fitBacking(bg, ...els) {
   const boxes = els.map((el) => el.getBBox());
@@ -218,8 +219,10 @@ function renderMap() {
   hudNodes.textContent = `NODES ${total}`;
   const escalated = connected && state.status === 'CONTACTING_HELP';
   hudHit.textContent = connected ? `HIT ${hit}` : 'HIT --';
-  hudHit.classList.toggle('alarm', connected && hit > 0);
-  hudHit.classList.toggle('warn', !connected);
+  // A protected home that was hit reads amber, not alarm red; the dots keep their encoding.
+  const hitAlarm = connected && hit > 0 && state.status !== 'PROTECTED';
+  hudHit.classList.toggle('alarm', hitAlarm);
+  hudHit.classList.toggle('warn', !connected || (hit > 0 && !hitAlarm));
   hudEscalated.style.display = escalated ? '' : 'none';
   hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
   hudLive.classList.toggle('warn', !connected);

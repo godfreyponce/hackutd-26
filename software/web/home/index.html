@@ -115,7 +115,8 @@
   @media (max-width: 1399.98px) {
     .banner { display: grid; grid-template-columns: auto auto 1fr auto; row-gap: calc(var(--u) * 0.3); }
     .banner svg { grid-row: span 2; }
-    .banner .headline { grid-row: 2; grid-column: 3 / -1; }
+    .banner .headline { grid-row: 2; grid-column: 3; }
+    .banner .area { grid-row: 2; grid-column: -2; align-self: end; }
   }
 
   .hero { grid-area: hero; container-type: inline-size; display: flex; align-items: center; gap: var(--hero-gap); padding: calc(var(--u) * 1.2) 0 calc(var(--u) * 0.5); }
@@ -138,6 +139,7 @@
      (the others at most 7.2 em), and keeps 0.6u free before the column edge. */
   body[data-status="CONTACTING_HELP"] .word { font-size: min(calc(var(--u) * 6.4), calc((100cqi - var(--shield-w) - var(--hero-gap) - var(--u) * 0.6) / 9.3)); letter-spacing: 0.005em; }
   body[data-status="PROTECTED"]:not([data-link="down"]) .word { color: var(--text); }
+  body[data-status="CONTACTING_HELP"] .word { color: #ff5969; }
   .detail { font-size: max(24px, calc(var(--u) * 1.6)); }
   .note {
     display: inline-block; margin-top: 0.3em; padding: 0.2em 0.7em; border-radius: 6px;
@@ -194,16 +196,16 @@
   .card-value { margin-left: auto; white-space: nowrap; font-size: calc(var(--u) * 1.6); font-weight: 700; font-variant-numeric: tabular-nums; }
   .card-value small { font-size: max(18px, .7em); color: var(--muted); font-weight: 500; margin-left: .3em; }
   .card canvas { flex: 1; width: 100%; min-height: 0; margin-top: 0.6em; }
-  .heat-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px 0 0.3em; }
+  .heat-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 14px 0 0.3em; }
   /* The bar lines up with the trace's +1 g line in the card beside it; the reading sits centered between the
      scale and the caption at the bottom. When the card is short the space under the scale (::after, ordered
      between scale and reading) gives way first, then the space above the bar. */
-  .heat-body::before { content: ""; flex: 0 1 calc(var(--u) * 2); }
+  .heat-body::before { content: ""; flex: 0 1 calc(var(--u) * 2 - 6px); }
   .heat-body::after { content: ""; order: 1; flex: 0 100 calc(var(--u) * 1.2); }
   #temp, #heat-sub { order: 2; }
   #temp { margin: auto 0; }
   #heat-sub { margin-top: 0; padding-top: 0.6em; }
-  #heat-at { display: block; font-size: max(16px, 0.9em); }
+  #heat-at { display: block; font-size: max(18px, 0.9em); }
   #heat-at[hidden] { display: none; }
   /* With the banner up the card is short, so the space above the bar gives way before the space under the scale. */
   main:has(> .banner:not([hidden])) .heat-body::before { flex-shrink: 100; }
@@ -219,10 +221,11 @@
   .temp { font-size: calc(var(--u) * 4); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .temp small { font-size: 0.4em; color: var(--muted); font-weight: 500; }
   .temp .no-reading { font-size: max(22px, calc(var(--u) * 1.2)); font-weight: 500; line-height: 1.35; }
-  /* Tall screens: the reading sits right under the scale and the caption holds the bottom, so no band is empty. */
+  /* Tall screens: the scale holds the top and the reading sits on its caption at the bottom, as one group. */
   @media (min-height: 900px) {
     .temp { font-weight: 700; }
-    #temp { margin: calc(var(--u) * 1.4) 0 auto; }
+    #temp { margin: auto 0 0; }
+    #heat-sub { margin-top: 0; padding-top: calc(var(--u) * 0.5); }
     .heat-body::before { flex: 0 1 calc(var(--u) * 1.2); }
     .heat-body::after { flex-basis: 0; }
     .hero { padding-bottom: 0; }
@@ -234,8 +237,8 @@
   /* Fades the imagery's edges under the HUD corners. */
   .map-frame::after { content: ""; position: absolute; inset: 0; border-radius: 8px; pointer-events: none; box-shadow: inset 0 0 calc(var(--u) * 1.4) calc(var(--u) * 0.5) rgba(6, 16, 31, 0.85); }
   /* The five keys do not fit one line in the narrow card, so they sit in two rows on three shared columns. */
-  .map .legend { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 0.35em calc(var(--u) * 1.6); color: var(--muted); font-size: max(18px, calc(var(--u) * 1.1)); white-space: nowrap; margin-top: 0.5em; }
-  .map .legend i { display: inline-block; width: 0.75em; height: 0.75em; border-radius: 50%; margin-right: 0.35em; vertical-align: -0.05em; }
+  .map .legend { display: grid; grid-template-columns: repeat(3, auto); justify-content: space-between; gap: 0.35em calc(var(--u) * 0.8); color: var(--muted); font-size: max(18px, calc(var(--u) * 1.1)); white-space: nowrap; margin-top: 0.5em; }
+  .map .legend i { display: inline-block; width: 0.9em; height: 0.9em; border-radius: 50%; margin-right: 0.35em; vertical-align: -0.05em; }
   .map .legend i.escalated { border: 2px solid var(--danger); background: radial-gradient(circle, var(--danger) 0 0.16em, transparent 0.19em); }
   .map .legend i.real { border: 2px solid var(--real); }
   #map image { filter: saturate(1.15) contrast(1.05); }
