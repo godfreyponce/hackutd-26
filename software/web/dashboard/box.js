@@ -28,7 +28,7 @@ export function initialBox(now) {
 function answered(s, answer) {
   if (answer === 'ok') return { ...s, answered_ok: true, no_answer: 0, said_help: false };
   if (answer === 'help') return { ...s, said_help: true };
-  if (answer === 'no_answer') return { ...s, no_answer: Math.max(s.no_answer, s.try || s.no_answer + 1) };
+  if (answer === 'no_answer') return { ...s, answered_ok: false, no_answer: Math.max(s.no_answer, s.try || s.no_answer + 1) };
   return s;
 }
 
@@ -56,6 +56,10 @@ export function applyBoxEvent(state, msg, now) {
       s = { ...s, checkin: msg.state, try: msg.try ?? s.try };
       if (msg.state === 'ok' || msg.state === 'help' || msg.state === 'no_answer') return answered(s, msg.state);
       if (msg.state === 'alarm') return { ...s, alarm: true };
+      // Try 1 opens a new check-in. Under an alarm it is the stand-up re-ask, which keeps the alarm's state.
+      if (msg.state === 'asking' && msg.try === 1 && !s.alarm) {
+        return { ...s, answered_ok: false, no_answer: 0, said_help: false, heard: null };
+      }
       if (msg.state === 'clear') return { ...s, alarm: false, said_help: false, no_answer: 0 };
       return s;
     }
