@@ -50,6 +50,29 @@ The SAME recording plays on the box speaker in the room. It is never transmitted
 47 CFR 11.45 bans, and an antenna cannot pick up a phone speaker anyway (it hears 162.4 MHz radio waves, not
 sound). Station HACKDEMO marks it as ours, so the box always says "DEMO, not a real alert".
 
+## Phone calls (Twilio, ready)
+
+- Rafael's Twilio account is **upgraded** (no trial message), with a Dallas number for voice. It calls only
+  `TWILIO_TO` (Rafael's phone), never 911, no backup number. Keys live only in `~/.config/land/env` on the Pi.
+- Test call placed 2026-11-08 from the laptop: answered, 50 s, the full alarm message.
+- **Alarm call** (no answer x3, or a help answer): `_alarm_call_text` in `software/agent/checkin.py` says what
+  happened, how the person answered, what the camera sees and the battery state, then "Please check on them now, and
+  call 911 if you think they are hurt", twice. Every trigger has its own line: radio alert, shaking (peak g), fall,
+  heat (degrees), scream, X sign. Example: "This is LAND, the home safety box, with an alarm for the person at home.
+  The weather radio received an Earthquake Warning for Dallas County, Texas and Collin County, Texas (a demo alert).
+  I asked if they were okay 3 times and got no answer. The camera still sees them, not moving. ..."
+- **Help call** (after "yes" to `offer_call`): `_call_summary`, 1-2 sentences, then "Handing the call to the
+  homeowner." One-way today; the two-way bridge is issue #87.
+- **No internet:** no call is possible, so the box says `call_offline` ("If you can, call 911 from a phone. The
+  alarm stays on.") instead of pretending. SMS is not used (it needs A2P 10DLC registration).
+- Every call shows on the demo page: `{"type":"call","kind":"alarm"|"help","state":"dialing"|"placed"|"failed"}`.
+
+## The agent's tools
+
+Plain OpenAI-style function calling to Nemotron (7 tools: get_presence, speak, listen, raise_alarm,
+notify_contact, schedule_recheck, log_decision). Our code runs and checks every call. No MCP server: it would add a
+process and latency inside the emergency loop for no safety gain.
+
 ## For the judges' questions
 
 **Calling without Wi-Fi.** A cellular modem board on the Pi (for example a SIM7600 4G HAT) is the radio part of a
