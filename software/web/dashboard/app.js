@@ -837,11 +837,29 @@ function renderOverlays(now, cityA) {
   }
   setText('callout-title', title);
   setText('callout-text', text);
+  renderHandoff(boxAlarmed ? box.handoff : null);
   el.classList.toggle('alarm', boxAlarmed);
   const [x, y] = toScreen(REAL);
   const left = x + 340 > view.w;
   el.classList.toggle('left', left);
   el.style.transform = `translate(${Math.round(left ? x - 30 : x + 30)}px, ${Math.round(y)}px) translate(${left ? '-100%' : '0'}, -50%)`;
+}
+
+const BY_LABEL = { nemotron: 'Written by Nemotron', template: 'Template' };
+
+function renderHandoff(h) {
+  $('handoff').hidden = !h;
+  $('callout').classList.toggle('has-handoff', !!h);
+  if (!h) return;
+  for (const [id, by] of [['handoff-by', h.by], ['handoff-why-by', h.why_by]]) {
+    setText(id, BY_LABEL[by] ?? String(by));
+    $(id).classList.toggle('template', by !== 'nemotron');
+  }
+  setText('handoff-note', h.note ?? '');
+  setText('handoff-contact', h.contact ? `Contact first: ${h.contact.name} (${h.contact.role})` : '');
+  const why = (Array.isArray(h.why) ? h.why : []).map((line) => `<li>${esc(line)}</li>`).join('');
+  const list = $('handoff-why');
+  if (list.dataset.html !== why) list.innerHTML = list.dataset.html = why;
 }
 
 function draw(now) {

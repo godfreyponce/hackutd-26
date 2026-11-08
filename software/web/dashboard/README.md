@@ -26,6 +26,8 @@ The map has three stages:
 2. City: on a quake, a red pulse shows at north Texas, the globe turns to face it, and the camera flies down to the Richardson street map. Then the wave plays: red spreads over the streets like a stain, and each white dot turns red as it passes.
 3. Home: when H000 raises an alarm or says help, the camera zooms to its block with a callout. On `clear` it goes back to the city.
 
+After an alarm the agent sends a `handoff`. The callout then shows the hand-off note, who to contact first, and the why for the alarm. Each part says who wrote it: "Written by Nemotron", or "Template" when the agent fell back.
+
 With `prefers-reduced-motion`, the map cuts between stages and shows no stain.
 
 ## Tests
@@ -69,6 +71,6 @@ Every queue row shows each of these factors.
 
 ## Bus
 
-- Listens to `quake`, `presence`, `fall_hint`, `power`, `heartbeat`, `checkin`, `heard`, `agent`, `rerank`, `alert` and `reset`.
+- Listens to `quake`, `presence`, `fall_hint`, `power`, `heartbeat`, `checkin`, `heard`, `agent`, `handoff`, `rerank`, `alert` and `reset`.
 - Sends `queue` with the top 20 when the order changes, at most once every 2 s.
 - Guardrail on `rerank`: a move goes through only if it is at most 3 places and names a factor. A move can never demote a home under 30 min or a home that said help, or push one down. `by` < 0 moves a home up. A blocked move shows on screen with its reason.

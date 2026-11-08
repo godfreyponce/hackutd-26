@@ -34,3 +34,10 @@ ALARM_CALL_TEXT = (
     "This is a test alarm from the HackUTD home safety demo. "
     "There was no response after an event at the box."
 )
+
+# Demo contacts the hand-off note may name first. Teammates with role labels, no phone numbers.
+# Nothing texts them: the alarm calls and texts only TWILIO_TO.
+HANDOFF_CONTACTS = {
+    "godfrey": {"name": "Godfrey", "role": "family contact, demo"},
+    "rafael": {"name": "Rafael", "role": "neighbor, demo"},
+}

@@ -7,8 +7,10 @@ text. The planner can add steps but can never skip an alarm the rule demands.
 import asyncio
 import json
 import logging
+from datetime import datetime
 
 from . import rule
+from .handoff import HandoffWriter, build_facts
 from .planner import LLMPlanner, PlannerUnavailable, ScriptPlanner
 from .scripts import (ALARM_CALL_TEXT, ESCALATE_SCRIPT, REPLY_SCRIPTS, RETRY_SCRIPTS, SCRIPTS, SMS_TEMPLATES,
                       STANDUP_SCRIPT)
@@ -55,11 +57,13 @@ def build_tools(ask_script):
 class Incident:
     """One event, from trigger until ok, clear, no alarm, or reset."""
 
-    def __init__(self, trigger):
+    def __init__(self, trigger, peak_g=None):
         self.trigger = trigger
+        self.peak_g = peak_g
         self.goal = "checkin"  # or "standup": one "Are you okay?" after the alarm
         self.tries = 0
         self.answers = []
+        self.heard_log = []  # (try, answer, screened transcript) for the hand-off note
         self.pending = None  # script id of a question waiting for its answer
         self.reply_due = None  # reply script id the last answer still needs
         self.reply_due_turn = None
@@ -92,7 +96,7 @@ class Incident:
 
 
 class Agent:
-    def __init__(self, bus, settings, planners, guard, notifier, ranker=None):
+    def __init__(self, bus, settings, planners, guard, notifier, ranker=None, writer=None):
         self.bus = bus
         self.settings = settings
         if not isinstance(planners[-1], ScriptPlanner):
@@ -101,8 +105,12 @@ class Agent:
         self.guard = guard
         self.notifier = notifier
         self.ranker = ranker
+        self.writer = writer or HandoffWriter(None, None, settings.planner_timeout_s)
         self.tools = build_tools(settings.ask_script)
         self.presence = "none"
+        self.battery_pct = None
+        self.power = None
+        self.alert = None
         self.incident = None
         self.task = None
         self.rechecks = []
@@ -119,7 +127,13 @@ class Agent:
         if kind == "presence":
             await self._on_presence(msg.get("state"))
         elif kind in ("quake", "fall_hint"):
-            self._start_checkin(kind)
+            self._start_checkin(kind, msg.get("peak_g"))
+        elif kind == "heartbeat":
+            self.battery_pct = msg.get("battery_pct")
+        elif kind == "power":
+            self.power = msg.get("state")
+        elif kind == "alert":
+            self.alert = msg
         elif kind == "heard":
             inc = self.incident
             if inc and inc.pending:
@@ -157,15 +171,16 @@ class Agent:
         self.rechecks.clear()
         self.incident = None
         self.presence = "none"
+        self.battery_pct = self.power = self.alert = None
         log.info("reset: check-in cleared")
 
     # ---- triggers ----
 
-    def _start_checkin(self, trigger):
+    def _start_checkin(self, trigger, peak_g=None):
         if self.incident and self.incident.open:
             log.info("%s while a check-in is open, ignored", trigger)
             return
-        self.incident = Incident(trigger)
+        self.incident = Incident(trigger, peak_g)
         self._launch("checkin")
 
     def _launch(self, goal):
@@ -222,6 +237,8 @@ class Agent:
                 await self.trace("VERIFY", f"{planner.label} stopped before the check-in finished. The fixed script takes over.")
                 chain = chain[-1:]
             turn += 1
+        if inc.goal == "checkin" and inc.alarm_raised:
+            await self._handoff(inc)
         if isinstance(chain[0], LLMPlanner):
             await self._follow_up(chain[0], messages, inc, turn)
         await self.trace("VERIFY", self._decision_text(inc), "log_decision")
@@ -356,6 +373,7 @@ class Agent:
         transcript = await self._screen(msg.get("transcript") or "")
         try_n = 1 if inc.goal == "standup" else inc.tries
         inc.answers.append(answer)
+        inc.heard_log.append((try_n, answer, transcript))
         inc.run_answered = True
         await self.send({"type": "checkin", "state": answer, "try": try_n})
         if answer in REPLY_SCRIPTS:
@@ -424,6 +442,22 @@ class Agent:
         await self.send({"type": "checkin", "state": "alarm", "try": inc.tries + 1})
         how = await self.notifier.call(ALARM_CALL_TEXT)
         await self.trace("VERIFY", f"Fake alarm raised ({reason}). On-screen alarm sent. {how}", "raise_alarm")
+
+    async def _handoff(self, inc):
+        """After the alarm: Nemotron's note for responders and its why. Code checks both."""
+        facts = build_facts(trigger=inc.trigger, peak_g=inc.peak_g, presence=self.presence, answers=inc.heard_log,
+                            battery_pct=self.battery_pct, power=self.power, alert=self.alert,
+                            reason=inc.alarm_reason, at=datetime.now().strftime("%H:%M"))
+        await self.trace("ACT", f"write_handoff(home={facts['home']!r})", "write_handoff")
+        await self.trace("ACT", "explain_alarm(reasoning='on')", "explain_alarm")
+        h = await self.writer.write(facts)
+        for step, text, tool in h.rows:
+            await self.trace(step, text, tool)
+        await self.send(h.event())
+        contact = h.event()["contact"]
+        await self.trace("VERIFY", f"Hand-off note by {h.by.capitalize()}: {h.note} Contact first: {contact['name']} "
+                         f"({contact['role']}).", "write_handoff")
+        await self.trace("VERIFY", f"Why by {h.why_by.capitalize()}: {' '.join(h.why)}", "explain_alarm")
 
     async def _notify_contact(self, inc, turn, args):
         tid = args.get("template_id")

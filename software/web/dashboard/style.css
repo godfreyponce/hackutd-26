@@ -205,6 +205,18 @@ kbd {
 .callout.alarm { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft), 0 8px 30px rgba(0, 0, 0, 0.5); }
 .callout.alarm b { color: #ffb4ae; }
 .callout.alarm span { color: var(--text); }
+.callout.has-handoff { max-width: 340px; }
+.handoff { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.handoff[hidden] { display: none; }
+.handoff p { margin: 0; }
+.h-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.h-head em { font: 700 10px var(--mono); font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.h-head .by { font: 700 10px var(--mono); font-style: normal; padding: 2px 6px; border-radius: 4px; color: #dcc4ff; background: var(--agent-soft); }
+.h-head .by.template { color: var(--amber); background: var(--amber-soft); }
+.h-note { color: var(--text); }
+.h-contact { color: var(--real); }
+.h-why { margin: 0 0 2px; padding: 0; list-style: none; color: var(--text); }
+.h-why li + li { margin-top: 2px; }
 @keyframes callout-in { from { opacity: 0; } }
 
 /* Right column */
