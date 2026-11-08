@@ -26,6 +26,8 @@ HEF = "/usr/share/hailo-models/yolov8s_pose_h8.hef"
 STRIDES = (8, 16, 32)
 SCORE_MIN = 0.5
 KP_MIN = 0.4
+HOLD_S = 0.8            # a presence state must hold this long before it is sent
+FALL_COOLDOWN_S = 20    # at most one fall_hint per 20 s
 # COCO keypoint indices
 NOSE, L_SH, R_SH, L_HIP, R_HIP, L_KNEE, R_KNEE, L_ANK, R_ANK = 0, 5, 6, 11, 12, 13, 14, 15, 16
 SKELETON = [(5, 6), (5, 7), (7, 9), (6, 8), (8, 10), (5, 11), (6, 12), (11, 12),
@@ -68,7 +70,8 @@ def decode(outputs):
     if not boxes:
         return np.zeros((0, 4)), np.zeros(0), np.zeros((0, 17, 3))
     boxes, scores, kpts = np.concatenate(boxes), np.concatenate(scores), np.concatenate(kpts)
-    idx = cv2.dnn.NMSBoxes([[*b[:2], *(b[2:] - b[:2])] for b in boxes.tolist()], scores.tolist(), SCORE_MIN, 0.5)
+    xywh = np.concatenate([boxes[:, :2], boxes[:, 2:] - boxes[:, :2]], axis=1)
+    idx = cv2.dnn.NMSBoxes(xywh.tolist(), scores.tolist(), SCORE_MIN, 0.5)
     idx = np.array(idx).reshape(-1)
     return boxes[idx], scores[idx], kpts[idx]
 
@@ -151,11 +154,11 @@ def main():
         if not args.no_window:
             cv2.namedWindow("LAND camera", cv2.WINDOW_NORMAL)
             cv2.setWindowProperty("LAND camera", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-
         votes = deque(maxlen=8)          # posture smoothing
-        track = deque(maxlen=15)         # (t, center, box_h) for motion
+        track = deque(maxlen=30)         # (t, center, box_h) for motion, ~1 s
         last_seen, presence, posture = 0.0, "none", None
-        upright_until = 0.0              # last time the person was upright
+        candidate, candidate_since = "none", 0.0   # presence must hold HOLD_S before it is sent
+        upright_until, last_fall = 0.0, 0.0        # last time upright; last fall_hint sent
         fps_t, fps_n, fps = time.time(), 0, 0.0
 
         while True:
@@ -189,17 +192,22 @@ def main():
             if len(track) >= 2 and now - last_seen < 1.5:
                 (t0, c0, h0), (t1, c1, h1) = track[0], track[-1]
                 travel = math.dist(c0, c1) / max(h1, 1.0)
-                moving = travel > 0.08 or posture == "UNCLEAR"
-            new_presence = "none" if now - last_seen > 1.5 else ("moving" if moving else "still")
+                moving = travel > 0.06
+            observed = "none" if now - last_seen > 1.5 else ("moving" if moving else "still")
+            if observed != candidate:
+                candidate, candidate_since = observed, now
 
             if posture in ("STANDING", "SITTING"):
                 upright_until = now
-            if new_presence != presence:
-                hub.send({"type": "presence", "state": new_presence})
-                # fall hint: lying and still within 5 s of being upright (contract: a hint, not a diagnosis)
-                if new_presence == "still" and posture == "LYING" and now - upright_until < 5:
+            # hysteresis: only report a presence change that has held for HOLD_S (no moving/still flicker)
+            if candidate != presence and now - candidate_since >= HOLD_S:
+                presence = candidate
+                hub.send({"type": "presence", "state": presence})
+                # fall hint: lying and still soon after being upright; one per FALL_COOLDOWN_S
+                if (presence == "still" and posture == "LYING" and now - upright_until < 6
+                        and now - last_fall > FALL_COOLDOWN_S):
                     hub.send({"type": "fall_hint"})
-                presence = new_presence
+                    last_fall = now
 
             fps_n += 1
             if now - fps_t >= 1:
@@ -212,7 +220,7 @@ def main():
             cv2.putText(img, f"{fps:4.1f} fps  {args.mount}  {hub_txt}", (main_wh[0] - 470, 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
             if not args.no_window:
-                cv2.imshow("LAND camera", img)
+                cv2.imshow("LAND camera", cv2.resize(img, (1920, 1080)))  # fill the monitor
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
             elif fps_n == 0:  # headless: refresh a snapshot once a second
