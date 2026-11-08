@@ -308,3 +308,183 @@ def test_reset_clears_everything():
 )
 def test_json_mode_parsing(text, expected):
     assert [(c.name, c.args) for c in parse_json_calls(text)] == expected
+
+
+# ---- emergency alerts (#36) ----
+
+def alert(code, level, **extra):
+    """A hub `alert` message. The hub adds `level`; tests set it themselves."""
+    msg = {"type": "alert", "source": "noaa", "event": "Earthquake Warning", "severity": "Extreme",
+           "urgency": "Immediate", "certainty": "Observed", "area": "Dallas County",
+           "headline": "Earthquake Warning for Dallas County", "code": code, "station": "KEC56"}
+    if level is not None:
+        msg["level"] = level
+    return {**msg, **extra}
+
+
+EQW = alert("EQW", "emergency")
+DEMO_EQW = alert("EQW", "emergency", station="HACKDEMO", demo=True)
+DEMO = "DEMO, not a real alert."
+
+
+@pytest.mark.parametrize("kind", PLANNERS)
+def test_eqw_emergency_alert_starts_a_checkin_with_the_ask_event_line(kind):
+    bus, agent = go(["ok"], [STILL, EQW], PLANNERS[kind]())
+    assert bus.says() == ["ask_event", "reply_ok"]
+    assert [m for m in bus.sent if m["type"] == "say"][0]["text"] == SCRIPTS["ask_event"]
+    assert bus.checkins() == [("asking", 1), ("ok", 1)]
+    assert agent.alert == EQW
+    assert agent.incident.trigger == "alert"
+
+
+@pytest.mark.parametrize("kind", PLANNERS)
+def test_eqw_alert_keeps_the_alarm_rule(kind):
+    bus, _ = go(["no_answer"] * 3, [STILL, EQW], PLANNERS[kind]())
+    assert bus.says() == ["ask_event", "ask_retry_2", "ask_retry_3", "escalate"]
+    assert bus.states()[-1] == "alarm"
+    bus, _ = go(["no_answer"], [NOBODY, EQW], PLANNERS[kind]())
+    assert bus.checkins() == [("asking", 1), ("no_answer", 1)]
+
+
+def test_planner_asking_with_the_other_ask_id_still_gets_ask_event():
+    def stubborn(messages):
+        return [(n, {"script_id": "ask_stopped"} if n == "speak" else a) for n, a in cooperative(messages)]
+
+    bus, _ = go(["no_answer"] * 3, [STILL, EQW], llm(FakeClient(stubborn)))
+    assert bus.says() == ["ask_event", "ask_retry_2", "ask_retry_3", "escalate"]
+
+
+@pytest.mark.parametrize("msg", [
+    alert("EQW", "warning"),
+    alert("EQW", "watch"),
+    alert("EQW", None),
+    alert("TOR", "warning", event="Tornado Warning"),
+    alert("TOR", "emergency", event="Tornado Warning"),
+    alert(None, "emergency"),
+], ids=["eqw-warning", "eqw-watch", "eqw-no-level", "tor-warning", "tor-emergency", "no-code"])
+def test_other_alerts_are_only_stored(msg):
+    bus, agent = go(["ok"], [STILL, msg])
+    assert agent.alert == msg
+    assert agent.incident is None
+    assert bus.sent == []
+
+
+def _clocked(agent, now):
+    agent.clock = lambda: now[0]
+
+
+def test_second_eqw_within_300_s_of_an_incident_start_is_ignored_then_works_after():
+    async def scenario():
+        now = [1000.0]
+        bus = FakeBus(["ok", "ok", "ok"])
+        agent = make_agent(bus)
+        _clocked(agent, now)
+        await agent.handle(STILL)
+        await agent.handle(EQW)
+        await agent.idle()
+        now[0] += 299
+        await agent.handle(EQW)
+        await agent.idle()
+        asked_before_300 = bus.says().count("ask_event")
+        now[0] += 1
+        await agent.handle(EQW)
+        await agent.idle()
+        return bus, asked_before_300
+
+    bus, asked_before_300 = asyncio.run(scenario())
+    assert asked_before_300 == 1
+    assert bus.says().count("ask_event") == 2
+    ignored = [r["text"] for r in bus.trace("VERIFY") if "ignored" in r["text"]]
+    assert len(ignored) == 1 and "299 s ago" in ignored[0] and "300 s" in ignored[0]
+
+
+def test_eqw_right_after_a_quake_checkin_is_ignored():
+    async def scenario():
+        now = [50.0]
+        bus = FakeBus(["ok", "ok"])
+        agent = make_agent(bus)
+        _clocked(agent, now)
+        await agent.handle(STILL)
+        await agent.handle(QUAKE)
+        await agent.idle()
+        now[0] += 20
+        await agent.handle(EQW)
+        await agent.idle()
+        return bus, agent
+
+    bus, agent = asyncio.run(scenario())
+    assert bus.says() == ["ask_stopped", "reply_ok"]
+    assert agent.incident.trigger == "quake"
+    assert agent.alert == EQW
+
+
+def test_demo_eqw_says_and_writes_demo_not_a_real_alert():
+    client = FakeClient()
+    bus, _ = go(["no_answer"] * 3, [STILL, DEMO_EQW], llm(client))
+    says = [m for m in bus.sent if m["type"] == "say"]
+    assert says[0] == {"type": "say", "script_id": "alert_demo", "text": DEMO}
+    assert "listen_s" not in says[0]
+    assert [m["script_id"] for m in says[1:]] == ["ask_event", "ask_retry_2", "ask_retry_3", "escalate"]
+    assert DEMO in client.requests[0]["messages"][1]["content"]
+    about_alert = [r["text"] for r in bus.trace() if "alert" in r["text"].lower() or "EQW" in r["text"]]
+    assert about_alert and all(DEMO.rstrip(".") in t for t in about_alert)
+    [handoff] = [m for m in bus.sent if m["type"] == "handoff"]
+    assert DEMO in handoff["note"] and "Official" not in handoff["note"]
+
+
+def test_real_eqw_has_no_demo_wording():
+    bus, _ = go(["no_answer"] * 3, [STILL, EQW])
+    assert "alert_demo" not in bus.says()
+    assert not any("DEMO" in str(m) for m in bus.sent)
+
+
+def test_ignored_demo_eqw_row_says_demo():
+    async def scenario():
+        now = [0.0]
+        bus = FakeBus(["ok", "ok"])
+        agent = make_agent(bus)
+        _clocked(agent, now)
+        await agent.handle(DEMO_EQW)
+        await agent.idle()
+        now[0] += 10
+        await agent.handle(DEMO_EQW)
+        await agent.idle()
+        return bus
+
+    bus = asyncio.run(scenario())
+    [ignored] = [r["text"] for r in bus.trace("VERIFY") if "ignored" in r["text"]]
+    assert DEMO.rstrip(".") in ignored
+
+
+def test_eqw_while_an_alarm_is_still_up_after_300_s_is_ignored():
+    async def scenario():
+        now = [0.0]
+        bus = FakeBus(["no_answer"] * 3)
+        agent = make_agent(bus)
+        _clocked(agent, now)
+        await agent.handle(STILL)
+        await agent.handle(EQW)
+        await agent.idle()
+        now[0] += 301
+        await agent.handle(EQW)
+        await agent.idle()
+        return bus
+
+    bus = asyncio.run(scenario())
+    assert bus.says() == ["ask_event", "ask_retry_2", "ask_retry_3", "escalate"]
+    assert any("still open" in r["text"] for r in bus.trace("VERIFY"))
+
+
+def _note(bus):
+    [handoff] = [m for m in bus.sent if m["type"] == "handoff"]
+    return handoff["note"]
+
+
+def test_handoff_names_the_alert_that_started_the_checkin():
+    tor = alert("TOR", "warning", event="Tornado Warning")
+    demo_then_tor = [{"answer": "no_answer", "before": [tor]}, "no_answer", "no_answer"]
+    note = _note(go(demo_then_tor, [STILL, DEMO_EQW])[0])
+    assert DEMO in note and "Tornado" not in note
+    real_then_demo = [{"answer": "no_answer", "before": [DEMO_EQW]}, "no_answer", "no_answer"]
+    note = _note(go(real_then_demo, [STILL, EQW])[0])
+    assert "Official alert: Earthquake Warning" in note and "DEMO" not in note

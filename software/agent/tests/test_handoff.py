@@ -205,3 +205,30 @@ def test_a_note_that_says_fall_or_radar_fails():
     assert check_note("The person fell and stayed still.", FACTS) == "says fall or radar"
     assert check_note("Possible fall at the box.", FACTS) == "says fall or radar"
     assert check_note("Radar shows the person still.", FACTS) == "says fall or radar"
+
+
+# ---- demo alerts (#36) ----
+
+DEMO_ALERT = {"type": "alert", "source": "noaa", "event": "Earthquake Warning", "headline": "Earthquake Warning",
+              "code": "EQW", "level": "emergency", "station": "HACKDEMO", "demo": True}
+DEMO_FACTS = build_facts(trigger="alert", peak_g=None, presence="still", answers=[(1, "help", "help me")],
+                         battery_pct=None, power=None, alert=DEMO_ALERT, reason="the answer was help", at="14:32")
+
+
+def test_demo_alert_facts_and_template_say_demo():
+    assert DEMO_FACTS["alert"]["demo"] is True
+    assert DEMO_FACTS["alert"]["code"] == "EQW"
+    note = template_note(DEMO_FACTS, "godfrey")
+    assert "DEMO, not a real alert." in note
+    assert "Official" not in note
+
+
+def test_real_alert_template_stays_official():
+    assert "Official alert: Earthquake (usgs)." in template_note(FACTS, "godfrey")
+
+
+def test_a_note_about_a_demo_alert_must_say_demo():
+    assert check_note("H000: help after an Earthquake Warning alert. Alarm at 14:32.", DEMO_FACTS) == \
+        "does not say DEMO, not a real alert"
+    assert check_note("H000: help after an Earthquake Warning alert. DEMO, not a real alert. Alarm at 14:32.",
+                      DEMO_FACTS) is None
