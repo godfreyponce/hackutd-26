@@ -167,12 +167,13 @@ def test_alarm_sends_one_handoff_event_after_the_alarm():
 def test_the_facts_carry_battery_peak_g_alert_and_each_transcript():
     client = FakeWriterClient(note=GOOD_REPLY, why=GOOD_WHY)
     alert = {"type": "alert", "source": "usgs", "event": "Earthquake", "headline": "DEMO ONLY"}
-    answers = [{"answer": "no_answer", "transcript": "mmm"}, "no_answer", "no_answer"]
+    answers = [{"answer": "no_answer", "transcript": "mmm"}, {"answer": "help", "transcript": "help, my leg"}]
     run(answers, [{"type": "heartbeat", "battery_pct": 64}, alert, STILL, QUAKE],
         HandoffWriter(client, "fake-model", timeout_s=1))
     sent = str(client.requests[0]["messages"])
-    for fact in ("64", "0.82", "DEMO ONLY", "mmm", "still"):
+    for fact in ("64", "0.82", "DEMO ONLY", "help, my leg", "still"):
         assert fact in sent
+    assert "mmm" not in sent
 
 
 def test_help_sends_a_handoff_and_keeps_reply_help_before_the_alarm():

@@ -417,7 +417,7 @@ class Agent:
         if answer not in rule.ANSWERS:
             await self.trace("VERIFY", f"Unknown answer {answer!r}. Counting it as no_answer.", "listen")
             answer = "no_answer"
-        transcript = await self._screen(msg.get("transcript") or "")
+        transcript = await self._screen(msg.get("transcript") or "", answer)
         try_n = 1 if inc.goal == "standup" else inc.tries
         inc.answers.append(answer)
         inc.heard_log.append((try_n, answer, transcript))
@@ -458,9 +458,14 @@ class Agent:
         inc.alarm_reason = reason
         await self.trace("VERIFY", f"Rule: {reason} = alarm. Next: raise_alarm.")
 
-    async def _screen(self, transcript):
-        """Safety Guard on every transcript before it enters the planner context."""
+    async def _screen(self, transcript, answer):
+        """Safety Guard on every ok or help transcript before it enters the planner context.
+        A no_answer transcript is dropped, not screened: the rule does not read it, and room noise that the
+        voice service wrote into silence would wait 0.5 to 13 s on the guard for nothing."""
         if not transcript:
+            return ""
+        if answer == "no_answer":
+            await self.trace("VERIFY", "Safety Guard skipped: no answer, transcript dropped.")
             return ""
         safe, note = await self.guard.check(transcript)
         if note.startswith("MOCK"):

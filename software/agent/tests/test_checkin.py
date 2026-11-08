@@ -258,13 +258,49 @@ def test_every_tool_call_is_a_trace_row():
     assert bus.trace("PLAN") and bus.trace("VERIFY")
 
 
-def test_safety_guard_runs_on_every_transcript():
+def test_safety_guard_runs_on_every_ok_and_help_transcript():
     guard = FakeGuard()
     answers = [{"answer": "no_answer", "transcript": "mmm"},
                {"answer": "no_answer", "transcript": "what"},
                {"answer": "ok", "transcript": "I'm okay"}]
     go(answers, [STILL, FALL_HINT], llm(FakeClient()), guard=guard)
-    assert guard.seen == ["mmm", "what", "I'm okay"]
+    assert guard.seen == ["I'm okay"]
+
+
+def test_a_help_reply_still_goes_through_the_safety_guard():
+    guard = FakeGuard()
+    bus, _ = go([{"answer": "help", "transcript": "help me please"}], [STILL, QUAKE], llm(FakeClient()), guard=guard)
+    assert guard.seen == ["help me please"]
+    assert bus.states()[-1] == "alarm"
+
+
+NOISE = "[singing] And I want you to be mine"
+
+
+@pytest.mark.parametrize("kind", PLANNERS)
+def test_no_answer_noise_skips_the_guard_and_decides_like_silence(kind):
+    guard = FakeGuard()
+    noisy, _ = go([{"answer": "no_answer", "transcript": NOISE}] * 3, [STILL, FALL_HINT], PLANNERS[kind](), guard=guard)
+    silent, _ = go(["no_answer"] * 3, [STILL, FALL_HINT], PLANNERS[kind]())
+    assert guard.seen == []
+    assert noisy.checkins() == silent.checkins()
+    assert noisy.events() == silent.events()
+    skips = [r for r in noisy.trace("VERIFY") if r["text"].startswith("Safety Guard skipped")]
+    assert len(skips) == 3 and all("tool" not in r for r in skips)
+
+
+def test_an_unknown_answer_with_words_counts_as_no_answer_and_skips_the_guard():
+    guard = FakeGuard()
+    bus, _ = go([{"answer": "maybe", "transcript": "blah"}], [NOBODY, QUAKE], guard=guard)
+    assert guard.seen == []
+    assert bus.states()[-1] == "no_answer"
+
+
+def test_skipped_noise_never_reaches_the_planner():
+    client = FakeClient()
+    go([{"answer": "no_answer", "transcript": NOISE}, "ok"], [STILL, FALL_HINT], llm(client))
+    for req in client.requests:
+        assert NOISE not in str(req["messages"])
 
 
 def test_unsafe_transcript_never_reaches_the_planner():

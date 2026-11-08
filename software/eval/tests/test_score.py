@@ -141,6 +141,14 @@ def test_heard_to_rule_time_for_spoken_answers_only():
     assert judge(CASE["silence"], silence_run())["heard_to_rule_s"] == []
 
 
+def test_heard_to_rule_leaves_out_a_no_answer_reply_with_words():
+    events = [(0.0, EVENT), (1.0, ASK), (1.5, {"type": "heard", "answer": "no_answer", "transcript": "um, what"}),
+              (1.6, heard("no_answer", 1)), (3.0, {**ASK, "try": 2}),
+              (3.5, {"type": "heard", "answer": "ok", "transcript": "yeah, I'm fine"}), (6.0, heard("ok", 2)),
+              (7.0, decision("ok"))]
+    assert judge(CASE["unclear_then_ok"], events)["heard_to_rule_s"] == [2.5]
+
+
 def test_missing_heard_is_wrong():
     events = [(t, m) for t, m in silence_run() if m is not VOICE_SILENT]
     r = judge(CASE["silence"], events)
