@@ -307,11 +307,10 @@ function render() {
   $('note').hidden = !note;
   $('note').textContent = note ?? '\u00a0'; // one blank line keeps the hidden note's height
 
-  const none = connected ? 'Nothing yet' : 'Unknown while offline';
-  $('say').textContent = state.say ? `"${state.say.text}"` : none;
+  $('say').textContent = state.say ? `"${state.say.text}"` : connected ? 'No prompt yet' : 'Prompt unavailable';
   $('say-try').textContent = state.say?.tryNum ? `try ${state.say.tryNum}` : '';
   const heard = state.heard;
-  $('heard').textContent = heard ? (heard.transcript ? `"${heard.transcript}"` : '') : none;
+  $('heard').textContent = heard ? (heard.transcript ? `"${heard.transcript}"` : '') : connected ? 'No reply yet' : 'Reply unavailable';
   $('heard-chip').hidden = !heard;
   $('heard-chip').className = `chip ${heard?.answer ?? ''}`;
   $('heard-chip').textContent = heard ? ANSWERS[heard.answer] ?? heard.answer : '';
