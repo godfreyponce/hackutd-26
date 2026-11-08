@@ -474,3 +474,85 @@ def test_reset_during_the_standup_ask_with_the_alarm_on_never_stops_audio_twice_
 
     run_with_service(engine, body, alarm=engines.AlarmTone(), line_cut=engines.line_cut)
     assert not sd.overlapped
+
+
+class TailSoundDevice(FakeSoundDevice):
+    """The next wait() holds in the line's tail, past its length, until the test ends it. Notes a stop
+    from another thread while a wait runs: on macOS that hung PortAudio."""
+
+    def __init__(self):
+        super().__init__()
+        self.hold = False
+        self.in_tail = threading.Event()
+        self.end_tail = threading.Event()
+        self.waiter = None
+        self.stopped_during_wait = False
+
+    def wait(self):
+        self.waiter = threading.get_ident()
+        try:
+            if self.hold:
+                self.hold = False
+                self.in_tail.set()
+                self.end_tail.wait(5)
+            else:
+                super().wait()
+        finally:
+            self.waiter = None
+
+    def stop(self):
+        self.stopped_during_wait |= self.waiter not in (None, threading.get_ident())
+        super().stop()
+
+
+def test_reset_in_the_tail_of_a_line_with_the_alarm_on_never_stops_audio_from_another_thread(monkeypatch):
+    sd = TailSoundDevice()
+    monkeypatch.setitem(sys.modules, "sounddevice", sd)
+    engine = SpeakerEngine(["yes"], {"escalate": 0.05, "standup_ask": 0.05, "ask_stopped": 0.05})
+
+    async def body(ws, service):
+        await ask(ws, "escalate")
+        await ws.send(json.dumps({"type": "checkin", "state": "alarm", "try": 3}))
+        await wait_for(lambda: service.alarm_on)
+        sd.hold = True
+        await ask(ws, "standup_ask")
+        await wait_for(sd.in_tail.is_set)
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 1)
+        sd.end_tail.set()
+        await ask(ws, "ask_stopped", listen_s=0.05)
+        assert await next_heard(ws) == {"type": "heard", "answer": "ok", "transcript": "yes"}
+
+    run_with_service(engine, body, alarm=engines.AlarmTone(), line_cut=engines.line_cut)
+    assert not sd.stopped_during_wait
+
+
+def test_reset_while_the_next_line_is_still_being_made_stops_the_alarm_tone_at_once(monkeypatch):
+    # A reset must not wait for the busy voice worker to stop the alarm: a slow line keeps it sounding.
+    sd = FakeSoundDevice()
+    monkeypatch.setitem(sys.modules, "sounddevice", sd)
+    making = threading.Event()
+    made = threading.Event()
+
+    class SlowEngine(SpeakerEngine):
+        def speak(self, text, script_id=None):
+            if script_id == "standup_ask":
+                making.set()
+                made.wait(5)
+            super().speak(text, script_id)
+
+    engine = SlowEngine([], {"escalate": 0.05, "standup_ask": 0.05})
+
+    async def body(ws, service):
+        await ask(ws, "escalate")
+        await ws.send(json.dumps({"type": "checkin", "state": "alarm", "try": 3}))
+        await wait_for(lambda: service.alarm_on)
+        await ask(ws, "standup_ask")
+        await wait_for(making.is_set)
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 1)
+        assert sd.cut.is_set()
+        made.set()
+
+    run_with_service(engine, body, alarm=engines.AlarmTone(), line_cut=engines.line_cut)
+    assert sd.started == ["play", "play"]
