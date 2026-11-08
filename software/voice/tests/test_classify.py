@@ -223,6 +223,15 @@ TABLE = [
     ("no, the weather is nice", "help"),
     ("I'm fine, no", "help"),
     ("no no", "help"),
+    # the no is dropped only when nothing follows the ok phrase
+    ("no, okay, I collapsed", "help"),
+    ("no, ok, I passed out", "help"),
+    ("nope okay call my son", "help"),
+    ("no, fine, my leg is broken", "help"),
+    ("no, I'm okay but my leg is broken", "help"),
+    ("no, I'm fine, send someone", "help"),
+    ("no, im ok, i blacked out", "help"),
+    ("No, I'm fine, thank you", "help"),  # accepted cost: a false alarm is the cheap error
     # ok
     ("yes", "ok"),
     ("Yeah, I'm okay.", "ok"),

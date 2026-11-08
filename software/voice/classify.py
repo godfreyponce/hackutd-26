@@ -2,7 +2,7 @@
 
 Order matters: a help word wins over everything, then any negation counts as help
 (so "not okay" and "no" never become ok), then an ok word, else no_answer.
-One exception: a leading no right before an ok phrase is dropped first ("no, I'm fine").
+One exception: a leading no is dropped first when only an ok phrase follows ("no, I'm fine").
 """
 
 import re
@@ -33,11 +33,12 @@ NEGATION = re.compile(
     r"|cant|dont|wont|didnt|doesnt|isnt|wasnt|arent|werent"
     r"|couldnt|wouldnt|shouldnt|havent|hasnt|hadnt|aint)\b|n't\b"
 )
-# "No, I'm fine" answers "did you fall?". The no is dropped only if an ok phrase follows it.
-# Bare "good" is left out so "no good" stays help.
+# "No, I'm fine" answers "did you fall?". The no is dropped only when the whole reply is
+# no + one ok phrase: in "no, okay, I collapsed" the no is the answer, so it stays help.
+# A false alarm is the cheap error, so "no, I'm fine, thank you" stays help too.
 LEADING_NO = re.compile(
     r"^ ?((no|nope|nah)\b[,.!]? ?)+"
-    r"(?=(i'?m |i am )(doing |all )?good\b|(i'?m |i am )?(okay|ok|fine|alright|all right|all good|doing good)\b)"
+    r"(?=((i'?m |i am )(doing |all )?(good|okay|ok|fine|alright|all right)|all good)[.!]* ?$)"
 )
 OK = re.compile(r"\b(yes|yeah|yep|yup|okay|ok|fine|alright|all right|(i'?m|i am)( doing| all)? good|^(all|doing) good)\b")
 
