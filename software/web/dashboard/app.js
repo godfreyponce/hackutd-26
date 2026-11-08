@@ -64,6 +64,7 @@ let guardNote;
 let lastSweepAt;
 let eventHtml;
 let alertHtml;
+let alertLevel;
 let cam;
 let boxAlarmed = false;
 
@@ -94,10 +95,13 @@ function resetAll(now) {
   lastSweepAt = -Infinity;
   traceEntries.length = 0;
   $('trace-list').replaceChildren();
+  setText('trace-counts', '0 agent steps, 0 tool calls');
+  $('trace-empty').hidden = false;
   $('queue-list').replaceChildren();
   rowEls.clear();
   eventHtml = '';
   alertHtml = '';
+  alertLevel = null;
   boxAlarmed = false;
   cam = cam ? moveCamera('reset', now) : initialCamera(now, views, { reduced: reducedMotion.matches });
   renderEvent();
@@ -135,7 +139,7 @@ function startQuake(now, peakG, from) {
   waveAt = HOME_DIST.map((d) => waveStart + (d / MAX_HOME_DIST) * WAVE_MS);
   const when = new Date().toLocaleTimeString();
   const peak = typeof peakG === 'number' ? `, peak ${peakG} g` : '';
-  eventHtml = `<b>Earthquake</b>${peak}, ${when}. The wave is hitting 500 homes.`;
+  eventHtml = `<b>Earthquake</b>${peak}, ${when}. 500 homes in the quake area.`;
   renderEvent();
   addTrace('EVENT', `Quake${peak} from ${from}. Every home in the area gets a contact attempt.`, null, 'dashboard');
 }
@@ -261,8 +265,14 @@ const bus = connectBus(hubUrl(location.search), {
   onStatus(status) {
     const el = $('hub');
     el.dataset.status = status;
+    el.title = hubUrl(location.search);
+    // The bus retries every second; keep the offline look through each retry so the map does not flicker.
+    if (status !== 'connecting') {
+      document.body.dataset.hub = status;
+      $('legend-idle').textContent = status === 'offline' ? 'Unknown' : 'Not hit';
+    }
     $('hub-text').textContent =
-      status === 'connected' ? `Hub ${hubUrl(location.search)}` : status === 'offline' ? 'Hub offline, retrying' : 'Connecting to hub';
+      status === 'connected' ? 'Hub connected' : status === 'offline' ? 'Hub offline, retrying' : 'Connecting to hub';
   },
   onMessage(msg) {
     const now = performance.now();
@@ -279,7 +289,14 @@ const bus = connectBus(hubUrl(location.search), {
         onRerank(msg);
         return;
       case 'alert':
-        alertHtml = `Official alert${msg.level ? `, ${esc(msg.level)}` : ''}: ${msg.demo === true ? 'DEMO, not a real alert. ' : ''}${esc(msg.headline || msg.event || 'alert')} (${esc(msg.source ?? 'unknown')}).`;
+        {
+          // Level order and the missing-level default (errs high) follow home/state.js, and a lower alert never
+          // replaces a higher one. Unlike home, where info and watch expire, every alert here stays until reset.
+          const level = ALERT_LEVELS.includes(msg.level) ? msg.level : 'warning';
+          if (alertLevel && ALERT_LEVELS.indexOf(level) < ALERT_LEVELS.indexOf(alertLevel)) return;
+          alertLevel = level;
+          alertHtml = alertLine(msg, level);
+        }
         renderEvent();
         return;
       case 'help_gesture':
@@ -303,6 +320,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'q') startQuake(now, null, 'the q key on this page');
   if (e.key === 'r') resetAll(now);
   if (e.key === 'v') cam = moveCamera('v', now);
+  if (e.key === '?') $('keys').hidden = !$('keys').hidden;
 });
 
 // ---------- Rendering: text panels ----------
@@ -310,11 +328,21 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
+const ALERT_LEVELS = ['info', 'watch', 'warning', 'emergency'];
+
+function alertLine(msg, level) {
+  const label = [msg.source ?? 'official', level].map((s) => esc(String(s).toUpperCase())).join(' ');
+  const demo = msg.demo === true ? 'DEMO, not a real alert. ' : '';
+  return `<b class="lvl lvl-${level}">${label}</b> ${demo}${esc(msg.headline || msg.event || 'Alert')}`;
+}
+
 function renderEvent() {
   const el = $('event');
+  // The help sign and the alert lead so they are not the part cut off at narrow widths; the full line is the tooltip.
   const help = box.helpSign ? '<b>Help sign seen</b> at the box.' : '';
-  const html = [eventHtml, help, alertHtml].filter(Boolean).join(' ');
+  const html = [help, alertHtml && alertHtml.replace(/[.!]?$/, '.'), eventHtml].filter(Boolean).join(' ');
   el.innerHTML = html || 'No event yet. Waiting for the box.';
+  el.title = el.textContent;
   el.classList.toggle('live', Boolean(html));
 }
 
@@ -342,9 +370,12 @@ function renderCounters() {
   setText('c-escalated', escalated);
   setText('c-attempts', attempts);
   setText('c-forced', forced);
+  for (const [id, n] of [['c-hit', hit], ['c-checked', checked], ['c-noanswer', noAnswer], ['c-escalated', escalated]]) {
+    $(id).parentElement.classList.toggle('zero', n === 0);
+  }
 }
 
-const CHECKIN_LABEL = { asking: 'Asking', ok: 'Okay', help: 'Said help', no_answer: 'No answer', alarm: 'Alarm (demo)', clear: 'Cleared' };
+const CHECKIN_LABEL = { asking: 'Asking', ok: 'Okay', help: 'Said help', no_answer: 'No answer', alarm: 'Alarm', clear: 'Cleared' };
 const ANSWER_LABEL = { ok: 'Okay', help: 'Help', no_answer: 'No answer' };
 const PRESENCE_LABEL = { moving: 'Moving', still: 'Still', none: 'Nobody detected' };
 
@@ -375,7 +406,7 @@ function chipsFor(id, r) {
   const s = stateOf(id);
   const f = r.factors;
   const out = [];
-  if (s.device === 'none' || f.battery_min === null) out.push(chip('no device'));
+  if (s.device === 'none' || f.battery_min === null) out.push(chip('no medical device'));
   else {
     const w = DEVICE_WEIGHT[s.device];
     out.push(chip(`${DEVICE_LABEL[s.device]} ${f.battery_min} min${w !== 1 ? ` ×${w}` : ''}`, r.parts.device_min < 60 ? 'bad' : 'on'));
@@ -391,11 +422,13 @@ function chipsFor(id, r) {
   else if (s.answered_ok) out.push(chip('okay ×1.5', 'good'));
   else if (s.pendingAt != null) out.push(chip('calling', 'on'));
   else out.push(chip('not reached'));
-  out.push(f.stale ? chip('stale ×0.75', 'warn') : chip('fresh'));
+  if (f.stale) out.push(chip('stale ×0.75', 'warn'));
   return out.join('');
 }
 
 const rowEls = new Map();
+const slides = new Map();
+const slidMoves = new WeakSet();
 
 function fillRow(el, r, place) {
   const real = r.id === REAL_BOX_ID;
@@ -417,6 +450,9 @@ function renderQueue() {
   const top = shown.slice(0, QUEUE_ROWS);
   const before = new Map();
   for (const [id, el] of rowEls) before.set(id, el.getBoundingClientRect().top);
+  // Cancel after measuring, so a row caught mid-slide starts its next slide from where it is drawn.
+  for (const a of slides.values()) a.cancel();
+  slides.clear();
   const keep = new Set(top.map((r) => r.id));
   for (const [id, el] of rowEls) {
     if (!keep.has(id)) {
@@ -433,13 +469,20 @@ function renderQueue() {
     fillRow(el, r, i + 1);
     list.appendChild(el);
   });
+  // Short slide so viewers see the agent move a home, once per move and only when it jumps 2 or more rows.
+  // Rows that shift because the ranking math changed do not slide: during calls that is dozens per second.
   if (!reducedMotion.matches) {
     for (const r of top) {
+      const mv = moveById.get(r.id);
+      if (!mv || slidMoves.has(mv)) continue;
+      slidMoves.add(mv);
       const old = before.get(r.id);
       if (old === undefined) continue;
       const el = rowEls.get(r.id);
       const dy = old - el.getBoundingClientRect().top;
-      if (Math.abs(dy) > 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 350, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      const pitch = el.offsetHeight + parseFloat(getComputedStyle(el).marginBottom);
+      if (Math.abs(dy) < 1.5 * pitch) continue;
+      slides.set(r.id, el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 160, easing: 'cubic-bezier(.2,.8,.2,1)' }));
     }
   }
 
@@ -482,6 +525,7 @@ function addTrace(step, text, tool, who) {
   list.prepend(li);
   while (list.children.length > TRACE_MAX) list.lastElementChild.remove();
   const agentSteps = traceEntries.filter((e) => e.who === 'agent');
+  $('trace-empty').hidden = true;
   setText('trace-counts', `${agentSteps.length} agent steps, ${agentSteps.filter((e) => e.tool).length} tool calls`);
 }
 

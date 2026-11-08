@@ -1,4 +1,5 @@
-import { initialState, reduce, statusText, activeAlert, TRACE_WINDOW_MS } from './state.js';
+import { initialState, reduce, statusText, activeAlert, alertChip, TRACE_WINDOW_MS } from './state.js';
+import { HOME_COUNT } from '../dashboard/homes.js';
 
 // The product name is not settled. Change it here only.
 export const PRODUCT_NAME = 'LAND';
@@ -226,10 +227,10 @@ function renderMap() {
   const total = neighborDots.length + 1;
   // A home that answered okay was still hit, so check-in answers never lower the quake count.
   const hit = state.areaHit ? neighborDots.length + (state.home === 'idle' ? 0 : 1) : state.home === 'hit' ? 1 : 0;
-  hudNodes.textContent = `NODES ${total}`;
+  hudNodes.textContent = `NEARBY ${total} OF ${HOME_COUNT}`;
   const escalated = connected && state.status === 'CONTACTING_HELP';
   hudHit.textContent = connected ? `HIT ${hit}` : 'HIT --';
-  // Red only while an event is unresolved; a protected home that was hit reads neutral, like NODES. The dots keep their encoding.
+  // Red only while an event is unresolved; a protected home that was hit reads neutral, like NEARBY. The dots keep their encoding.
   hudHit.classList.toggle('alarm', connected && hit > 0 && state.status !== 'PROTECTED');
   hudHit.classList.toggle('warn', !connected);
   hudEscalated.style.visibility = escalated ? '' : 'hidden';
@@ -240,7 +241,7 @@ function renderMap() {
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
   // One line in every state, so the map below never moves when the text changes.
   $('map-sub').textContent = !connected ? 'No live data'
-    : state.areaHit ? `Quake hit ${hit} of ${total} nearby` : homeNote ? `${homeNote}.` : 'All homes quiet';
+    : state.areaHit ? (hit === total ? `Quake hit all ${total} nearby` : `Quake hit ${hit} of ${total} nearby`) : homeNote ? `${homeNote}.` : 'All homes quiet';
 }
 
 // ---------- seismic trace ----------
@@ -400,8 +401,8 @@ function render() {
   $('alert-count').hidden = !a;
   if (a) {
     $('banner').dataset.level = a.level;
-    $('alert-source').textContent = a.source;
-    $('alert-event').textContent = [a.event, a.severity].filter(Boolean).join(', ');
+    $('alert-source').textContent = alertChip(a);
+    $('alert-event').textContent = a.event;
     $('alert-headline').textContent = a.headline;
     // The headline often names the area already; then the space shows when the alert came in.
     $('alert-area').textContent = a.headline.includes(a.area)
@@ -422,7 +423,7 @@ function render() {
   $('heat-at').textContent = state.indoorAt == null ? '' : `Updated ${timeOf(state.indoorAt)}`;
 
   $('hub').classList.toggle('bad', !connected);
-  $('hub-text').textContent = connected ? 'Hub connected' : 'Hub disconnected';
+  $('hub-text').textContent = connected ? 'Hub connected' : 'Hub offline, retrying';
 
   renderQuake();
   renderMap();

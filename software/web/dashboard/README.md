@@ -12,18 +12,19 @@ http://localhost:8080/dashboard/
 
 To use another hub, add `?hub=ws://host:port`. The default is `ws://localhost:8765`. The page reconnects every second if the hub restarts. It loads nothing from the internet.
 
-Keys on the page:
+Keys on the page. The hint line is hidden so it stays off camera; press `?` to show or hide it.
 - `q`: start the wave on this page only. Nothing is sent to the bus.
 - `r`: reset this page only.
 - `v`: step the map through world, city and home by hand.
+- `?`: show or hide the key hints.
 
 The main trigger is a `quake` message on the bus. Quakes that come in while a wave is already running are ignored until `reset`.
 
 ## Map
 
 The map has three stages:
-1. World: before a quake, a dark globe turns slowly. A marker sits on Richardson, TX.
-2. City: on a quake, a red pulse shows at north Texas, the globe turns to face it, and the camera flies down to the Richardson street map. Then the wave plays: red spreads over the streets like a stain, and each white dot turns red as it passes.
+1. City: the page opens on the Richardson street map, and `reset` comes back here. On a quake the wave plays: red spreads over the streets like a stain, and each white dot turns red as it passes.
+2. World: only by hand with `v`. A dark globe turns slowly with a marker on Richardson, TX. A quake from here shows a red pulse at north Texas, turns the globe to face it, and flies down to the city before the wave.
 3. Home: when H000 raises an alarm or says help, the camera zooms to its block with a callout. On `clear` it goes back to the city.
 
 After an alarm the agent sends a `handoff`. The callout then shows the hand-off note, who to contact first, and the why for the alarm. Each part says who wrote it: "Written by Nemotron", or "Template" when the agent fell back.
