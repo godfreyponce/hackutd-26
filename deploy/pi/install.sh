@@ -7,7 +7,7 @@ step() { printf '\n== %s\n' "$*"; }
 fail() { echo "FAILED: $*" >&2; exit 1; }
 
 step "system packages (sudo)"
-sudo apt-get install -y multimon-ng sox rtl-sdr i2c-tools libportaudio2 python3-gpiozero python3-lgpio \
+sudo apt-get install -y multimon-ng sox rtl-sdr i2c-tools libportaudio2 pipewire-alsa python3-gpiozero python3-lgpio \
   || fail "apt-get install"
 
 step "services venv (.venv): hub, agent, presence, voice, same (pinned, no system packages)"
