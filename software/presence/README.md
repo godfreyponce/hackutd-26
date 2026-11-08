@@ -9,7 +9,7 @@ This service watches for a person with the camera and tells the hub what it sees
 
 `fall_hint` is the internal name of the hint that starts a check-in. The service sends it when the person goes from moving to still, at most once per 60 s. The agent then asks the person if they are okay. In anything a user sees or hears, call this "no response after an event".
 
-The service is a normal hub client. It reads `HUB_URL` (default `ws://localhost:8765`) and connects again 1 s after the hub drops. When it sees a `reset` on the bus, it sends the current state again at once.
+The service is a normal hub client. It reads `HUB_URL` (default `ws://localhost:8765`) and connects again 1 s after the hub drops. When it sees a `reset` on the bus, it sends the current state again at once. A reset also clears the once per 60 s limit on the check-in hint, so the next change from moving to still sends it again.
 
 ## How it decides
 
@@ -17,12 +17,13 @@ The camera gives person boxes as fractions of the frame, so a wide or fisheye le
 
 | State | When |
 |---|---|
-| `moving` | The box center moves more than 4% of the frame, or the box area changes more than 15%, within 1 s. |
+| `moving` | The box center moves more than 4% of the frame, or the box area changes more than 15%, within 1 s. This must show in 2 frames in a row. |
 | `still` | 3 s with no such change. |
-| `none` | No person for 5 s after `moving`, or for 20 s after `still`. The longer wait keeps a person lying down from becoming `none` during a check-in. |
+| `none` | No person for 5 s after `moving`, or for 60 s after `still`. A check-in takes about 30 s. The longer wait keeps a person lying down from becoming `none` during a check-in. |
 
 - At start, nothing is sent until the state is known. With nobody in view, that is `none` after 5 s.
 - One or two frames with no person change nothing.
+- One bad box does not make `moving`. The service ignores a frame that is far from the last second of boxes until the next frame is far too. A false `moving` right after `still` looks like a stand-up to the agent.
 - After a longer gap, the 3 s for `still` start again when the person is back. A person who walks out of view and back does not count as still.
 - The service sends each change at once and repeats the current state every 5 s.
 - All the numbers are guesses for the demo. They are constants at the top of `tracker.py`. Tune them on the Pi.

@@ -64,6 +64,7 @@ def _type(raw):
 async def run(url, frames, tracker):
     async def resend_state():
         # A reset puts every piece's presence back to none. Restore it now, not at the next 5 s repeat.
+        tracker.hub_reset()
         if tracker.state is not None:
             await link.send({"type": "presence", "state": tracker.state})
 
