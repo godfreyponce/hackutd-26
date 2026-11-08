@@ -38,7 +38,7 @@ Each hop writes an `agent` FALLBACK row with the reason. A text reply with no `t
 
 When the outcome is alarm, the agent asks Nemotron for two things, in parallel:
 
-- A hand-off note for responders, written from facts the code gives it: the trigger (quake peak g, or radar going from moving to still), presence, each answer with its transcript, battery, any active alert, the time. Nemotron also picks who to contact first from `HANDOFF_CONTACTS` in `scripts.py`. Thinking off.
+- A hand-off note for responders, written from facts the code gives it: the trigger (quake peak g, or the presence sensor going from moving to still), presence, each answer with its transcript, battery, any active alert, the time. Nemotron also picks who to contact first from `HANDOFF_CONTACTS` in `scripts.py`. Thinking off.
 - A why for the alarm decision, at most 3 lines. Reasoning on, with a budget of 200 reasoning tokens. It sees only the rule, presence and the answers. The rule still decides; the why only explains.
 
 Code checks both. Every number must come from the facts. No emergency number. Under 60 words. A check that fails, or a planner that is down, gets a plain template instead. The agent then sends:

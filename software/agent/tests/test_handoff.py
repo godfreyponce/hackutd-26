@@ -17,10 +17,10 @@ FACTS = build_facts(
     alert={"source": "usgs", "event": "Earthquake", "headline": "DEMO ONLY, NOT A REAL ALERT"},
     reason="someone detected + no answer after 3 tries", at="14:32",
 )
-GOOD_NOTE = ("H000: no response after an event (earthquake, peak 0.82 g). Radar shows someone still. "
+GOOD_NOTE = ("H000: no response after an event (earthquake, peak 0.82 g). Presence sensor shows someone still. "
              "No answer on 3 tries. Battery 87%. Alarm at 14:32.")
 GOOD_REPLY = '{"note": "%s", "contact": "rafael"}' % GOOD_NOTE
-GOOD_WHY = "Someone is there: radar says still.\n- No answer on 3 tries.\n- The rule says that is an alarm.\n- Extra line."
+GOOD_WHY = "Someone is there: presence sensor says still.\n- No answer on 3 tries.\n- The rule says that is an alarm.\n- Extra line."
 
 
 # ---- the note check ----
@@ -73,7 +73,7 @@ def test_nemotron_note_and_why_pass_the_check():
     client = FakeWriterClient(note=GOOD_REPLY, why=GOOD_WHY)
     h = write(client)
     assert (h.note, h.contact, h.by) == (GOOD_NOTE, "rafael", "nemotron")
-    assert h.why == ["Someone is there: radar says still.", "No answer on 3 tries.", "The rule says that is an alarm."]
+    assert h.why == ["Someone is there: presence sensor says still.", "No answer on 3 tries.", "The rule says that is an alarm."]
     assert h.why_by == "nemotron"
     note_req, why_req = sorted(client.requests, key=lambda r: r["extra_body"]["chat_template_kwargs"]["enable_thinking"])
     assert note_req["extra_body"] == {"chat_template_kwargs": {"enable_thinking": False}}

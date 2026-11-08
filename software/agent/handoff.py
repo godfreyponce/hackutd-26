@@ -41,7 +41,7 @@ Reply with only the lines."""
 
 def build_facts(*, trigger, peak_g, presence, answers, battery_pct, power, alert, reason, at):
     """answers: (try, answer, transcript) in order. alert: the last `alert` message or None."""
-    event = {"quake": "earthquake", "fall_hint": "radar saw the person go from moving to still",
+    event = {"quake": "earthquake", "fall_hint": "presence sensor saw the person go from moving to still",
              "recheck": "scheduled recheck"}.get(trigger, trigger)
     return {
         "home": HOME_ID,
@@ -83,7 +83,7 @@ def template_note(facts, contact_id):
     what = "the person said help after an event" if _said_help(facts) else "no response after an event"
     who = "someone detected" if facts["someone_detected"] else "nobody detected"
     answers = ", ".join(f"try {a['try']} {a['answer'].replace('_', ' ')}" for a in facts["answers"]) or "none"
-    parts = [f"{facts['home']}: {what} ({event}).", f"Radar: {facts['presence']}, {who}.", f"Answers: {answers}."]
+    parts = [f"{facts['home']}: {what} ({event}).", f"Presence sensor: {facts['presence']}, {who}.", f"Answers: {answers}."]
     if facts["battery_pct"] is not None:
         parts.append(f"Battery {facts['battery_pct']}%{', on battery power' if facts['power'] == 'battery' else ''}.")
     if facts["alert"]:
@@ -96,7 +96,7 @@ def template_note(facts, contact_id):
 def template_why(facts):
     who = "someone detected" if facts["someone_detected"] else "nobody detected"
     answers = ", ".join(a["answer"].replace("_", " ") for a in facts["answers"]) or "none"
-    return [f"Rule: {facts['alarm_reason']} = alarm.", f"Radar: {facts['presence']}, {who}.", f"Answers: {answers}."]
+    return [f"Rule: {facts['alarm_reason']} = alarm.", f"Presence sensor: {facts['presence']}, {who}.", f"Answers: {answers}."]
 
 
 @dataclass
