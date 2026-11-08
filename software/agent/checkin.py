@@ -23,6 +23,7 @@ log = logging.getLogger("agent")
 ALERT_TRIGGER = ("EQW", "emergency")
 # One quake can bring a shake and an EQW alert. An EQW alert within this many seconds
 # of any check-in start is ignored, so the person is asked once (owner, issue #36).
+# A help sign check-in does not start this window (owner, issue #46).
 ALERT_QUIET_S = 300
 
 SYSTEM_PROMPT = f"""You are the planner inside a home safety box. After an event (an earthquake, a person who stopped moving, or a help sign seen by the camera) you run a voice check-in by calling tools.
@@ -124,6 +125,7 @@ class Agent:
         self.power = None
         self.alert = None
         self.incident = None
+        self.quiet_from = None  # Agent.clock() start of the last check-in that mutes EQW alerts
         self.task = None
         self.rechecks = []
         self._handlers = {
@@ -182,6 +184,7 @@ class Agent:
             handle.cancel()
         self.rechecks.clear()
         self.incident = None
+        self.quiet_from = None
         self.presence = "none"
         self.battery_pct = self.power = self.alert = None
         log.info("reset: check-in cleared")
@@ -199,6 +202,8 @@ class Agent:
         else:
             ask = self.settings.ask_script
         self.incident = Incident(trigger, ask, self.clock(), peak_g, alert)
+        if trigger != "help_gesture":
+            self.quiet_from = self.incident.started_at
         self._launch("checkin")
 
     async def _on_alert(self, msg):
@@ -207,7 +212,7 @@ class Agent:
             return
         label = _alert_text(msg)
         inc = self.incident
-        if inc and (age := self.clock() - inc.started_at) < ALERT_QUIET_S:
+        if self.quiet_from is not None and (age := self.clock() - self.quiet_from) < ALERT_QUIET_S:
             await self.trace("VERIFY", f"{label}. Alert ignored: a check-in started {age:.0f} s ago, "
                                        f"under {ALERT_QUIET_S} s.")
             return

@@ -580,3 +580,44 @@ def test_help_sign_handoff_names_the_help_sign_and_never_says_fall_or_radar():
 def test_ask_gesture_cannot_be_the_default_ask_line():
     with pytest.raises(ValueError):
         replace(FAST, ask_script="ask_gesture")
+
+
+def test_eqw_right_after_a_help_sign_checkin_still_starts_a_checkin():
+    async def scenario():
+        now = [50.0]
+        bus = FakeBus(["ok", "ok"])
+        agent = make_agent(bus)
+        _clocked(agent, now)
+        await agent.handle(STILL)
+        await agent.handle(HELP_SIGN)
+        await agent.idle()
+        now[0] += 20
+        await agent.handle(EQW)
+        await agent.idle()
+        return bus, agent
+
+    bus, agent = asyncio.run(scenario())
+    assert bus.says() == ["ask_gesture", "reply_ok", "ask_event", "reply_ok"]
+    assert agent.incident.trigger == "alert"
+
+
+def test_eqw_after_quake_then_help_sign_keeps_the_quake_quiet_window():
+    async def scenario():
+        now = [50.0]
+        bus = FakeBus(["ok", "ok", "ok"])
+        agent = make_agent(bus)
+        _clocked(agent, now)
+        await agent.handle(STILL)
+        await agent.handle(QUAKE)
+        await agent.idle()
+        now[0] += 20
+        await agent.handle(HELP_SIGN)
+        await agent.idle()
+        now[0] += 20
+        await agent.handle(EQW)
+        await agent.idle()
+        return bus
+
+    bus = asyncio.run(scenario())
+    assert bus.says() == ["ask_stopped", "reply_ok", "ask_gesture", "reply_ok"]
+    assert any("40 s ago" in r["text"] for r in bus.trace("VERIFY"))
