@@ -181,7 +181,7 @@ def test_alarm_checkin_plays_the_tone_after_the_line_and_reset_stops_it():
     engine = OrderedEngine(["yes"], events)
 
     async def body(ws, service):
-        await say(ws, "Okay. I'm getting help now.")
+        await say(ws, "Okay. I'm alerting your emergency contact now.")
         await ws.send(json.dumps({"type": "checkin", "state": "alarm", "try": 2}))
         await wait_for(lambda: "alarm start" in events)
         assert events == ["say test", "alarm start"]
