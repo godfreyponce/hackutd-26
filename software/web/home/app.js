@@ -1,4 +1,4 @@
-import { initialState, reduce, statusText, activeAlert, alertChip, TRACE_WINDOW_MS, initialHistory, record, tryText, heardChip } from './state.js';
+import { initialState, reduce, statusText, tryAnswered, activeAlert, alertChip, TRACE_WINDOW_MS, initialHistory, record, tryText, heardChip } from './state.js';
 import { HOME_COUNT } from '../dashboard/homes.js';
 import { renderAlerts } from './views/alerts.js';
 import { renderDisasters } from './views/disasters.js';
@@ -387,7 +387,7 @@ const timeOf = (at) => new Date(at).toLocaleTimeString([], { hour: 'numeric', mi
 function render() {
   const a = activeAlert(state, Date.now());
   shownAlert = a;
-  const { word, detail, note } = statusText(state.status, { alert: Boolean(a), linked: connected, helpSign: state.helpSign, ended: state.ended, tryNum: state.tryNum });
+  const { word, detail, note } = statusText(state.status, { alert: Boolean(a), linked: connected, helpSign: state.helpSign, ended: state.ended, tryNum: state.tryNum, answered: tryAnswered(state) });
   document.body.dataset.status = state.status;
   document.body.dataset.link = connected ? 'up' : 'down';
   $('word').textContent = word;

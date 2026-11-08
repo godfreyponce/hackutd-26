@@ -79,17 +79,20 @@ export function sourceLabel(source) {
 
 export const SAY_HINT = 'Say "okay" or "help".';
 
+// heard arrives before its checkin, so an okay or help can be in while the try is still open.
+export const tryAnswered = (state) => state.heard != null && state.heard.tryNum === state.tryNum && state.heard.answer !== 'no_answer';
+
 // tryNum is null until the first ask of a check-in. After the last try the rule has already chosen the alarm.
-export function statusText(status, { alert = false, linked = true, helpSign = false, ended = false, tryNum = null } = {}) {
+export function statusText(status, { alert = false, linked = true, helpSign = false, ended = false, tryNum = null, answered = false } = {}) {
   switch (status) {
     case 'CHECKING_IN': {
       const detail = `${helpSign ? 'Help sign seen' : 'Event detected'}. Asking if you are okay.`;
-      return tryNum != null ? { word: 'CHECKING IN', detail, note: SAY_HINT } : { word: 'CHECKING IN', detail };
+      return tryNum != null && !answered ? { word: 'CHECKING IN', detail, note: SAY_HINT } : { word: 'CHECKING IN', detail };
     }
     case 'NO_RESPONSE':
       if (ended) return { word: 'NO RESPONSE', detail: 'Nobody seen at home. No alarm.' };
       if (tryNum >= MAX_TRIES) return { word: 'NO RESPONSE', detail: 'No response after an event.' };
-      if (tryNum == null) return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.' };
+      if (tryNum == null || answered) return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.' };
       return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.', note: SAY_HINT };
     case 'CONTACTING_HELP':
       return {
@@ -130,11 +133,12 @@ function onEvent(state, kind, extra = {}) {
 function onCheckin(state, msg) {
   const tryNum = msg.try ?? state.tryNum;
   if (msg.state === 'ok' || msg.state === 'clear') {
+    const say = state.say ? { ...state.say, tryNum: null } : state.say;
     // With nobody there, the agent sends clear right after a no answer. The check-in is over, but nobody said they were okay.
     if (msg.state === 'clear' && state.status === 'NO_RESPONSE') {
-      return { ...state, ended: true, tryNum: null, say: state.say ? { ...state.say, tryNum: null } : state.say, helpSign: false, trigger: null };
+      return { ...state, ended: true, tryNum: null, say, helpSign: false, trigger: null };
     }
-    return { ...state, status: 'PROTECTED', ended: false, tryNum: null, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false, trigger: null };
+    return { ...state, status: 'PROTECTED', ended: false, tryNum: null, say, home: state.home === 'hit' ? 'ok' : state.home, helpSign: false, trigger: null };
   }
   const status = CHECKIN_STATUS[msg.state];
   if (!status) return state;

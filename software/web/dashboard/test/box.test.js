@@ -165,6 +165,10 @@ test('a miss on try 3 heard before its checkin no_answer never says asking again
   assert.equal(boxNote(s), 'No answer on try 3.');
 });
 
+test('an alarm seen without its tries, after a dashboard reload, says Alarm', () => {
+  assert.equal(checkinText(run([{ type: 'checkin', state: 'alarm', try: 4 }])), 'Alarm');
+});
+
 test('okay and help answers carry no try', () => {
   const ok = run([...ask(2), { type: 'heard', answer: 'ok', transcript: "I'm okay" }, { type: 'checkin', state: 'ok', try: 2 }]);
   assert.deepEqual([checkinText(ok), heardText(ok)], ['Okay', 'Okay: "I\'m okay"']);

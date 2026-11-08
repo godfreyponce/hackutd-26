@@ -85,7 +85,11 @@ export function checkinText(s) {
   if (!s.checkin) return 'None yet';
   if (s.alarm && s.checkin === 'asking') return 'Alarm, asking again';
   if (s.alarm && s.checkin === 'no_answer') return 'Alarm, no answer';
-  if (s.checkin === 'alarm') return s.said_help ? 'Alarm, said help' : `Alarm after ${s.try} tries`;
+  if (s.checkin === 'alarm') {
+    if (s.said_help) return 'Alarm, said help';
+    // A dashboard reloaded mid check-in has not seen the tries.
+    return s.try ? `Alarm after ${s.try} tries` : 'Alarm';
+  }
   if (s.try && s.checkin === 'asking') return `Asking, try ${s.try} of ${MAX_TRIES}`;
   if (s.try && s.checkin === 'no_answer') return `No answer, try ${s.try}`;
   return CHECKIN_LABEL[s.checkin] ?? s.checkin;

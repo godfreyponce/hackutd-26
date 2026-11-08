@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, reduce, statusText, sourceLabel, activeAlert, alertChip, tryText, heardChip } from './state.js';
+import { initialState, reduce, statusText, tryAnswered, sourceLabel, activeAlert, alertChip, tryText, heardChip } from './state.js';
 
 const NOW = 1_000_000;
 
@@ -358,7 +358,7 @@ test('a missed stand-up answer under the alarm shows no try on HEARD', () => {
   assert.equal(heardChip(s.heard, s.status), 'No answer');
 });
 
-const hint = (s) => statusText(s.status, { ended: s.ended, tryNum: s.tryNum }).note;
+const hint = (s) => statusText(s.status, { ended: s.ended, tryNum: s.tryNum, answered: tryAnswered(s) }).note;
 
 test('while the box asks, the note tells the person what to say; an ended check-in and PROTECTED show none', () => {
   assert.equal(hint(run(quake, asking(1))), 'Say "okay" or "help".');
@@ -377,6 +377,23 @@ test('after a miss on the last try the screen neither asks for an answer nor say
   const s = run(quake, asking(3), missed, noAnswer(3));
   assert.equal(s.status, 'NO_RESPONSE');
   assert.deepEqual(statusText(s.status, { tryNum: s.tryNum }), { word: 'NO RESPONSE', detail: 'No response after an event.' });
+});
+
+test('once the open try is answered okay or help, no note asks for an answer', () => {
+  assert.equal(hint(run(quake, asking(1), { type: 'heard', answer: 'ok', transcript: 'okay' })), undefined);
+  assert.equal(hint(run(quake, asking(1), noAnswer(1), asking(2), { type: 'heard', answer: 'help', transcript: 'help' })), undefined);
+  assert.equal(hint(run(quake, asking(1), missed, noAnswer(1), asking(2))), 'Say "okay" or "help".');
+});
+
+test('an okay clears the try on the prompt row, also after a stand-up okay under the alarm', () => {
+  const ok = { type: 'checkin', state: 'ok', try: 1 };
+  const s = run(quake, asking(1), { type: 'say', text: 'Are you okay?' }, { type: 'heard', answer: 'ok', transcript: 'okay' }, ok);
+  assert.equal(s.status, 'PROTECTED');
+  assert.equal(tryText(s.say.tryNum), '');
+  const standup = run(quake, asking(3), noAnswer(3), { type: 'checkin', state: 'alarm', try: 4 }, asking(1),
+    { type: 'say', text: 'Can you stand up?' }, ok, clear);
+  assert.equal(standup.status, 'PROTECTED');
+  assert.equal(tryText(standup.say.tryNum), '');
 });
 
 test('a nobody-home end clears the try on the prompt row', () => {
