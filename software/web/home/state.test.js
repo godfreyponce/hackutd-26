@@ -93,10 +93,44 @@ for (const end of ['clear', 'ok']) {
   });
 }
 
-test('a clear that ends a check-in nobody answered keeps the home dot red', () => {
-  const s = run(quake, asking(1), noAnswer(1), { type: 'checkin', state: 'clear', try: 1 });
+const clear = { type: 'checkin', state: 'clear', try: 1 };
+const ended = [quake, asking(1), noAnswer(1), clear];
+const shown = (s, alert = false) => statusText(s.status, { alert, ended: s.ended });
+const ENDED_TEXT = { word: 'NO RESPONSE', detail: 'Nobody seen at home. No alarm.' };
+
+for (const alert of [false, true]) {
+  test(`a clear that ends a check-in nobody answered stays NO RESPONSE, says no alarm, keeps the dot red${alert ? ', with an official alert' : ''}`, () => {
+    const s = run(...ended);
+    assert.equal(s.status, 'NO_RESPONSE');
+    assert.equal(s.tryNum, null);
+    assert.equal(s.home, 'hit');
+    assert.deepEqual(shown(s, alert), ENDED_TEXT);
+  });
+}
+
+test('the next event, first ask, ok or reset after an ended check-in leaves NO RESPONSE', () => {
+  const s = run(...ended, { type: 'fall_hint' });
+  assert.equal(s.status, 'CHECKING_IN');
+  assert.equal(s.ended, false);
+  assert.equal(run(...ended, asking(1)).status, 'CHECKING_IN');
+  assert.equal(run(...ended, asking(1)).ended, false);
+  const ok = run(...ended, { type: 'checkin', state: 'ok', try: 1 });
+  assert.equal(ok.status, 'PROTECTED');
+  assert.equal(ok.home, 'ok');
+  assert.deepEqual(run(...ended, { type: 'reset' }), initialState());
+});
+
+test('a new check-in after an ended one answered okay goes to PROTECTED', () => {
+  const s = run(...ended, quake, asking(1), { type: 'checkin', state: 'ok', try: 1 });
   assert.equal(s.status, 'PROTECTED');
-  assert.equal(s.home, 'hit');
+  assert.equal(s.home, 'ok');
+  assert.equal(shown(s, true).detail, 'All okay at home. Official alert active.');
+});
+
+test('a new check-in after an ended one asks again at a no answer, until its own clear', () => {
+  const s = run(...ended, quake, asking(1), noAnswer(1));
+  assert.equal(shown(s).detail, 'No response after an event. Asking again.');
+  assert.deepEqual(shown(reduce(s, clear, NOW)), ENDED_TEXT);
 });
 
 const STATES = {
