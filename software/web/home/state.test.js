@@ -157,7 +157,7 @@ test('PROTECTED with an official alert says the alert is active', () => {
 test('with the hub link down, a quiet home shows HUB OFFLINE instead of a live-looking PROTECTED', () => {
   const t = statusText('PROTECTED', { linked: false });
   assert.equal(t.word, 'HUB OFFLINE');
-  assert.match(t.detail, /last known/i);
+  assert.equal(t.detail, 'Live status unavailable. Reconnecting to hub.');
   assert.equal(statusText('PROTECTED').word, 'PROTECTED');
 });
 

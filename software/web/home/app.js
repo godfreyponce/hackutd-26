@@ -16,7 +16,7 @@ let lastWaveAt = null;
 
 document.title = `${PRODUCT_NAME} Home`;
 $('product-name').textContent = PRODUCT_NAME;
-$('hub-url').textContent = `Hub ${hubUrl}`;
+$('hub').title = `Hub ${hubUrl}`;
 
 // ---------- neighborhood map (tactical display) ----------
 
@@ -27,7 +27,8 @@ function neighbors() {
   for (let row = 0; row < 6; row++) {
     for (let col = 0; col < 7; col++) {
       const x = 22 + col * 43 + (rand() - 0.5) * 22;
-      const y = 22 + row * 44 + (rand() - 0.5) * 22;
+      // The row 3, col 5 dot is nudged south so it does not sit on the imagery's E POLK ST label.
+      const y = 22 + row * 44 + (rand() - 0.5) * 22 + (row === 3 && col === 5 ? 8 : 0);
       if (Math.hypot(x - HOME.x, y - HOME.y) > 24 && rand() > 0.2) dots.push({ x, y });
     }
   }
@@ -110,14 +111,19 @@ svgEl('path', {
 }, map);
 const homeDot = svgEl('circle', { class: 'node home', cx: HOME.x, cy: HOME.y, r: 4.5, filter: 'url(#glow)' }, map);
 // Left of the dot: the imagery prints BELT LINE RD to the right.
-hudText(map, HOME.x - 18, HOME.y - 4, 'H000', { 'text-anchor': 'end' });
-hudText(map, HOME.x - 18, HOME.y + 9, 'THIS HOME', { class: 'hud dim', 'text-anchor': 'end' });
+const hudHome = hudText(map, HOME.x - 18, HOME.y - 4, 'H000', { 'text-anchor': 'end' });
+const hudThisHome = hudText(map, HOME.x - 18, HOME.y + 9, 'THIS HOME', { class: 'hud dim', 'text-anchor': 'end' });
 
 const hudNodes = hudText(map, 6, 254, '');
 const hudHit = hudText(map, 294, 254, '', { 'text-anchor': 'end' });
 const hudGrid = hudText(map, 6, 14, 'GRID H000');
 const hudLive = hudText(map, 294, 14, '', { 'text-anchor': 'end' });
-const corners = [[hudGrid, false, false], [hudLive, true, false], [hudNodes, false, true], [hudHit, true, true]];
+const corners = [[hudGrid, false, false], [hudLive, true, false], [hudNodes, false, true], [hudHit, true, true]]
+  .map(([el, right, bottom]) => {
+    const bg = svgEl('rect', { class: 'hud-bg' });
+    el.before(bg);
+    return { el, bg, right, bottom };
+  });
 
 const IMAGERY = { x0: -216, y0: -11, x1: -216 + 3 * TILE, y1: -11 + 2 * TILE };
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -132,9 +138,25 @@ function fitMap() {
   const x = clamp(HOME.x - w / 2, IMAGERY.x0, IMAGERY.x1 - w), y = clamp(HOME.y - h / 2, IMAGERY.y0, IMAGERY.y1 - h);
   map.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
   for (const [k2, v] of Object.entries({ x, y, width: w, height: h })) vignette.setAttribute(k2, v);
-  for (const [el, right, bottom] of corners) {
-    el.setAttribute('x', right ? x + w - 6 : x + 6);
-    el.setAttribute('y', bottom ? y + h - 6 : y + 14);
+  // HUD text is 1u on screen, never under 13 px so it reads from 2 m at 1280x800.
+  const f = Math.max(13, parseFloat(getComputedStyle(document.body).fontSize)) * k;
+  map.style.setProperty('--hud', `${f}px`);
+  hudHome.setAttribute('y', HOME.y - 0.36 * f);
+  hudThisHome.setAttribute('y', HOME.y + 0.82 * f);
+  view = { x, y, w, h, f };
+  placeHud();
+}
+
+let view = { x: 0, y: 0, w: 300, h: 260, f: 11 };
+const HUD_PAD = 4;
+// Called again after the corner texts change, since each backing box is sized to its text.
+function placeHud() {
+  const { x, y, w, h, f } = view;
+  for (const { el, bg, right, bottom } of corners) {
+    el.setAttribute('x', right ? x + w - 2 * HUD_PAD : x + 2 * HUD_PAD);
+    el.setAttribute('y', bottom ? y + h - HUD_PAD - 0.45 * f : y + HUD_PAD + 1.05 * f);
+    const bb = el.getBBox();
+    for (const [k, v] of Object.entries({ x: bb.x - HUD_PAD, y: bb.y, width: bb.width + 2 * HUD_PAD, height: bb.height })) bg.setAttribute(k, v);
   }
 }
 new ResizeObserver(fitMap).observe(map);
@@ -159,6 +181,7 @@ function renderMap() {
   hudHit.classList.toggle('warn', !connected);
   hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
   hudLive.classList.toggle('warn', !connected);
+  placeHud();
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
   $('map-sub').textContent = !connected ? 'No live data'
     : state.areaHit ? `Quake hit ${hit} of ${total} homes${state.home === 'ok' ? '. This home answered okay' : ''}` : homeNote ? `${homeNote}.` : 'All homes quiet';

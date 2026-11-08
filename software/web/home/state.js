@@ -47,7 +47,7 @@ export function statusText(status, { alert = false, linked = true } = {}) {
         note: 'Demo alarm. No emergency number is called.',
       };
     default:
-      if (!linked) return { word: 'HUB OFFLINE', detail: 'Live status unavailable. Showing last known.' };
+      if (!linked) return { word: 'HUB OFFLINE', detail: 'Live status unavailable. Reconnecting to hub.' };
       return { word: 'PROTECTED', detail: alert ? 'All okay at home. Official alert active.' : 'No active events' };
   }
 }
