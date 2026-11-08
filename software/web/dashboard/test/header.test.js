@@ -22,8 +22,8 @@ const marks = brand.match(/<img\b[^>]*\bclass="mark"[^>]*>/g) ?? [];
 
 test('the header shows the LAND mark once, named for screen readers', () => {
   assert.equal(marks.length, 1);
-  assert.match(marks[0], /\bsrc="[^"]*land-mark-white\.svg"/);
-  assert.match(marks[0], /\balt="LAND"/);
+  assert.match(marks[0], /\ssrc="[^"]*land-mark-white\.svg"/);
+  assert.match(marks[0], /\salt="LAND"/);
 });
 
 test('the header shows only the subtitle as text, not the word LAND again', () => {
