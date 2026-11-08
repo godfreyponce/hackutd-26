@@ -19,6 +19,7 @@ export function initialBox(now) {
     event: false,
     power: 'mains',
     battery_pct: null,
+    handoff: null,
     lastSeen: now,
   };
 }
@@ -43,6 +44,9 @@ export function applyBoxEvent(state, msg, now) {
       return { ...s, power: msg.state };
     case 'heartbeat':
       return { ...s, battery_pct: msg.battery_pct };
+    case 'handoff':
+      if (msg.home !== REAL_BOX_ID) return s;
+      return { ...s, handoff: { note: msg.note, contact: msg.contact, by: msg.by, why: msg.why, why_by: msg.why_by } };
     case 'heard':
       return answered({ ...s, heard: { answer: msg.answer, transcript: msg.transcript } }, msg.answer);
     case 'checkin': {

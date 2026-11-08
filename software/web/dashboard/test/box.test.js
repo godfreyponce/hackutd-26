@@ -61,3 +61,14 @@ test('reset returns the real box to its start state', () => {
   const s = run([{ type: 'presence', state: 'still' }, { type: 'checkin', state: 'alarm', try: 4 }]);
   assert.deepEqual(applyBoxEvent(s, { type: 'reset' }, 7), initialBox(7));
 });
+
+test('a handoff for H000 is kept until reset; one for another home is ignored', () => {
+  const msg = {
+    type: 'handoff', home: 'H000', note: 'No answer on 3 tries.', by: 'nemotron',
+    contact: { id: 'godfrey', name: 'Godfrey', role: 'family contact, demo' }, why: ['Someone is there.'], why_by: 'template',
+  };
+  const s = run([{ type: 'checkin', state: 'alarm', try: 4 }, msg]);
+  assert.deepEqual(s.handoff, { note: msg.note, contact: msg.contact, by: 'nemotron', why: msg.why, why_by: 'template' });
+  assert.equal(run([{ ...msg, home: 'H042' }]).handoff, null);
+  assert.equal(applyBoxEvent(s, { type: 'reset' }, 0).handoff, null);
+});
