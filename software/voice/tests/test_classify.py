@@ -53,6 +53,29 @@ TABLE = [
     ("No.", "help"),
     ("nope", "help"),
     ("I don't feel okay", "help"),
+    # negations with no apostrophe, as a transcriber may write them.
+    # Some realistic ok replies become help, same as their apostrophe form;
+    # a false help only brings the fake alarm sooner.
+    ("I cannot move", "help"),
+    ("I cant stand", "help"),
+    ("I dont feel good", "help"),
+    ("yes I cannot", "help"),
+    ("I cannot, okay", "help"),
+    ("I wont be okay", "help"),
+    ("I didnt hear, I'm okay", "help"),
+    ("it isnt okay", "help"),
+    ("I wouldnt say fine", "help"),
+    ("I couldnt get up", "help"),
+    ("doesnt matter, I'm fine", "help"),
+    ("I'm fine, dont worry", "help"),
+    ("I wasnt okay", "help"),
+    ("things arent okay", "help"),
+    ("my legs werent working", "help"),
+    ("I shouldnt move", "help"),
+    ("I havent been okay", "help"),
+    ("it hasnt been fine", "help"),
+    ("I aint okay", "help"),
+    ("I hadnt noticed, I'm fine", "help"),
     # ok
     ("yes", "ok"),
     ("Yeah, I'm okay.", "ok"),
@@ -70,6 +93,8 @@ TABLE = [
     ("the weather is nice today", "no_answer"),
     ("I know", "no_answer"),  # "know" is not "no"
     ("token", "no_answer"),  # "token" is not "ok"
+    ("cantaloupe", "no_answer"),  # not "cant"
+    ("wonton", "no_answer"),  # not "wont"
     ("Good boy", "no_answer"),  # a real mishearing of room chatter; "good" is not an answer
     ("I'm good", "no_answer"),
 ]

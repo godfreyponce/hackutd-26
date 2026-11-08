@@ -13,7 +13,12 @@ HELP = re.compile(
     r"|(fell|fallen)\b(?! asleep)"
     r"|on the (floor|ground))"
 )
-NEGATION = re.compile(r"\b(no|nope|nah|not|never)\b|n't\b")
+# cant, dont ... aint: -n't words as a transcriber may write them, with no apostrophe.
+NEGATION = re.compile(
+    r"\b(no|nope|nah|not|never|cannot"
+    r"|cant|dont|wont|didnt|doesnt|isnt|wasnt|arent|werent"
+    r"|couldnt|wouldnt|shouldnt|havent|hasnt|hadnt|aint)\b|n't\b"
+)
 OK = re.compile(r"\b(yes|yeah|yep|yup|okay|ok|fine|alright|all right)\b")
 
 
