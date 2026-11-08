@@ -391,7 +391,10 @@ class ReplyClient(FakeClient):
     SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=None, tool_calls=[
         SimpleNamespace(id="call_0", type="function",
                         function=SimpleNamespace(name="get_presence", arguments={"x": 1}))]))]),
-], ids=["json_mode_single_quotes", "native_args_not_a_string"])
+    SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=None, tool_calls=[
+        SimpleNamespace(id="call_0", type="function",
+                        function=SimpleNamespace(name=None, arguments="{}"))]))]),
+], ids=["json_mode_single_quotes", "native_args_not_a_string", "native_name_not_a_string"])
 def test_a_reply_the_box_cannot_read_still_ends_with_the_fixed_script(reply):
     bus_bad, agent = go(["no_answer"] * 3, [STILL, FALL_HINT], llm(ReplyClient(reply)))
     bus_script, _ = go(["no_answer"] * 3, [STILL, FALL_HINT])
@@ -410,6 +413,45 @@ def test_a_template_id_that_is_not_a_string_is_refused():
     assert agent.notifier.sms == []
     assert any(r["text"].startswith("Refused notify_contact") for r in bus.trace("VERIFY"))
     assert bus.states()[-1] == "alarm"
+
+
+@pytest.mark.parametrize("minutes", [10**400, float("nan"), float("inf")], ids=["huge", "nan", "inf"])
+def test_a_recheck_time_that_is_not_a_real_number_is_refused(minutes):
+    def policy(messages):
+        r = last_result(messages)
+        if r is not None and r.get("next") == "done":
+            return [("schedule_recheck", {"minutes": minutes})]
+        return cooperative(messages)
+
+    bus, agent = go(["ok"], [STILL, FALL_HINT], llm(FakeClient(policy)))
+    assert agent.rechecks == []
+    assert any(r["text"].startswith("Refused schedule_recheck") for r in bus.trace("VERIFY"))
+
+
+class GuardThatBreaksOnce(FakeGuard):
+    async def check(self, text):
+        if not self.seen:
+            self.seen.append(text)
+            raise RuntimeError("guard broke")
+        return await super().check(text)
+
+
+def test_a_check_in_that_crashes_does_not_block_the_next_event():
+    async def scenario():
+        bus = FakeBus(["ok", "ok"])
+        agent = make_agent(bus, guard=GuardThatBreaksOnce())
+        await agent.handle(STILL)
+        await agent.handle(FALL_HINT)
+        with pytest.raises(RuntimeError):
+            await agent.idle()
+        await agent.handle(QUAKE)
+        await agent.idle()
+        return bus, agent
+
+    bus, agent = asyncio.run(scenario())
+    assert agent.incident.trigger == "quake"
+    assert agent.incident.outcome == "ok"
+    assert bus.says() == ["ask_stopped", "ask_stopped", "reply_ok"]
 
 
 # ---- emergency alerts (#36) ----

@@ -92,6 +92,8 @@ class LLMPlanner:
             text = (msg.content or "").strip()
             if msg.tool_calls:
                 calls = [ToolCall(tc.function.name, _args(tc.function.arguments), tc.id) for tc in msg.tool_calls]
+                if not all(isinstance(c.name, str) for c in calls):
+                    raise ValueError("a tool call has no name")
                 return Plan(calls, text, native=True)
             return Plan(parse_json_calls(text), text, native=False)
         except Exception as e:  # any failure, a reply it cannot read included, means: hand over to the next planner

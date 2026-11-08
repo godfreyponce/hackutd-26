@@ -7,6 +7,7 @@ text. The planner can add steps but can never skip an alarm the rule demands.
 import asyncio
 import json
 import logging
+import sys
 import time
 from datetime import datetime
 
@@ -228,6 +229,15 @@ class Agent:
         inc.presence_checked = False
         inc.run_answered = False
         self.task = asyncio.get_running_loop().create_task(self._run(inc))
+        self.task.add_done_callback(lambda task: self._on_run_done(task, inc))
+
+    def _on_run_done(self, task, inc):
+        """A check-in that crashed before its outcome must not keep every later event out."""
+        if task.cancelled() or task.exception() is None:
+            return
+        log.error("check-in crashed", exc_info=task.exception())
+        if self.incident is inc and inc.outcome is None:
+            self.incident = None
 
     async def _on_presence(self, state):
         prev, self.presence = self.presence, state
@@ -532,7 +542,7 @@ class Agent:
 
     async def _schedule_recheck(self, inc, turn, args):
         minutes = args.get("minutes")
-        if not isinstance(minutes, (int, float)) or minutes <= 0:
+        if not isinstance(minutes, (int, float)) or not 0 < minutes <= sys.float_info.max:
             return {"error": "minutes must be a positive number"}
         delay = minutes * self.settings.recheck_unit_s
         self.rechecks.append(asyncio.get_running_loop().call_later(delay, self._start_checkin, "recheck"))
