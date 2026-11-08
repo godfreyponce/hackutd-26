@@ -65,7 +65,7 @@ function realBox() {
     battery_min: null,
     vulnerable: false,
     indoor_f: 70,
-    presence: 'moving',
+    presence: 'none',
     stale: false,
     outcome: null,
     skipped: false,
