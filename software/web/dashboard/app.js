@@ -299,6 +299,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'q') startQuake(now, null, 'the q key on this page');
   if (e.key === 'r') resetAll(now);
   if (e.key === 'v') cam = moveCamera('v', now);
+  if (e.key === '?') $('keys').hidden = !$('keys').hidden;
 });
 
 // ---------- Rendering: text panels ----------

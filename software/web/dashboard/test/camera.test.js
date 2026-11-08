@@ -15,9 +15,17 @@ const sameView = (a, b) => {
   close(a.scale, b.scale, 1e-3);
 };
 
-test('idle: the globe starts in the world stage and turns slowly', () => {
+// The world stage is reached only with the v key, two steps from the city.
+const worldCamera = () => ({ ...initialCamera(0, VIEWS), stage: 'world' });
+
+test('the page opens on the city view', () => {
   const cam = initialCamera(0, VIEWS);
-  assert.equal(cam.stage, 'world');
+  assert.equal(cam.stage, 'city');
+  sameView(viewAt(cam, 0, VIEWS), VIEWS.city);
+});
+
+test('idle in the world stage: the globe turns slowly', () => {
+  const cam = worldCamera();
   const a = viewAt(cam, 0, VIEWS);
   const b = viewAt(cam, 1000, VIEWS);
   assert.equal(a.scale, VIEWS.world.scale);
@@ -25,7 +33,7 @@ test('idle: the globe starts in the world stage and turns slowly', () => {
 });
 
 test('quake flies from the world to the city and lands on the city view', () => {
-  const cam = cameraEvent(initialCamera(0, VIEWS), 'quake', 5000, VIEWS);
+  const cam = cameraEvent(worldCamera(), 'quake', 5000, VIEWS);
   assert.equal(cam.stage, 'city');
   assert.ok(flying(cam, 5001));
   assert.ok(arrivalAt(cam) > 5000);
@@ -33,8 +41,8 @@ test('quake flies from the world to the city and lands on the city view', () => 
 });
 
 test('quake: the globe turns to face the city before the camera flies down', () => {
-  const start = viewAt(initialCamera(0, VIEWS), 30000, VIEWS);
-  const cam = cameraEvent(initialCamera(0, VIEWS), 'quake', 30000, VIEWS);
+  const start = viewAt(worldCamera(), 30000, VIEWS);
+  const cam = cameraEvent(worldCamera(), 'quake', 30000, VIEWS);
   const early = viewAt(cam, cam.at + cam.ms * 0.25, VIEWS);
   assert.ok(early.scale < VIEWS.world.scale * 1.5, 'still zoomed out');
   assert.ok(Math.abs(early.lon - start.lon) > 1, 'already turning');
@@ -64,13 +72,17 @@ test('clear outside the home view changes nothing', () => {
   assert.equal(cameraEvent(cam, 'clear', 9000, VIEWS), cam);
 });
 
-test('reset flies back to the globe, which turns again after landing', () => {
+test('reset goes back to the city view, from the home or the world', () => {
   let cam = cameraEvent(initialCamera(0, VIEWS), 'alarm', 0, VIEWS);
   cam = cameraEvent(cam, 'reset', 10000, VIEWS);
-  assert.equal(cam.stage, 'world');
-  const landed = viewAt(cam, arrivalAt(cam), VIEWS);
-  sameView(landed, VIEWS.world);
-  assert.ok(viewAt(cam, arrivalAt(cam) + 1000, VIEWS).lon !== landed.lon);
+  assert.equal(cam.stage, 'city');
+  sameView(viewAt(cam, arrivalAt(cam), VIEWS), VIEWS.city);
+  assert.equal(cameraEvent(worldCamera(), 'reset', 0, VIEWS).stage, 'city');
+});
+
+test('reset in the city view changes nothing', () => {
+  const cam = initialCamera(0, VIEWS);
+  assert.equal(cameraEvent(cam, 'reset', 0, VIEWS), cam);
 });
 
 test('v steps world, city, home and back to world', () => {
@@ -80,7 +92,7 @@ test('v steps world, city, home and back to world', () => {
 });
 
 test('an event mid-flight starts from where the camera is', () => {
-  let cam = cameraEvent(initialCamera(0, VIEWS), 'quake', 0, VIEWS);
+  let cam = cameraEvent(worldCamera(), 'quake', 0, VIEWS);
   const mid = cam.at + cam.ms / 2;
   const here = viewAt(cam, mid, VIEWS);
   cam = cameraEvent(cam, 'alarm', mid, VIEWS);
@@ -94,15 +106,13 @@ test('reduced motion cuts: the new view shows at once', () => {
 });
 
 test('reduced motion: the idle globe does not turn', () => {
-  const cam = initialCamera(0, VIEWS, { reduced: true });
+  const cam = { ...initialCamera(0, VIEWS, { reduced: true }), stage: 'world' };
   assert.equal(viewAt(cam, 0, VIEWS).lon, viewAt(cam, 60000, VIEWS).lon);
-  const back = cameraEvent(cameraEvent(cam, 'quake', 0, VIEWS, { reduced: true }), 'reset', 10, VIEWS, { reduced: true });
-  assert.equal(viewAt(back, 10, VIEWS).lon, viewAt(back, 60000, VIEWS).lon);
 });
 
 test('the turn takes the short way across the date line', () => {
   const views = { ...VIEWS, city: { lon: -170, lat: 0, scale: 400000 }, world: { lon: 170, lat: 0, scale: 300 } };
-  let cam = initialCamera(0, views);
+  let cam = { ...initialCamera(0, views), stage: 'world' };
   cam = cameraEvent(cam, 'quake', 0, views);
   const v = viewAt(cam, cam.ms * 0.2, views);
   assert.ok(v.lon > 170 || v.lon < -170, `went the long way: ${v.lon}`);

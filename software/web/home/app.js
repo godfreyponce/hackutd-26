@@ -1,4 +1,5 @@
 import { initialState, reduce, statusText, activeAlert, TRACE_WINDOW_MS } from './state.js';
+import { HOME_COUNT } from '../dashboard/homes.js';
 
 // The product name is not settled. Change it here only.
 export const PRODUCT_NAME = 'LAND';
@@ -226,7 +227,7 @@ function renderMap() {
   const total = neighborDots.length + 1;
   // A home that answered okay was still hit, so check-in answers never lower the quake count.
   const hit = state.areaHit ? neighborDots.length + (state.home === 'idle' ? 0 : 1) : state.home === 'hit' ? 1 : 0;
-  hudNodes.textContent = `NODES ${total}`;
+  hudNodes.textContent = `NEARBY ${total} OF ${HOME_COUNT}`;
   const escalated = connected && state.status === 'CONTACTING_HELP';
   hudHit.textContent = connected ? `HIT ${hit}` : 'HIT --';
   // Red only while an event is unresolved; a protected home that was hit reads neutral, like NODES. The dots keep their encoding.

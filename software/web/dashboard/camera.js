@@ -21,7 +21,7 @@ const NEXT = {
   quake: { world: 'city' },
   alarm: { world: 'home', city: 'home' },
   clear: { home: 'city' },
-  reset: { city: 'world', home: 'world' },
+  reset: { world: 'city', home: 'city' },
   v: { world: 'city', city: 'home', home: 'world' },
 };
 
@@ -32,7 +32,7 @@ export function nextStage(stage, event) {
 const spinRate = (reduced) => (reduced ? 0 : SPIN_DEG_PER_MS);
 
 export function initialCamera(now, views, { reduced = false } = {}) {
-  return { stage: 'world', from: null, at: now, ms: 0, spinLon: views.world.lon, spinAt: now, spin: spinRate(reduced) };
+  return { stage: 'city', from: null, at: now, ms: 0, spinLon: views.world.lon, spinAt: now, spin: spinRate(reduced) };
 }
 
 export function arrivalAt(cam) {

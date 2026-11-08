@@ -40,14 +40,14 @@
         <p class="box-note" id="box-note" hidden></p>
       </section>
 
-      <p class="keys"><kbd>q</kbd> quake on this page only <kbd>r</kbd> reset this page <kbd>v</kbd> world, city, home</p>
+      <p class="keys" id="keys" hidden><kbd>q</kbd> quake on this page only <kbd>r</kbd> reset this page <kbd>v</kbd> world, city, home <kbd>?</kbd> hide keys</p>
     </aside>
 
     <section class="map-wrap" aria-label="Map of 500 homes">
       <canvas id="map"></canvas>
-      <div class="stage" id="stage" data-stage="world">
+      <div class="stage" id="stage" data-stage="city">
         <span class="stage-steps" aria-hidden="true"><i data-s="world"></i><i data-s="city"></i><i data-s="home"></i></span>
-        <span id="stage-now">World</span>
+        <span id="stage-now">City</span>
       </div>
       <p class="attrib" id="attrib"></p>
       <div class="callout" id="callout" hidden>
