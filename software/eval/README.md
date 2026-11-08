@@ -109,3 +109,48 @@ The Safety Guard check runs before the rule, so a spoken reply waits for it. Tha
 
 Times are measured from the hub's publish time of the event to the hub's publish time of the
 `checkin` message, so they include the planner and Safety Guard calls but not text to speech.
+
+# Judge-table rehearsal timing (issue #60)
+
+Times the demo run and the "Help" fast path end to end, with real speaking and listening time.
+It reuses the eval above: the real hub on a free port, the real agent process, the real voice service.
+
+- Demo run (case `standup`): event, 3 asks with no answer, alarm, dashboard zoom, the person stands
+  up, "Are you okay?", "I'm okay", stand-down.
+- Help fast path (case `help`): help sign, one ask, "Help", alarm.
+
+The voice engines are real: ElevenLabs (or Kokoro offline) makes every line, and Scribe (or Moonshine
+offline) reads every reply. Only the speaker and the microphone are stand-ins, so a rehearsal makes no
+sound while the live loop is filmed. A line waits its audio's real length instead of playing. A listen
+waits the listen window, then gives the speech-to-text a recorded reply clip (the voice test fixtures,
+macOS `say` voice) half a second into real room noise.
+
+Step times come from the hub's publish time of each bus message, measured from the event. First and
+last word come from the stand-in speaker, because speaking time is not on the bus. The dashboard zoom
+lands 1.6 s after the alarm (or "help") message, the city to home flight in `camera.js` (the flight from the
+world view is longer). No browser runs.
+
+## Run
+
+```bash
+NVIDIA_API_KEY=... ELEVENLABS_API_KEY=... .venv/bin/python -m software.eval.rehearsal --out /tmp/land-rehearsal --runs 10
+```
+
+Flags:
+
+- `--cut-internet`: sets a dead proxy (a closed local port) in this process and the agent child, so
+  hosted Nemotron, the Safety Guard and ElevenLabs all fail at once. Nothing global changes: no Wi-Fi,
+  firewall or hosts file. The fixed script plans and Kokoro and Moonshine take every line. A refused
+  connection fails at once, so these times are the best case: a network that hangs instead waits out the
+  ElevenLabs timeout on each line and the planner timeout on each turn.
+- `--listen-s S`: the agent's `AGENT_LISTEN_S` (demo default 6).
+- `--voice online|offline`: online needs `ELEVENLABS_API_KEY` (the default when it is set).
+- `--max-rpm R` (default 15): paces hosted Nemotron calls, as in the eval.
+- `--cases ID,ID` (default `standup,help`): only cases whose replies have a recorded clip ("I'm okay",
+  "Help", or silence).
+- `--run-timeout-s S` (default 240): a run with no decision by then counts as failed.
+
+Output in `--out`: `rehearsal.md`, `rehearsal.json`, plus the eval's `raw.jsonl`, `agent.log`,
+`voice.log`, and `engine.log` (the voice engines' fallback lines). Keys are redacted from the logs.
+
+Results from the table rehearsal: `software/eval/rehearsal-results.md`.
