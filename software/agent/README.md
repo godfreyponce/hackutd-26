@@ -23,7 +23,7 @@ Each hop writes an `agent` FALLBACK row with the reason. A text reply with no `t
 
 ## Guardrails in code
 
-- Alarm rule (`rule.py`): nobody + no answer = no alarm. Someone + no answer = alarm after 3 tries. "Help" = alarm. "Okay" = log it.
+- Alarm rule (`rule.py`): nobody + no answer = no alarm, and the agent sends `clear` to end the check-in. Someone + no answer = alarm after 3 tries. "Help" = alarm. "Okay" = log it.
 - Once the alarm is up, only an ok answer (then `clear`) or a reset ends it. No answer to the stand-up re-ask keeps the alarm up, even when nobody is detected.
 - If the rule demands an alarm and the planner skips it for one turn, code raises it (VERIFY "Rule override").
 - `raise_alarm` is refused when the rule does not call for it.
