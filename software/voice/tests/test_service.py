@@ -83,14 +83,14 @@ def test_say_with_listen_sends_one_heard_and_say_without_listen_sends_none():
     engine = FakeEngine(["I'm okay", "help me"])
 
     async def body(ws, service):
-        await say(ws, "Contacting emergency services now.")
+        await say(ws, "Alerting your emergency contact now.")
         await say(ws, "Are you okay?", listen_s=6)
         first = await next_heard(ws)
         await say(ws, "Are you okay?", listen_s=4)
         second = await next_heard(ws)
         assert first == {"type": "heard", "answer": "ok", "transcript": "I'm okay"}
         assert second == {"type": "heard", "answer": "help", "transcript": "help me"}
-        assert engine.spoken == ["Contacting emergency services now.", "Are you okay?", "Are you okay?"]
+        assert engine.spoken == ["Alerting your emergency contact now.", "Are you okay?", "Are you okay?"]
         assert engine.listens == [6, 4]
 
     run_with_service(engine, body)
@@ -134,10 +134,10 @@ class BrokenAudioEngine(FakeEngine):
 
 
 def test_audio_error_answers_no_answer_and_keeps_the_worker_alive():
-    engine = BrokenAudioEngine(["yes"], broken={"Contacting emergency services now.", "Can you hear me?"})
+    engine = BrokenAudioEngine(["yes"], broken={"Alerting your emergency contact now.", "Can you hear me?"})
 
     async def body(ws, service):
-        await say(ws, "Contacting emergency services now.")
+        await say(ws, "Alerting your emergency contact now.")
         await say(ws, "Can you hear me?", listen_s=6)
         assert await next_heard(ws) == {"type": "heard", "answer": "no_answer", "transcript": ""}
         await say(ws, "Are you okay?", listen_s=6)

@@ -37,6 +37,7 @@ Rafael: "I haven't figured out everything yet." Below: **Decided** = his words; 
    - **Outage: the Pi stays on** a battery backup (UPS board, issue #11). This replaces the "Pi shuts down, ESP32 on battery" proposal. "Low-power mode" now means the Pi stays up and sheds load (screen dim, fewer checks), not a shutdown.
    - **Accelerometer for earthquakes:** use Rafael's own kit "Gyro and accelerometer" module (likely an MPU-6050; check the chip). Mount it rigidly to the case or wall.
    - Full module list: [HackUTD-Inventory](HackUTD-Inventory.md) (kit modules).
+10. **Camera back IN** (2026-11-07 ~6:30 PM, supersedes 9's "no camera"): Camera Module 3 + the **AI HAT+ 26 TOPS** (bought) do person detection, which finds a person by body shape even when lying still. **Replaces the radar** (not bought). Also not bought: the PiPower 5 UPS and the amp + speaker, so outage power and voice output are open again.
 
 ## Alert receiver: how it works (from Rafael's decision 7)
 - **Inputs:** NOAA Weather Radio over the RTL-SDR (SAME header, works offline); NWS API (GeoJSON with CAP fields); CAP XML feeds (GDACS, later FEMA IPAWS); USGS/EMSC quake JSON; the node's own sensors.
@@ -50,7 +51,7 @@ Rafael: "I haven't figured out everything yet." Below: **Decided** = his words; 
 - **Receiving:** live list of sources and their state (weather radio station + signal, NWS, USGS, EMSC, GDACS, local sensors), last message time each.
 - **Map:** homes as white dots; a home inside an active alert area, or one that reported a local event, turns red. Alert area drawn as its polygon.
 - Open: which tablet (old tablet/phone in kiosk mode vs Pi touchscreen); does it read from the node over Wi-Fi only (outage behaviour); how many homes on the map are real vs simulated.
-- **Visual reference (Rafael, 2026-11-07):** ![Wall tablet reference](ui/wall-tablet-reference.png)
+- **Visual reference (Rafael, 2026-11-07):** !HackUTD-Wall-Tablet-Reference.png
   - Keep: dark navy, glowing blue, landscape wall display, left nav (Overview / Alerts / Disasters / Security / System), one big status word ("PROTECTED · No active threats"), two cards (Disaster Monitor, Security Monitor), globe/map on the right, footer with the node ID.
   - Don't copy: the DHS seal and name, "Secure Gov Network", "Top Secret". It's a student project, not a government system; showing a federal seal would mislead judges and isn't ours to use. Put our own name and logo there.
 

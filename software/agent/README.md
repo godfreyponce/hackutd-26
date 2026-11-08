@@ -28,7 +28,7 @@ Each hop writes an `agent` FALLBACK row with the reason. A text reply with no `t
 - `raise_alarm` is refused when the rule does not call for it.
 - `speak` takes a script id from `scripts.py`, never text. A 4th ask is refused.
 - Each try has its own line. The planner asks with the ask id; code picks `ask_stopped` (or `ask_event`), then `ask_retry_2`, then `ask_retry_3` by try number. The planner cannot skip or reorder them.
-- After 3 no-answers the box says `escalate` ("I haven't heard back, so I'm contacting emergency services now."), then the alarm.
+- After 3 no-answers the box says `escalate` ("I haven't heard back, so I'm alerting your emergency contact now."), then the alarm.
 - An ok answer gets `reply_ok`. A help answer gets `reply_help` before the alarm, and no `escalate`. Replies do not listen.
 - `reply_ok` is refused unless the last answer was ok. `reply_help` is refused unless it was help. If the planner skips a due reply for one turn, code speaks it (VERIFY "Rule override").
 - Safety Guard (`nvidia/llama-3.1-nemotron-safety-guard-8b-v3`) screens every transcript before the planner sees it. No key: MOCK pass-through row. Guard error: the transcript is withheld.
