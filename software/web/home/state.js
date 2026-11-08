@@ -24,6 +24,7 @@ export function initialState() {
     onBattery: false,
     batteryPct: null,
     indoorF: null,
+    indoorAt: null, // when the last indoor reading arrived
     quakes: [],
     areaHit: false, // neighborhood dots turn red after a quake
     home: 'idle', // node map dot: idle (white), hit (red), ok (green)
@@ -34,19 +35,20 @@ export function sourceLabel(source) {
   return SOURCE_LABELS[source] ?? String(source ?? '').toUpperCase();
 }
 
-export function statusText(status, { alert = false } = {}) {
+export function statusText(status, { alert = false, linked = true } = {}) {
   switch (status) {
     case 'CHECKING_IN':
       return { word: 'CHECKING IN', detail: 'Event detected. Asking if you are okay.' };
     case 'NO_RESPONSE':
-      return { word: 'NO RESPONSE', detail: 'No response after an event' };
+      return { word: 'NO RESPONSE', detail: 'No response after an event. Asking again.' };
     case 'CONTACTING_HELP':
       return {
         word: 'CONTACTING HELP',
-        detail: 'Contacting your emergency contact',
+        detail: 'Alerting your emergency contact',
         note: 'Demo alarm. No emergency number is called.',
       };
     default:
+      if (!linked) return { word: 'HUB OFFLINE', detail: 'Live status unavailable. Reconnecting to hub.' };
       return { word: 'PROTECTED', detail: alert ? 'All okay at home. Official alert active.' : 'No active events' };
   }
 }
@@ -93,6 +95,7 @@ export function reduce(state, msg, now) {
           severity: msg.severity ?? '',
           area: msg.area ?? '',
           headline: msg.headline ?? '',
+          at: now,
         },
       };
     case 'power':
@@ -103,7 +106,7 @@ export function reduce(state, msg, now) {
     case 'queue': {
       const home = Array.isArray(msg.homes) && msg.homes.find((h) => h && h.id === 'H000');
       const f = home?.factors?.indoor_f;
-      return typeof f === 'number' ? { ...state, indoorF: f } : state;
+      return typeof f === 'number' ? { ...state, indoorF: f, indoorAt: now } : state;
     }
     case 'reset':
       return initialState();
