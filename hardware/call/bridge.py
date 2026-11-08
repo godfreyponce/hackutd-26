@@ -30,8 +30,10 @@ import sounddevice as sd
 PORT = int(os.environ.get("CALL_BRIDGE_PORT", 8091))
 RATE = 16000                 # box side (the PipeWire land_mic / land_speaker run at any rate; PipeWire resamples)
 ANNOUNCE_S = 30              # re-announce the tunnel URL this often (agents that start later still learn it)
-DUCK = 0.25                  # mic level while the caller is talking (on top of echo cancel): no echo back
-VOICE_RMS = 0.02             # speech-ish level for the transcript chunker (after the box's gain control)
+DUCK = 0.5                   # mic level while the caller is SPEAKING (on top of echo cancel): less echo back
+CALLER_SPEECH_RMS = 0.05     # caller frames this loud are speech; phone-line hiss stays below, so it never ducks
+VOICE_RMS = 0.02             # speech-ish level for the transcript chunker (after the mic gain below)
+MIC_TARGET_RMS, MIC_MAX_GAIN = 0.12, 16.0   # the box mic is quiet: raise speech toward phone level, up to +24 dB
 SILENCE_S, MIN_SPEECH_S = 0.7, 0.5
 
 
@@ -59,13 +61,43 @@ def ulaw_encode(x: np.ndarray) -> bytes:
     return (~(sign | (exp << 4) | man) & 0xFF).astype(np.uint8).tobytes()
 
 
-def up2(x):    # 8 kHz -> 16 kHz, linear interpolation
-    return np.interp(np.arange(len(x) * 2) / 2, np.arange(len(x)), x).astype(np.float32)
+class Resampler:
+    """Streaming 2x up/down with a proper low-pass FIR (a phone line is 300-3400 Hz), state kept across frames."""
+
+    TAPS = None
+
+    def __init__(self):
+        if Resampler.TAPS is None:
+            n = np.arange(-24, 25)
+            Resampler.TAPS = (np.sinc(n / 2) / 2 * np.hamming(49)).astype(np.float32)  # half-band, cutoff fs/4
+        self.tail = np.zeros(48, np.float32)
+
+    def _filt(self, x):
+        y = np.convolve(np.concatenate([self.tail, x]), Resampler.TAPS, mode="valid")
+        self.tail = np.concatenate([self.tail, x])[-48:]
+        return y.astype(np.float32)
+
+    def down2(self, x):  # 16 kHz -> 8 kHz
+        return self._filt(x)[::2]
+
+    def up2(self, x):  # 8 kHz -> 16 kHz
+        z = np.zeros(len(x) * 2, np.float32)
+        z[::2] = x * 2
+        return self._filt(z)
 
 
-def down2(x):  # 16 kHz -> 8 kHz, average pairs (enough low-pass for a phone line)
-    x = x[: len(x) // 2 * 2]
-    return x.reshape(-1, 2).mean(axis=1).astype(np.float32)
+class Agc:
+    """Slow automatic gain for the box mic: speech toward MIC_TARGET_RMS, never boosts silence."""
+
+    def __init__(self):
+        self.gain = 4.0
+
+    def __call__(self, x):
+        rms = float(np.sqrt((x ** 2).mean()))
+        if rms * self.gain > 0.01:  # only adapt on speech-level frames
+            want = min(MIC_MAX_GAIN, max(1.0, MIC_TARGET_RMS / max(rms, 1e-6)))
+            self.gain += (want - self.gain) * (0.3 if want < self.gain else 0.05)  # fast down, slow up
+        return np.tanh(x * self.gain).astype(np.float32)
 
 
 def chime():
@@ -189,7 +221,7 @@ class Bridge:
         if self.call:
             log("second stream while a call is live: refused")
             return await ws.close()
-        out, chunkers = deque(), {}
+        out, chunkers, rs_in, rs_out, agc = deque(), {}, Resampler(), Resampler(), Agc()
         call = {"ws": ws, "stream": None, "call_sid": None, "out": out, "caller_loud_until": 0.0}
         loop = asyncio.get_running_loop()
         emit = lambda who, a: self.transcribe(who, a)  # noqa: E731
@@ -205,13 +237,13 @@ class Bridge:
             pending = pending[n:]
 
         def mic(indata, frames, t, status):
-            x = indata[:, 0].copy()
+            x = agc(indata[:, 0].copy())
             if time.monotonic() < call["caller_loud_until"]:
-                x *= DUCK  # the caller is talking: keep their voice from echoing back
+                x *= DUCK  # the caller is speaking: less of their voice echoes back
             else:
                 chunkers["home"].push(x)
             if call["stream"]:
-                payload = base64.b64encode(ulaw_encode(down2(x))).decode()
+                payload = base64.b64encode(ulaw_encode(rs_out.down2(x))).decode()
                 msg = json.dumps({"event": "media", "streamSid": call["stream"], "media": {"payload": payload}})
                 asyncio.run_coroutine_threadsafe(ws.send(msg), loop)
 
@@ -233,9 +265,9 @@ class Bridge:
                     for s in streams:
                         s.start()
                 elif ev == "media" and m["media"].get("track", "inbound") == "inbound":
-                    x = up2(ulaw_decode(base64.b64decode(m["media"]["payload"])))
+                    x = rs_in.up2(ulaw_decode(base64.b64decode(m["media"]["payload"])))
                     out.append(x)
-                    if float(np.sqrt((x ** 2).mean())) > VOICE_RMS / 2:
+                    if float(np.sqrt((x ** 2).mean())) > CALLER_SPEECH_RMS:
                         call["caller_loud_until"] = time.monotonic() + 0.3
                     chunkers["caller"].push(x)
                 elif ev == "stop":

@@ -226,7 +226,12 @@ const qs = new URLSearchParams(location.search), HOST = location.hostname || "lo
 const HUB = qs.get("hub") || `ws://${HOST}:8765`;
 const $ = (id) => document.getElementById(id);
 $("video").src = qs.get("video") || `http://${HOST}:8090/stream.mjpg`;
-$("video").onerror = () => { $("videoNote").textContent = "No camera stream (land-camera on :8090)."; };
+const VIDEO = $("video").src;
+$("video").onerror = () => {  // the box may still be booting: keep retrying, never stay blank
+  $("videoNote").textContent = "Camera stream not up yet (land-camera on :8090), retrying…";
+  setTimeout(() => { $("video").src = VIDEO + (VIDEO.includes("?") ? "&" : "?") + "r=" + Date.now(); }, 3000);
+};
+$("video").onload = () => { $("videoNote").textContent = "Runs on the AI HAT+ (Hailo-8). Faces are blurred on the box; no video is stored or sent."; };
 let ws, drain = null;
 
 function light(id, text, red) {
