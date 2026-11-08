@@ -4,6 +4,9 @@ The ask wording is still open between Godfrey and Rafael. The default is
 "ask_stopped". Set AGENT_ASK_SCRIPT=ask_event for the originally agreed line.
 """
 
+# Every line the agent says or writes about an alert with demo true carries these words.
+DEMO_TEXT = "DEMO, not a real alert"
+
 SCRIPTS = {
     "ask_stopped": "Hey, I noticed you stopped moving. Are you okay?",
     "ask_event": "Something just happened. Are you okay? Please respond.",
@@ -13,9 +16,14 @@ SCRIPTS = {
     "escalate": "I haven't heard back, so I'm alerting your emergency contact now.",
     "reply_help": "Okay. I'm getting help now. Stay with me, you're not alone.",
     "reply_ok": "Good. I'm glad you're okay. I'll check on you again soon.",
+    "alert_demo": f"{DEMO_TEXT}.",
 }
 
 ASK_SCRIPTS = ("ask_stopped", "ask_event")
+# An EQW emergency alert check-in always asks with this line, whatever AGENT_ASK_SCRIPT says.
+ALERT_ASK_SCRIPT = "ask_event"
+# Said before the first ask when the alert has demo true.
+ALERT_DEMO_SCRIPT = "alert_demo"
 # Tries 2 and 3. Code picks the line by try number, so the planner cannot skip or reorder them.
 RETRY_SCRIPTS = ("ask_retry_2", "ask_retry_3")
 STANDUP_SCRIPT = "standup_ask"

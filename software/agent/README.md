@@ -34,6 +34,14 @@ Each hop writes an `agent` FALLBACK row with the reason. A text reply with no `t
 - Safety Guard (`nvidia/llama-3.1-nemotron-safety-guard-8b-v3`) screens every transcript before the planner sees it. No key: MOCK pass-through row. Guard error: the transcript is withheld.
 - `raise_alarm` always sends `checkin alarm`. It calls `TWILIO_TO` only when all `TWILIO_*` vars are set and `TWILIO_TO` is a full `+1XXXXXXXXXX` number. Never 911.
 
+## Alerts (#36)
+
+The agent stores every hub `alert` (the last one goes into the hand-off facts). Only `code` "EQW" with `level` "emergency" (the hub adds `level`) starts a check-in, like a quake. It asks with `ask_event` whatever `AGENT_ASK_SCRIPT` says. Then the same 3 tries and the same alarm rule apply.
+
+- An EQW alert within `ALERT_QUIET_S` (300 s) of any check-in start is ignored, so a shake followed by an alert asks once. A shake right after an alert check-in still starts its own check-in. A VERIFY row says when an alert is ignored.
+- The hand-off note uses the alert that started the check-in, not a later one.
+- `demo: true`: the box says `alert_demo` ("DEMO, not a real alert.") before the first ask. Trace rows, the planner brief, the decision row and the hand-off note say it too. A Nemotron note about a demo alert without those words gets the template.
+
 ## Hand-off note and why
 
 When the outcome is alarm, the agent asks Nemotron for two things, in parallel:

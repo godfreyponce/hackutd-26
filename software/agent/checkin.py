@@ -7,15 +7,22 @@ text. The planner can add steps but can never skip an alarm the rule demands.
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime
 
 from . import rule
 from .handoff import HandoffWriter, build_facts
 from .planner import LLMPlanner, PlannerUnavailable, ScriptPlanner
-from .scripts import (ALARM_CALL_TEXT, ESCALATE_SCRIPT, REPLY_SCRIPTS, RETRY_SCRIPTS, SCRIPTS, SMS_TEMPLATES,
-                      STANDUP_SCRIPT)
+from .scripts import (ALARM_CALL_TEXT, ALERT_ASK_SCRIPT, ALERT_DEMO_SCRIPT, ASK_SCRIPTS, DEMO_TEXT,
+                      ESCALATE_SCRIPT, REPLY_SCRIPTS, RETRY_SCRIPTS, SCRIPTS, SMS_TEMPLATES, STANDUP_SCRIPT)
 
 log = logging.getLogger("agent")
+
+# The hub `alert` (code, level) that starts a check-in. Every other alert is only stored.
+ALERT_TRIGGER = ("EQW", "emergency")
+# One quake can bring a shake and an EQW alert. An EQW alert within this many seconds
+# of any check-in start is ignored, so the person is asked once (owner, issue #36).
+ALERT_QUIET_S = 300
 
 SYSTEM_PROMPT = f"""You are the planner inside a home safety box. After an event (an earthquake, or a person who stopped moving) you run a voice check-in by calling tools.
 Rules you cannot change:
@@ -34,12 +41,12 @@ def _tool(name, description, props=None, required=()):
         "parameters": {"type": "object", "properties": props or {}, "required": list(required)}}}
 
 
-def build_tools(ask_script):
+def build_tools():
     return [
         _tool("get_presence", "Latest presence sensor state: moving, still or none."),
         _tool("speak", "Say a fixed line by id. After a question the voice service listens. "
               "reply_ok and reply_help answer an ok or help answer and need no listen.",
-              {"script_id": {"type": "string", "enum": [ask_script, STANDUP_SCRIPT, *REPLY_SCRIPTS.values()]}},
+              {"script_id": {"type": "string", "enum": [*ASK_SCRIPTS, STANDUP_SCRIPT, *REPLY_SCRIPTS.values()]}},
               ["script_id"]),
         _tool("listen", "Wait for the answer to the last question: ok, help or no_answer, plus a transcript.",
               {"seconds": {"type": "number"}}),
@@ -57,9 +64,12 @@ def build_tools(ask_script):
 class Incident:
     """One event, from trigger until ok, clear, no alarm, or reset."""
 
-    def __init__(self, trigger, peak_g=None):
+    def __init__(self, trigger, ask_script, started_at, peak_g=None, alert=None):
         self.trigger = trigger
+        self.ask_script = ask_script  # the try-1 question
+        self.started_at = started_at  # Agent.clock() seconds
         self.peak_g = peak_g
+        self.alert = alert  # the `alert` message that started it, or None
         self.goal = "checkin"  # or "standup": one "Are you okay?" after the alarm
         self.tries = 0
         self.answers = []
@@ -106,7 +116,8 @@ class Agent:
         self.notifier = notifier
         self.ranker = ranker
         self.writer = writer or HandoffWriter(None, None, settings.planner_timeout_s)
-        self.tools = build_tools(settings.ask_script)
+        self.tools = build_tools()
+        self.clock = time.monotonic
         self.presence = "none"
         self.battery_pct = None
         self.power = None
@@ -133,7 +144,7 @@ class Agent:
         elif kind == "power":
             self.power = msg.get("state")
         elif kind == "alert":
-            self.alert = msg
+            await self._on_alert(msg)
         elif kind == "heard":
             inc = self.incident
             if inc and inc.pending:
@@ -176,12 +187,29 @@ class Agent:
 
     # ---- triggers ----
 
-    def _start_checkin(self, trigger, peak_g=None):
+    def _start_checkin(self, trigger, peak_g=None, alert=None):
         if self.incident and self.incident.open:
             log.info("%s while a check-in is open, ignored", trigger)
             return
-        self.incident = Incident(trigger, peak_g)
+        ask = ALERT_ASK_SCRIPT if alert else self.settings.ask_script
+        self.incident = Incident(trigger, ask, self.clock(), peak_g, alert)
         self._launch("checkin")
+
+    async def _on_alert(self, msg):
+        self.alert = msg
+        if (msg.get("code"), msg.get("level")) != ALERT_TRIGGER:
+            return
+        label = _alert_text(msg)
+        inc = self.incident
+        if inc and (age := self.clock() - inc.started_at) < ALERT_QUIET_S:
+            await self.trace("VERIFY", f"{label}. Alert ignored: a check-in started {age:.0f} s ago, "
+                                       f"under {ALERT_QUIET_S} s.")
+            return
+        if inc and inc.open:
+            await self.trace("VERIFY", f"{label}. Alert ignored: a check-in is still open.")
+            return
+        await self.trace("VERIFY", f"{label}. Starting a check-in.")
+        self._start_checkin("alert", alert=msg)
 
     def _launch(self, goal):
         inc = self.incident
@@ -290,19 +318,19 @@ class Agent:
         return {"next": "speak", "script_id": self._question_id(inc)}
 
     def _question_id(self, inc):
-        return STANDUP_SCRIPT if inc.goal == "standup" or inc.stood_up else self.settings.ask_script
+        return STANDUP_SCRIPT if inc.goal == "standup" or inc.stood_up else inc.ask_script
 
     def _brief(self, inc):
         if inc.goal == "standup":
             return ("The person stood up after the alarm (presence sensor went from still to moving). "
                     f"Ask {STANDUP_SCRIPT} once and listen. An ok answer clears the alarm.")
-        return (f"Event: {inc.trigger}. Presence sensor now: {self.presence}. Start the check-in. "
+        return (f"Event: {_trigger_text(inc)}. Presence sensor now: {self.presence}. Start the check-in. "
                 "Tool results tell you what the rule needs next.")
 
     def _decision_text(self, inc):
         someone = "someone detected" if rule.someone_detected(self.presence) else "nobody detected"
         answers = ", ".join(inc.answers) or "none"
-        return (f"Decision: trigger {inc.trigger}; presence sensor {self.presence} ({someone}); "
+        return (f"Decision: trigger {_trigger_text(inc)}; presence sensor {self.presence} ({someone}); "
                 f"answers {answers}; outcome {inc.outcome}.")
 
     # ---- tools ----
@@ -313,7 +341,7 @@ class Agent:
 
     async def _speak(self, inc, turn, args):
         sid = args.get("script_id")
-        allowed = (STANDUP_SCRIPT,) if inc.goal == "standup" else (self.settings.ask_script, STANDUP_SCRIPT)
+        allowed = (STANDUP_SCRIPT,) if inc.goal == "standup" else (*ASK_SCRIPTS, STANDUP_SCRIPT)
         if inc.finished():
             return {"error": "the check-in is over"}
         if sid in REPLY_SCRIPTS.values() or inc.reply_due:
@@ -333,12 +361,14 @@ class Agent:
                 return {"error": f"the box asks at most {rule.MAX_TRIES} times"}
             inc.tries += 1
             try_n = inc.tries
-            if sid == self.settings.ask_script:
-                sid = (sid, *RETRY_SCRIPTS)[try_n - 1]
+            if sid in ASK_SCRIPTS:
+                sid = (inc.ask_script, *RETRY_SCRIPTS)[try_n - 1]
         while not inc.heard.empty():
             inc.heard.get_nowait()
         inc.pending = sid
         await self.send({"type": "checkin", "state": "asking", "try": try_n})
+        if try_n == 1 and inc.goal == "checkin" and inc.alert and inc.alert.get("demo"):
+            await self.send({"type": "say", "script_id": ALERT_DEMO_SCRIPT, "text": SCRIPTS[ALERT_DEMO_SCRIPT]})
         await self.send({"type": "say", "script_id": sid, "text": SCRIPTS[sid], "listen_s": self.settings.listen_s})
         return {"spoken": sid, "try": try_n}
 
@@ -446,7 +476,7 @@ class Agent:
     async def _handoff(self, inc):
         """After the alarm: Nemotron's note for responders and its why. Code checks both."""
         facts = build_facts(trigger=inc.trigger, peak_g=inc.peak_g, presence=self.presence, answers=inc.heard_log,
-                            battery_pct=self.battery_pct, power=self.power, alert=self.alert,
+                            battery_pct=self.battery_pct, power=self.power, alert=inc.alert or self.alert,
                             reason=inc.alarm_reason, at=datetime.now().strftime("%H:%M"))
         await self.trace("ACT", f"write_handoff(home={facts['home']!r})", "write_handoff")
         await self.trace("ACT", "explain_alarm(reasoning='on')", "explain_alarm")
@@ -488,6 +518,16 @@ class Agent:
 
     async def _log_decision(self, inc, turn, args):
         return {"logged": True}
+
+
+def _alert_text(alert):
+    """e.g. "EQW alert (emergency)", with the demo words when the alert has demo true."""
+    text = f"{alert.get('code')} alert ({alert.get('level')})"
+    return f"{text}, {DEMO_TEXT}" if alert.get("demo") else text
+
+
+def _trigger_text(inc):
+    return _alert_text(inc.alert) if inc.alert else inc.trigger
 
 
 def _fmt(args):
