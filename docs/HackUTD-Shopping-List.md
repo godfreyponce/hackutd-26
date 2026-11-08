@@ -17,6 +17,30 @@ Part of [HackUTD-2026](HackUTD-2026.md). Merged 2026-11-07 ~3:50 PM from:
 **Stock and prices are unverified** (Micro Center blocks bots). Call or check the app before driving. Micro Center Dallas, 13929 N Central Expy, open until 9 PM.
 The case session's parts list (rafam-ca, ~3:55 PM) is merged in.
 
+## Partner's run (sent by Rafael, 2026-11-07 ~7:45 PM)
+- Maybe return: the Raspberry Pi 4 case fan, if a 30 or 40 mm 5 V fan is found.
+- Micro Connectors PC mounting screws M3 × 1/4" (6.35 mm), 50-pack (065128, $7.99).
+- 2nd Adafruit I2S MEMS Microphone Breakout SPH0645LM4H (007153).
+- Adafruit MAX98357A I2S 3 W amp (007112, $5.95).
+- Mono Enclosed Speaker 3 W 4 Ω (002402, $4.95), or the 40 mm 4 Ω 3 W speaker (002436, $5.95).
+- Argon40 POLY+ 5 case with a 30 mm PWM 5 V fan (686314, $5.99), for its fan.
+- M2.5: the case's nut traps also take the AI HAT+ kit's own M2.5 screw heads (case session), so no extra M2.5 kit.
+
+## Second run: LIVE Dallas stock (read from microcenter.com with storeid=131, 2026-11-07 ~7:30 PM)
+| Part | MC SKU | Dallas stock | Price |
+|---|---|---|---|
+| Adafruit MAX98357A I2S 3 W amp | 007112 | **1** | $5.95 |
+| Adafruit Mono Enclosed Speaker 3 W 4 Ω | 002402 | 5 | $4.95 |
+| Adafruit Speaker 40 mm 4 Ω 3 W | 002436 | **1** | $5.95 |
+| Adafruit I2S MEMS Microphone Breakout (2nd mic) | 007153 | **1** | $6.95 |
+| Black Nylon Screw and Stand-off Set, M2.5 | 725317 | 2 | $16.95 |
+| Assorted M2.5 Standoff Kit, 114 pcs (cheaper) | 103903 | 8 | $9.99 |
+| microSD 64 GB U3 V30 (633x) | 038299 | 21 | $24.99 |
+| USB 2.0 A-male to B-male cable 3 ft (Uno R3) | 418707 | 5 | $14.99 |
+| USB-C to USB-C 100 W cable 1 ft | 811737 | 3 | $19.99 |
+| **SunFounder PiPower 5 / any Pi 5 UPS** | — | **not in stock at Dallas** | — |
+| Power bank 10,000 mAh 22.5 W (outage fallback) | 911677 | 4 | $19.99 |
+
 ## Bring list (Rafael, 2026-11-07 ~6:45 PM, his words)
 | Item | Notes |
 |---|---|
