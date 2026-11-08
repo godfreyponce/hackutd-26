@@ -1,0 +1,14 @@
+[Unit]
+Description=LAND hub (bus ws:8765 + screens http:8080)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/hackutd-26
+ExecStart=%h/hackutd-26/.venv/bin/python -m software.hub --bus --host 0.0.0.0
+StandardOutput=append:%h/land-logs/hub.log
+StandardError=append:%h/land-logs/hub.log
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

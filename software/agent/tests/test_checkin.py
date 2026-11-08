@@ -838,3 +838,17 @@ def test_eqw_after_quake_then_help_sign_keeps_the_quake_quiet_window():
     bus = asyncio.run(scenario())
     assert bus.says() == ["ask_stopped", "reply_ok", "ask_gesture", "reply_ok"]
     assert any("40 s ago" in r["text"] for r in bus.trace("VERIFY"))
+
+
+def test_offline_skips_cloud_planner_and_guard_at_once():
+    hosted_client, local_client, guard = FakeClient(), FakeClient(), FakeGuard()
+    hosted = LLMPlanner("hosted Nemotron 30B", hosted_client, "m")
+    hosted.hosted = True
+    local = LLMPlanner("local Nemotron 4B", local_client, "m")
+    offline = {"type": "net", "online": False}
+    mumble = {"answer": "no_answer", "transcript": "mmm"}
+    bus, _ = go([mumble] * 3, [offline, STILL, FALL_HINT], [hosted, local, ScriptPlanner()], guard=guard)
+    assert hosted_client.requests == [] and local_client.requests
+    assert guard.seen == []
+    assert "cloud planner is skipped" in bus.trace("FALLBACK")[0]["text"]
+    assert bus.states()[-1] == "alarm"

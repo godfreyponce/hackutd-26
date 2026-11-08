@@ -283,6 +283,8 @@ class OfflineEngine:
         self.tts = make_tts(OFFLINE_VOICE)
         self.stt = MoonshineSTT()
 
+    used = {"tts": "Kokoro (on-board)", "stt": "Moonshine (on-board)"}
+
     def speak(self, text: str, script_id: str | None = None):
         self.tts.speak(text)
 
@@ -312,10 +314,15 @@ class ElevenLabsEngine:
         self.http.headers["xi-api-key"] = api_key
         self.offline = offline
         self.log = log
+        self.online = True  # set from {"type":"net"}: False goes straight to the on-board engines
+        self.used = {"tts": "ElevenLabs (cloud)", "stt": "ElevenLabs Scribe (cloud)"}
 
     def speak(self, text: str, script_id: str | None = None):
         import requests
 
+        if not self.online:
+            self.used["tts"] = self.offline.used["tts"]
+            return self.offline.speak(text)
         tag = ELEVEN_TAGS.get(script_id)
         try:
             r = self.http.post(
@@ -327,7 +334,9 @@ class ElevenLabsEngine:
             r.raise_for_status()
         except requests.RequestException as e:
             self.log(f"FALLBACK: ElevenLabs text-to-speech failed ({e}); the offline voice speaks this line")
+            self.used["tts"] = self.offline.used["tts"]
             return self.offline.speak(text)
+        self.used["tts"] = "ElevenLabs (cloud)"
         play(np.frombuffer(r.content, dtype=np.int16).astype(np.float32) / 32768, SAMPLE_RATE)
 
     def listen(self, seconds: float) -> str:
@@ -336,6 +345,9 @@ class ElevenLabsEngine:
         audio = record(seconds, self.log)
         if audio is None:
             return ""
+        if not self.online:
+            self.used["stt"] = self.offline.used["stt"]
+            return self.offline.stt.transcribe(audio)
         try:
             r = self.http.post(
                 f"{ELEVEN_URL}/speech-to-text",
@@ -344,9 +356,11 @@ class ElevenLabsEngine:
                 timeout=ELEVEN_TIMEOUT_S,
             )
             r.raise_for_status()
+            self.used["stt"] = "ElevenLabs Scribe (cloud)"
             return r.json()["text"].strip()
         except (requests.RequestException, KeyError, ValueError) as e:
             self.log(f"FALLBACK: ElevenLabs speech-to-text failed ({e}); Moonshine transcribes this answer")
+            self.used["stt"] = self.offline.used["stt"]
             return self.offline.stt.transcribe(audio)
 
 
