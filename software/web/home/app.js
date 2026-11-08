@@ -401,10 +401,9 @@ function render() {
   $('alert-count').hidden = !a;
   if (a) {
     $('banner').dataset.level = a.level;
-    $('alert-source').textContent = a.source;
-    // The level word, not the CAP severity, so the title matches the banner color.
-    const levelWord = a.level[0].toUpperCase() + a.level.slice(1);
-    $('alert-event').textContent = a.event.toLowerCase().includes(a.level) ? a.event : `${a.event}, ${levelWord}`;
+    // Same label as the dashboard header: source and level, in the level color.
+    $('alert-source').textContent = `${a.source} ${a.level}`.toUpperCase();
+    $('alert-event').textContent = a.event;
     $('alert-headline').textContent = a.headline;
     // The headline often names the area already; then the space shows when the alert came in.
     $('alert-area').textContent = a.headline.includes(a.area)
