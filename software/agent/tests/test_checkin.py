@@ -134,6 +134,31 @@ def test_standup_after_alarm_then_ok_clears(kind):
 
 
 @pytest.mark.parametrize("kind", PLANNERS)
+@pytest.mark.parametrize("presence_at_answer", [[], [NOBODY]], ids=["stays", "walks_out"])
+def test_standup_after_alarm_with_no_answer_keeps_the_alarm_up(kind, presence_at_answer):
+    async def scenario():
+        bus = FakeBus(["no_answer"] * 3)
+        agent = make_agent(bus, planners=PLANNERS[kind]())
+        await agent.handle(STILL)
+        await agent.handle(FALL_HINT)
+        await agent.idle()
+        assert bus.states()[-1] == "alarm"
+        bus.answers = [{"answer": "no_answer", "before": presence_at_answer}]
+        await agent.handle(MOVING)
+        await agent.idle()
+        says = bus.says()
+        await agent.handle({"type": "help_gesture", "source": "camera"})
+        await agent.idle()
+        return bus, agent, says
+
+    bus, agent, says = asyncio.run(scenario())
+    assert says[-1] == "standup_ask"
+    assert agent.incident.outcome == "alarm"
+    assert "clear" not in bus.states()
+    assert bus.says() == says
+
+
+@pytest.mark.parametrize("kind", PLANNERS)
 def test_standup_during_asking_then_ok_clears(kind):
     answers = ["no_answer", {"answer": "ok", "before": [MOVING]}]
     bus, _ = go(answers, [MOVING, QUAKE, STILL], PLANNERS[kind]())

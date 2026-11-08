@@ -441,11 +441,11 @@ class Agent:
             else:
                 inc.outcome = "ok"
                 await self.trace("VERIFY", "Rule: answer ok. Log it, no alarm.")
+        elif inc.alarm_raised:
+            await self.trace("VERIFY", f"Rule: {who} + {answer}. The alarm stays up.")
         elif verdict == rule.NO_ALARM:
             inc.outcome = "no_alarm"
             await self.trace("VERIFY", "Rule: nobody detected + no answer = no alarm.")
-        elif inc.alarm_raised:
-            await self.trace("VERIFY", f"Rule: {who} + {answer}. The alarm stays up.")
         elif answer == "help":
             await self._alarm_due(inc, turn, "the answer was help")
         elif inc.tries < rule.MAX_TRIES:
