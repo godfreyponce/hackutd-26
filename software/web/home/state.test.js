@@ -63,6 +63,27 @@ test('a quake or a stand-up re-ask never hides CONTACTING_HELP', () => {
   assert.equal(s.status, 'CONTACTING_HELP');
 });
 
+test('a first ask after a check-in that ended at no response, with no alarm, shows CHECKING_IN', () => {
+  // Nobody home: the agent sends asking 1, no_answer 1, then nothing. The next event starts a new check-in.
+  const s = run(quake, asking(1), noAnswer(1), { type: 'fall_hint' }, asking(1));
+  assert.equal(s.status, 'CHECKING_IN');
+  assert.equal(s.tryNum, 1);
+});
+
+test('a first ask clears what was heard in the last check-in', () => {
+  const s = run(asking(1), { type: 'heard', answer: 'ok', transcript: "I'm okay" }, { type: 'checkin', state: 'ok', try: 1 },
+    { type: 'fall_hint' }, asking(1));
+  assert.equal(s.heard, null);
+});
+
+test('the stand-up re-ask after an alarm keeps CONTACTING_HELP and clears what was heard before it', () => {
+  const s = run(quake, asking(1), noAnswer(1), asking(2), noAnswer(2), asking(3),
+    { type: 'heard', answer: 'no_answer', transcript: '' }, noAnswer(3), { type: 'checkin', state: 'alarm', try: 4 }, asking(1));
+  assert.equal(s.status, 'CONTACTING_HELP');
+  assert.equal(s.heard, null);
+  assert.equal(reduce(s, noAnswer(1), NOW).status, 'CONTACTING_HELP');
+});
+
 for (const end of ['clear', 'ok']) {
   test(`checkin ${end} goes back to PROTECTED and turns the home dot green`, () => {
     const s = run(quake, noAnswer(3), { type: 'checkin', state: 'alarm' }, { type: 'checkin', state: end });
@@ -258,6 +279,15 @@ test('the help sign line stays for its check-in and goes when the home is okay a
   const later = run(help, asking(1), ok, asking(1));
   assert.equal(statusText(later.status, { helpSign: later.helpSign }).detail, 'Event detected. Asking if you are okay.');
   assert.equal(run(help, { type: 'reset' }).helpSign, false);
+});
+
+test('a check-in started by a help sign that ended at no response does not mark the next check-in', () => {
+  const help = { type: 'help_gesture', source: 'camera' };
+  const s = run(help, asking(1), noAnswer(1), quake, asking(1));
+  assert.equal(statusText(s.status, { helpSign: s.helpSign }).detail, 'Event detected. Asking if you are okay.');
+  // An alert check-in starts with only `checkin asking`, no event message.
+  assert.equal(run(help, asking(1), noAnswer(1), asking(1)).helpSign, false);
+  assert.equal(run(quake, asking(1), noAnswer(1), help, asking(1)).helpSign, true);
 });
 
 test('alert chip names source and level, but not a level the event title already says', () => {
