@@ -80,3 +80,14 @@ test('a help sign is kept for the event line until reset', () => {
   assert.equal(run([help, { type: 'checkin', state: 'ok', try: 1 }]).helpSign, true);
   assert.equal(run([help, { type: 'reset' }]).helpSign, false);
 });
+
+test('the alarm after 3 asks is not counted as a 4th try', () => {
+  const asks = [1, 2, 3].flatMap((n) => [
+    { type: 'checkin', state: 'asking', try: n },
+    { type: 'checkin', state: 'no_answer', try: n },
+  ]);
+  const s = run([...asks, { type: 'checkin', state: 'alarm', try: 4 }]);
+  assert.equal(s.try, 3, 'the box panel prints this as "Alarm, try N"');
+  const late = applyBoxEvent(s, { type: 'heard', answer: 'no_answer', transcript: '' }, 0);
+  assert.equal(late.no_answer, 3);
+});
