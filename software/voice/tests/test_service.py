@@ -1,11 +1,15 @@
 import asyncio
 import json
+import sys
 import threading
 import time
 
+import numpy as np
+import pytest
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import broadcast, serve
 
+from software.voice import engines
 from software.voice.service import VoiceService
 
 
@@ -57,10 +61,10 @@ async def next_heard(ws, timeout=5):
                 return msg
 
 
-def run_with_service(engine, body, alarm=None, warning=None, log=lambda line: None):
+def run_with_service(engine, body, alarm=None, warning=None, log=lambda line: None, line_cut=None):
     async def main():
         server, url, clients = await fake_bus()
-        service = VoiceService(engine, log=log, alarm=alarm, warning=warning)
+        service = VoiceService(engine, log=log, alarm=alarm, warning=warning, line_cut=line_cut)
         task = asyncio.create_task(service.run(url))
         try:
             async with connect(url) as ws:
@@ -292,3 +296,181 @@ def test_reset_during_the_warning_tone_drops_the_line():
     run_with_service(engine, body, warning=FakeWarning(events, hold=hold))
     assert engine.spoken == ["After the reset."]
     assert engine.listens == []
+
+
+# ---- a reset cuts the line in progress ----
+
+@pytest.fixture(autouse=True)
+def clear_line_cut():
+    yield
+    engines.line_cut.clear()
+
+
+class FakeSoundDevice:
+    """Stands in for sounddevice: a sound or a recording lasts its full length unless stop() cuts it."""
+
+    def __init__(self, stop_s=0):
+        self.started = []
+        self.cut = threading.Event()
+        self.length = 0
+        self.stop_s = stop_s  # a real stop waits for the audio buffer to drain
+        self.stopping = 0
+        self.overlapped = False
+
+    def _start(self, what, seconds):
+        self.started.append(what)
+        self.cut = threading.Event()
+        self.length = seconds
+
+    def play(self, audio, rate):
+        self._start("play", len(audio) / rate)
+
+    def rec(self, frames, samplerate, channels, dtype):
+        self._start("rec", frames / samplerate)
+        return np.full((frames, channels), 0.1, dtype=dtype)
+
+    def wait(self):
+        self.cut.wait(self.length)
+
+    def stop(self):
+        self.stopping += 1
+        self.overlapped |= self.stopping > 1
+        time.sleep(self.stop_s)
+        self.cut.set()
+        self.stopping -= 1
+
+
+class SpeakerEngine:
+    """Speaks and listens through engines.play and engines.record, as the real engines do."""
+
+    def __init__(self, transcripts, line_s):
+        self.transcripts = list(transcripts)
+        self.line_s = line_s
+        self.spoken = []
+
+    def speak(self, text, script_id=None):
+        self.spoken.append(script_id)
+        engines.play(np.zeros(int(self.line_s[script_id] * engines.SAMPLE_RATE), dtype=np.float32),
+                     engines.SAMPLE_RATE)
+
+    def listen(self, seconds):
+        audio = engines.record(seconds, lambda line: None)
+        return "" if audio is None else self.transcripts.pop(0)
+
+
+LONG_S = 3  # a line, a listen or a tone that a reset must cut short
+CUT_S = 1.5  # the next ask starts well before the long one would have ended
+
+
+def ask(ws, script_id, listen_s=None, tone=None):
+    msg = {"type": "say", "script_id": script_id, "text": script_id}
+    if listen_s is not None:
+        msg["listen_s"] = listen_s
+    if tone is not None:
+        msg["tone"] = tone
+    return ws.send(json.dumps(msg))
+
+
+def test_reset_cuts_the_line_in_progress_and_the_next_ask_starts_at_once(monkeypatch):
+    sd = FakeSoundDevice()
+    monkeypatch.setitem(sys.modules, "sounddevice", sd)
+    engine = SpeakerEngine(["yes"], {"escalate": LONG_S, "ask_stopped": 0.05})
+    events = []
+
+    async def body(ws, service):
+        await ask(ws, "escalate")
+        await ws.send(json.dumps({"type": "checkin", "state": "alarm", "try": 3}))
+        await wait_for(lambda: sd.started == ["play"])
+        await asyncio.sleep(0.2)
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 1)
+        cut_at = time.monotonic()
+        await ask(ws, "ask_stopped", listen_s=0.05)
+        assert await next_heard(ws) == {"type": "heard", "answer": "ok", "transcript": "yes"}
+        assert time.monotonic() - cut_at < CUT_S
+
+    run_with_service(engine, body, alarm=FakeAlarm(events), line_cut=engines.line_cut)
+    assert engine.spoken == ["escalate", "ask_stopped"]
+    assert events == []
+
+
+def test_reset_cuts_the_listen_in_progress_and_drops_its_answer(monkeypatch):
+    sd = FakeSoundDevice()
+    monkeypatch.setitem(sys.modules, "sounddevice", sd)
+    engine = SpeakerEngine(["yes"], {"ask_stopped": 0.05, "ask_retry_2": 0.05})
+
+    async def body(ws, service):
+        await ask(ws, "ask_retry_2", listen_s=LONG_S)
+        await wait_for(lambda: "rec" in sd.started)
+        await asyncio.sleep(0.2)
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 1)
+        cut_at = time.monotonic()
+        await ask(ws, "ask_stopped", listen_s=0.05)
+        assert await next_heard(ws) == {"type": "heard", "answer": "ok", "transcript": "yes"}
+        assert time.monotonic() - cut_at < CUT_S
+
+    run_with_service(engine, body, line_cut=engines.line_cut)
+    assert engine.spoken == ["ask_retry_2", "ask_stopped"]
+
+
+def test_reset_cuts_the_warning_tone_in_progress(monkeypatch):
+    sd = FakeSoundDevice()
+    monkeypatch.setitem(sys.modules, "sounddevice", sd)
+    engine = SpeakerEngine(["yes"], {"ask_event": 0.05, "ask_stopped": 0.05})
+    warning = engines.WarningTone()
+    warning.audio = np.zeros(LONG_S * warning.rate, dtype=np.float32)
+
+    async def body(ws, service):
+        await ask(ws, "ask_event", listen_s=0.05, tone="warning")
+        await wait_for(lambda: sd.started == ["play"])
+        await asyncio.sleep(0.2)
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 1)
+        cut_at = time.monotonic()
+        await ask(ws, "ask_stopped", listen_s=0.05)
+        assert await next_heard(ws) == {"type": "heard", "answer": "ok", "transcript": "yes"}
+        assert time.monotonic() - cut_at < CUT_S
+
+    run_with_service(engine, body, warning=warning, line_cut=engines.line_cut)
+    assert engine.spoken == ["ask_stopped"]
+
+
+def test_after_a_reset_the_next_line_and_the_alarm_tone_play_and_a_reset_stops_the_tone(monkeypatch):
+    sd = FakeSoundDevice()
+    monkeypatch.setitem(sys.modules, "sounddevice", sd)
+    engine = SpeakerEngine([], {"escalate": 0.05})
+
+    async def body(ws, service):
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 1)
+        await ask(ws, "escalate")
+        await ws.send(json.dumps({"type": "checkin", "state": "alarm", "try": 3}))
+        await wait_for(lambda: service.alarm_on)
+        assert sd.started == ["play", "play"]
+        assert not sd.cut.is_set()
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 2)
+        assert sd.cut.is_set()
+
+    run_with_service(engine, body, alarm=engines.AlarmTone(), line_cut=engines.line_cut)
+
+
+def test_reset_during_the_standup_ask_with_the_alarm_on_never_stops_audio_twice_at_once(monkeypatch):
+    # sounddevice's stop() closes the stream with no lock: two at once would close it twice.
+    sd = FakeSoundDevice(stop_s=0.05)
+    monkeypatch.setitem(sys.modules, "sounddevice", sd)
+    engine = SpeakerEngine([], {"escalate": 0.05, "standup_ask": 0.05})
+
+    async def body(ws, service):
+        await ask(ws, "escalate")
+        await ws.send(json.dumps({"type": "checkin", "state": "alarm", "try": 3}))
+        await wait_for(lambda: service.alarm_on)
+        await ask(ws, "standup_ask", listen_s=LONG_S)
+        await wait_for(lambda: "rec" in sd.started)
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 1)
+        await asyncio.sleep(0.3)
+
+    run_with_service(engine, body, alarm=engines.AlarmTone(), line_cut=engines.line_cut)
+    assert not sd.overlapped

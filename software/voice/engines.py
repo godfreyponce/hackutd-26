@@ -6,6 +6,7 @@ import os
 import select
 import sys
 import termios
+import threading
 import wave
 from pathlib import Path
 
@@ -67,11 +68,31 @@ def mic_blocked_message() -> str:
     )
 
 
+# A reset sets it to cut the line in progress: play() and record() stop early and start nothing.
+# The voice service clears it as it starts the next line.
+line_cut = threading.Event()
+
+
+def _wait_or_cut(seconds: float) -> bool:
+    """Wait for the sound or recording to end. False if a reset cut it. The thread that started
+    it calls stop: sd.stop() from another thread during sd.wait() hung PortAudio on macOS."""
+    import sounddevice as sd
+
+    if line_cut.wait(seconds):
+        stop_audio()
+        return False
+    sd.wait()
+    return True
+
+
 def record(seconds: float, log) -> np.ndarray | None:
     import sounddevice as sd
 
+    if line_cut.is_set():
+        return None
     audio = sd.rec(int(seconds * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype="float32")
-    sd.wait()
+    if not _wait_or_cut(seconds):
+        return None
     audio = audio[:, 0]
     if not np.any(audio):
         log(mic_blocked_message())
@@ -82,15 +103,23 @@ def record(seconds: float, log) -> np.ndarray | None:
 def play(audio: np.ndarray, rate: int, wait: bool = True):
     import sounddevice as sd
 
+    if line_cut.is_set():
+        return
     sd.play(audio, rate)
     if wait:
-        sd.wait()
+        _wait_or_cut(len(audio) / rate)
+
+
+# sd.stop() closes the stream with no lock of its own. A reset can stop the alarm tone on one
+# thread while the cut line stops on another, and two at once would close the stream twice.
+_stop_lock = threading.Lock()
 
 
 def stop_audio():
     import sounddevice as sd
 
-    sd.stop()
+    with _stop_lock:
+        sd.stop()
 
 
 class AlarmTone:
