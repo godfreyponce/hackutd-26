@@ -1,11 +1,13 @@
 import asyncio
+from dataclasses import replace
 
 import httpx
 import pytest
 
 from software.agent.planner import LLMPlanner, ScriptPlanner, parse_json_calls
+from software.agent.scripts import SCRIPTS, SMS_TEMPLATES
 
-from .fakes import FakeBus, FakeClient, FakeGuard, cooperative, last_result, make_agent
+from .fakes import FAST, FakeBus, FakeClient, FakeGuard, cooperative, last_result, make_agent
 
 STILL = {"type": "presence", "state": "still"}
 MOVING = {"type": "presence", "state": "moving"}
@@ -25,9 +27,12 @@ PLANNERS = {
 }
 
 
-async def run(answers, events, planners=None, guard=None):
+ASKS = ["ask_stopped", "ask_retry_2", "ask_retry_3"]
+
+
+async def run(answers, events, planners=None, guard=None, settings=FAST):
     bus = FakeBus(answers)
-    agent = make_agent(bus, planners=planners, guard=guard)
+    agent = make_agent(bus, planners=planners, guard=guard, settings=settings)
     for e in events:
         await agent.handle(e)
     await agent.idle()
@@ -41,7 +46,8 @@ def go(*a, **kw):
 @pytest.mark.parametrize("kind", PLANNERS)
 def test_three_no_answers_then_alarm_on_fourth(kind):
     bus, _ = go(["no_answer", "no_answer", None], [STILL, FALL_HINT], PLANNERS[kind]())
-    assert bus.says() == ["ask_stopped"] * 3 + ["escalate"]
+    assert bus.says() == ASKS + ["escalate"]
+    assert bus.events()[-2:] == ["escalate", "alarm"]
     assert bus.checkins() == [
         ("asking", 1), ("no_answer", 1),
         ("asking", 2), ("no_answer", 2),
@@ -49,7 +55,7 @@ def test_three_no_answers_then_alarm_on_fourth(kind):
         ("alarm", 4),
     ]
     escalate = [m for m in bus.sent if m["type"] == "say"][-1]
-    assert escalate["text"] == "Contacting emergency services now"
+    assert escalate["text"] == "I haven't heard back, so I'm contacting emergency services now."
     assert "listen_s" not in escalate
 
 
@@ -57,7 +63,33 @@ def test_three_no_answers_then_alarm_on_fourth(kind):
 def test_help_alarms_at_once(kind):
     bus, _ = go(["help"], [STILL, FALL_HINT], PLANNERS[kind]())
     assert bus.checkins() == [("asking", 1), ("help", 1), ("alarm", 2)]
-    assert bus.says() == ["ask_stopped", "escalate"]
+    assert bus.events() == ["ask_stopped", "help", "reply_help", "alarm"]
+    reply = [m for m in bus.sent if m["type"] == "say"][-1]
+    assert reply["text"] == "Okay. I'm getting help now. Stay with me, you're not alone."
+    assert "listen_s" not in reply
+    assert not any("override" in r["text"].lower() for r in bus.trace("VERIFY"))
+
+
+def _texts_after_outcome(template_id):
+    def policy(messages):
+        r = last_result(messages)
+        if r is not None and r.get("next") == "done":
+            return [("notify_contact", {"template_id": template_id})]
+        return cooperative(messages)
+    return policy
+
+
+def test_help_answer_texts_the_help_template_even_if_planner_picks_no_response():
+    bus, agent = go(["help"], [STILL, FALL_HINT], llm(FakeClient(_texts_after_outcome("no_response"))))
+    assert agent.notifier.sms == [SMS_TEMPLATES["said_help"]]
+    assert any("override" in r["text"].lower() for r in bus.trace("VERIFY"))
+
+
+def test_no_answers_text_the_no_response_template():
+    bus, agent = go(["no_answer", "no_answer", None], [STILL, FALL_HINT],
+                    llm(FakeClient(_texts_after_outcome("no_response"))))
+    assert agent.notifier.sms == [SMS_TEMPLATES["no_response"]]
+    assert not any("override" in r["text"].lower() for r in bus.trace("VERIFY"))
 
 
 @pytest.mark.parametrize("kind", PLANNERS)
@@ -65,6 +97,10 @@ def test_okay_logs_with_no_alarm(kind):
     bus, _ = go(["ok"], [STILL, QUAKE], PLANNERS[kind]())
     assert bus.checkins() == [("asking", 1), ("ok", 1)]
     assert "alarm" not in bus.states()
+    assert bus.says() == ["ask_stopped", "reply_ok"]
+    reply = [m for m in bus.sent if m["type"] == "say"][-1]
+    assert reply["text"] == "Good. I'm glad you're okay. I'll check on you again soon."
+    assert "listen_s" not in reply
     assert any(r.get("tool") == "log_decision" for r in bus.trace())
 
 
@@ -90,8 +126,8 @@ def test_standup_after_alarm_then_ok_clears(kind):
         return bus
 
     bus = asyncio.run(scenario())
-    assert bus.says()[-1] == "standup_ask"
-    assert [m for m in bus.sent if m["type"] == "say"][-1]["text"] == "Are you okay?"
+    assert bus.says()[-2:] == ["standup_ask", "reply_ok"]
+    assert [m for m in bus.sent if m["type"] == "say"][-2]["text"] == "Are you okay?"
     assert bus.states()[-2:] == ["ok", "clear"]
     assert bus.states().count("alarm") == 1
 
@@ -107,7 +143,7 @@ def test_standup_during_asking_then_ok_clears(kind):
 def test_quake_while_moving_then_still_is_someone_detected():
     bus, _ = go(["no_answer"] * 3, [MOVING, QUAKE, STILL, FALL_HINT])
     assert bus.states()[-1] == "alarm"
-    assert bus.says().count("ask_stopped") == 3
+    assert bus.says()[:3] == ASKS
 
 
 def test_llm_that_skips_the_alarm_is_overridden():
@@ -119,8 +155,52 @@ def test_llm_that_skips_the_alarm_is_overridden():
 
     bus, _ = go(["help"], [STILL, FALL_HINT], llm(FakeClient(skipper)))
     assert bus.states()[-1] == "alarm"
-    assert bus.says()[-1] == "escalate"
+    assert bus.says() == ["ask_stopped", "reply_help"]
     assert any("override" in r["text"].lower() for r in bus.trace("VERIFY"))
+
+
+@pytest.mark.parametrize("answer, reply", [("ok", "reply_ok"), ("help", "reply_help")])
+def test_llm_that_skips_the_reply_has_code_speak_it(answer, reply):
+    def mute(messages):
+        r = last_result(messages)
+        if r and r.get("script_id", "").startswith("reply_"):
+            return [("log_decision", {"reason": "No need to answer."})]
+        return cooperative(messages)
+
+    bus, _ = go([answer], [STILL, FALL_HINT], llm(FakeClient(mute)))
+    assert bus.says() == ["ask_stopped", reply]
+    assert any("override" in r["text"].lower() and reply in r["text"] for r in bus.trace("VERIFY"))
+
+
+@pytest.mark.parametrize("ask_script", ["ask_stopped", "ask_event"])
+def test_each_try_speaks_its_own_line(ask_script):
+    def stubborn(messages):
+        # Always asks with the try-1 id. Code still picks each try's own line.
+        return [(n, {"script_id": ask_script} if n == "speak" else a) for n, a in cooperative(messages)]
+
+    settings = replace(FAST, ask_script=ask_script)
+    bus, _ = go(["no_answer"] * 3, [STILL, FALL_HINT], llm(FakeClient(stubborn)), settings=settings)
+    asks = [m for m in bus.sent if m["type"] == "say" and "listen_s" in m]
+    assert [m["script_id"] for m in asks] == [ask_script, "ask_retry_2", "ask_retry_3"]
+    assert [m["text"] for m in asks] == [SCRIPTS[ask_script],
+                                         "I didn't catch that. Are you okay? Just say okay, or help.",
+                                         "I still can't hear you. If I don't hear from you, I'll get help. Are you okay?"]
+    if ask_script == "ask_stopped":
+        assert asks[0]["text"] == "Hey, I noticed you stopped moving. Are you okay?"
+
+
+@pytest.mark.parametrize("answer, wrong", [(None, "reply_help"), ("help", "reply_ok"), ("ok", "reply_help")])
+def test_llm_cannot_speak_a_reply_the_answer_did_not_earn(answer, wrong):
+    def eager(messages):
+        r = last_result(messages)
+        if (r is None) if answer is None else (r and r.get("answer") == answer):
+            return [("speak", {"script_id": wrong})]
+        return cooperative(messages)
+
+    bus, _ = go([answer or "ok"], [STILL, QUAKE], llm(FakeClient(eager)))
+    assert wrong not in bus.says()
+    assert any(r["text"].startswith("Refused speak") for r in bus.trace("VERIFY"))
+    assert not any("turn cap" in r["text"] for r in bus.trace("VERIFY"))
 
 
 def test_llm_cannot_raise_alarm_the_rule_does_not_demand():
@@ -141,7 +221,7 @@ def test_llm_cannot_speak_free_text_or_a_fourth_ask():
         return r
 
     bus, _ = go(["no_answer"] * 3, [STILL, FALL_HINT], llm(FakeClient(chatty)))
-    assert bus.says() == ["ask_stopped"] * 3 + ["escalate"]
+    assert bus.says() == ASKS + ["escalate"]
     assert bus.states()[-1] == "alarm"
 
 

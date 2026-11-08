@@ -46,6 +46,11 @@ class FakeBus:
     def says(self):
         return [m["script_id"] for m in self.sent if m["type"] == "say"]
 
+    def events(self):
+        """Says and check-in states in bus order, e.g. ["ask_stopped", "help", "reply_help", "alarm"]."""
+        return [m.get("script_id") or m["state"] for m in self.sent if m["type"] in ("say", "checkin")
+                and m.get("state") != "asking"]
+
     def trace(self, step=None):
         return [m for m in self.sent if m["type"] == "agent" and (step is None or m["step"] == step)]
 
@@ -119,6 +124,8 @@ def cooperative(messages):
     if r is None:
         return [("get_presence", {})]
     nxt = r["next"]
+    if nxt == "speak" and r["script_id"].startswith("reply_"):
+        return [("speak", {"script_id": r["script_id"]})]
     if nxt == "speak":
         return [("speak", {"script_id": r["script_id"]}), ("listen", {"seconds": 6})]
     if nxt == "listen":

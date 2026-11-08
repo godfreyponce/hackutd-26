@@ -10,14 +10,16 @@ import logging
 
 from . import rule
 from .planner import LLMPlanner, PlannerUnavailable, ScriptPlanner
-from .scripts import ALARM_CALL_TEXT, ESCALATE_SCRIPT, SCRIPTS, SMS_TEMPLATES, STANDUP_SCRIPT
+from .scripts import (ALARM_CALL_TEXT, ESCALATE_SCRIPT, REPLY_SCRIPTS, RETRY_SCRIPTS, SCRIPTS, SMS_TEMPLATES,
+                      STANDUP_SCRIPT)
 
 log = logging.getLogger("agent")
 
 SYSTEM_PROMPT = f"""You are the planner inside a home safety box. After an event (an earthquake, or a person who stopped moving) you run a voice check-in by calling tools.
 Rules you cannot change:
 - The box only says fixed lines by id. Use speak(script_id). Never write what the box says.
-- After each speak, call listen. The box asks at most {rule.MAX_TRIES} times.
+- After each question, call listen. The box asks at most {rule.MAX_TRIES} times and picks the wording for each try.
+- After an ok answer, speak reply_ok. After a help answer, speak reply_help before raise_alarm. Do not listen after a reply.
 - The alarm rule is code. Every tool result has a "next" field with what the rule needs now. When next is "raise_alarm", call raise_alarm at once.
 - You may add steps: notify_contact, schedule_recheck, log_decision.
 - When next is "done", reply with no tool call.
@@ -33,11 +35,13 @@ def _tool(name, description, props=None, required=()):
 def build_tools(ask_script):
     return [
         _tool("get_presence", "Latest radar state: moving, still or none."),
-        _tool("speak", "Say a fixed question by id. The voice service then listens.",
-              {"script_id": {"type": "string", "enum": [ask_script, STANDUP_SCRIPT]}}, ["script_id"]),
+        _tool("speak", "Say a fixed line by id. After a question the voice service listens. "
+              "reply_ok and reply_help answer an ok or help answer and need no listen.",
+              {"script_id": {"type": "string", "enum": [ask_script, STANDUP_SCRIPT, *REPLY_SCRIPTS.values()]}},
+              ["script_id"]),
         _tool("listen", "Wait for the answer to the last question: ok, help or no_answer, plus a transcript.",
               {"seconds": {"type": "number"}}),
-        _tool("raise_alarm", "Raise the fake alarm: says the escalation line, on-screen alarm, call to a teammate. Only when the rule demands it.",
+        _tool("raise_alarm", "Raise the fake alarm: says the escalation line after no answers, on-screen alarm, call to a teammate. Only when the rule demands it.",
               {"reason": {"type": "string"}}, ["reason"]),
         _tool("notify_contact", "Text a contact a fixed template by id.",
               {"template_id": {"type": "string", "enum": list(SMS_TEMPLATES)}}, ["template_id"]),
@@ -57,6 +61,8 @@ class Incident:
         self.tries = 0
         self.answers = []
         self.pending = None  # script id of a question waiting for its answer
+        self.reply_due = None  # reply script id the last answer still needs
+        self.reply_due_turn = None
         self.heard = asyncio.Queue()
         self.alarm_due_turn = None
         self.alarm_reason = ""
@@ -76,6 +82,8 @@ class Incident:
         return self.alarm_due_turn is not None and not self.alarm_raised
 
     def finished(self):
+        if self.reply_due:
+            return False
         if self.outcome in ("ok", "clear", "no_alarm"):
             return True
         if self.goal == "checkin":
@@ -235,7 +243,11 @@ class Agent:
             await self._execute(call, inc, turn)
 
     async def _enforce(self, inc, turn):
-        if inc.alarm_due and inc.alarm_due_turn < turn:
+        if inc.reply_due and inc.reply_due_turn < turn:
+            await self.trace("VERIFY", f"Rule override: the answer needs {inc.reply_due} and the planner skipped it. "
+                             "Speaking it in code.", "speak")
+            await self._say_reply(inc)
+        elif inc.alarm_due and inc.alarm_due_turn < turn:
             await self.trace("VERIFY", "Rule override: the rule demands an alarm and the planner skipped it. Raising it in code.",
                              "raise_alarm")
             await self._raise_alarm(inc, inc.alarm_reason)
@@ -250,6 +262,8 @@ class Agent:
 
     def next_hint(self):
         inc = self.incident
+        if inc.reply_due:
+            return {"next": "speak", "script_id": inc.reply_due}
         if inc.alarm_due:
             return {"next": "raise_alarm"}
         if inc.finished():
@@ -285,6 +299,8 @@ class Agent:
         allowed = (STANDUP_SCRIPT,) if inc.goal == "standup" else (self.settings.ask_script, STANDUP_SCRIPT)
         if inc.finished():
             return {"error": "the check-in is over"}
+        if sid in REPLY_SCRIPTS.values() or inc.reply_due:
+            return await self._speak_reply(inc, turn, sid)
         if inc.alarm_due:
             return {"error": "the rule demands an alarm. Call raise_alarm."}
         if sid not in allowed:
@@ -300,12 +316,28 @@ class Agent:
                 return {"error": f"the box asks at most {rule.MAX_TRIES} times"}
             inc.tries += 1
             try_n = inc.tries
+            if sid == self.settings.ask_script:
+                sid = (sid, *RETRY_SCRIPTS)[try_n - 1]
         while not inc.heard.empty():
             inc.heard.get_nowait()
         inc.pending = sid
         await self.send({"type": "checkin", "state": "asking", "try": try_n})
         await self.send({"type": "say", "script_id": sid, "text": SCRIPTS[sid], "listen_s": self.settings.listen_s})
         return {"spoken": sid, "try": try_n}
+
+    async def _speak_reply(self, inc, turn, sid):
+        if sid != inc.reply_due:
+            if inc.reply_due:
+                return {"error": f"the last answer needs {inc.reply_due} first"}
+            return {"error": "reply_ok only follows an ok answer and reply_help only a help answer"}
+        await self._say_reply(inc)
+        if inc.alarm_due:
+            inc.alarm_due_turn = turn  # one more turn to call raise_alarm, counted from the reply
+        return {"spoken": sid}
+
+    async def _say_reply(self, inc):
+        sid, inc.reply_due = inc.reply_due, None
+        await self.send({"type": "say", "script_id": sid, "text": SCRIPTS[sid]})
 
     async def _listen(self, inc, turn, args):
         if not inc.pending:
@@ -326,6 +358,9 @@ class Agent:
         inc.answers.append(answer)
         inc.run_answered = True
         await self.send({"type": "checkin", "state": answer, "try": try_n})
+        if answer in REPLY_SCRIPTS:
+            inc.reply_due = REPLY_SCRIPTS[answer]
+            inc.reply_due_turn = turn
         await self._apply_rule(inc, turn, answer, try_n)
         return {"answer": answer, "transcript": transcript, "presence": self.presence, "stood_up": inc.stood_up}
 
@@ -377,9 +412,15 @@ class Agent:
         return {"alarm": "raised"}
 
     async def _raise_alarm(self, inc, reason):
+        if inc.reply_due:
+            await self.trace("VERIFY", f"Rule override: {inc.reply_due} comes before the alarm and the planner "
+                             "skipped it. Speaking it in code.", "speak")
+            await self._say_reply(inc)
         inc.alarm_raised = True
         inc.outcome = "alarm"
-        await self.send({"type": "say", "script_id": ESCALATE_SCRIPT, "text": SCRIPTS[ESCALATE_SCRIPT]})
+        # After a help answer, reply_help already told the person; "I haven't heard back" would be wrong.
+        if inc.answers[-1] != "help":
+            await self.send({"type": "say", "script_id": ESCALATE_SCRIPT, "text": SCRIPTS[ESCALATE_SCRIPT]})
         await self.send({"type": "checkin", "state": "alarm", "try": inc.tries + 1})
         how = await self.notifier.call(ALARM_CALL_TEXT)
         await self.trace("VERIFY", f"Fake alarm raised ({reason}). On-screen alarm sent. {how}", "raise_alarm")
@@ -388,7 +429,20 @@ class Agent:
         tid = args.get("template_id")
         if tid not in SMS_TEMPLATES:
             return {"error": f"template_id must be one of {list(SMS_TEMPLATES)}"}
+        expected = self._contact_template(inc)
+        if expected and tid != expected:
+            await self.trace("VERIFY", f"Rule override: the contact text must say what happened ({expected}), "
+                             f"not {tid}.", "notify_contact")
+            tid = expected
         return {"sms": await self.notifier.send_sms(SMS_TEMPLATES[tid])}
+
+    @staticmethod
+    def _contact_template(inc):
+        if inc.outcome == "alarm":
+            return "said_help" if inc.answers and inc.answers[-1] == "help" else "no_response"
+        if inc.outcome in ("ok", "clear"):
+            return "answered_ok"
+        return None
 
     async def _schedule_recheck(self, inc, turn, args):
         minutes = args.get("minutes")

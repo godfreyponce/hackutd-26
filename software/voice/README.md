@@ -23,7 +23,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -r software/voice/requirements
 
 ## Modes
 
-- **Online:** ElevenLabs text-to-speech (`eleven_flash_v2_5`) and speech-to-text (`scribe_v2`). If a request fails, that line falls back to Piper or Moonshine, so cutting the Wi-Fi mid-demo keeps working. With no `ELEVENLABS_API_KEY` it logs `MOCK/OFFLINE: no ELEVENLABS_API_KEY` and runs offline.
+- **Online:** ElevenLabs text-to-speech (`eleven_v4_turbo`) and speech-to-text (`scribe_v2`). If a request fails, that line falls back to Piper or Moonshine, so cutting the Wi-Fi mid-demo keeps working. With no `ELEVENLABS_API_KEY` it logs `MOCK/OFFLINE: no ELEVENLABS_API_KEY` and runs offline.
 - **Offline:** Piper or Kokoro speaks, Moonshine (`moonshine/base`) listens. `moonshine/tiny` missed the "help me" fixture.
 
 ## Voice
@@ -34,6 +34,16 @@ One setting each. Set the env var, or change the default in `engines.py`.
 - Offline speech plays at 90% speed (`OFFLINE_SPEED` in `engines.py`), the speed of the sample Godfrey picked.
 - `ELEVEN_VOICE_ID`: an ElevenLabs voice id. Default `ljX1ZrXuDIIRVcmiVSyR`, picked by Godfrey from the Voice Library. It must be in the account's My Voices.
 - **Text:** no audio. A timeout counts as silence.
+
+## Audio tags
+
+ElevenLabs gets an audio tag in front of each line, for example `[gently]` for `ask_retry_2`. The tags live in `ELEVEN_TAGS` in `engines.py`, keyed by the `say` message's `script_id`. A line with an unknown id gets no tag. The agent's text has no tags, so a tag never reaches the bus or the home screen. The offline voice never gets one, because it would read the tag out loud.
+
+## Alarm tone
+
+On `{"type":"checkin","state":"alarm"}` the box speaker plays `assets/alarm.wav` once, after the line it is speaking. The service keeps listening for later messages while the tone plays. A `reset` stops it. Text mode only logs it.
+
+The alarm is fake. The tone plays only on the box. Nothing is called. `assets/alarm.wav` is a placeholder; `assets/make_tones.py` makes the candidates.
 
 Why not Eleven Realtime v1 Mini: it is a speech-to-speech agent. Its docs don't promise that it says a fixed line word for word, and they list no event that hands us a transcript of the answer. The box must say the agent's exact line, and the agent must get a transcript.
 
