@@ -107,8 +107,9 @@ def test_okay_logs_with_no_alarm(kind):
 
 @pytest.mark.parametrize("kind", PLANNERS)
 def test_nobody_and_no_answer_is_no_alarm(kind):
-    bus, _ = go(["no_answer"], [NOBODY, QUAKE], PLANNERS[kind]())
-    assert bus.checkins() == [("asking", 1), ("no_answer", 1)]
+    bus, _ = go(["no_answer"] * 3, [NOBODY, QUAKE], PLANNERS[kind]())
+    # nobody in view still gets all 3 asks (Rafael: the person may be out of view); no alarm at the end
+    assert bus.checkins() == [("asking", 1), ("no_answer", 1), ("asking", 2), ("no_answer", 2), ("asking", 3), ("no_answer", 3)]
     assert "alarm" not in bus.states()
 
 
@@ -343,8 +344,9 @@ def test_eqw_alert_keeps_the_alarm_rule(kind):
     bus, _ = go(["no_answer"] * 3, [STILL, EQW], PLANNERS[kind]())
     assert bus.says() == ["ask_event", "ask_retry_2", "ask_retry_3", "escalate"]
     assert bus.states()[-1] == "alarm"
-    bus, _ = go(["no_answer"], [NOBODY, EQW], PLANNERS[kind]())
-    assert bus.checkins() == [("asking", 1), ("no_answer", 1)]
+    bus, _ = go(["no_answer"] * 3, [NOBODY, EQW], PLANNERS[kind]())
+    # nobody in view still gets all 3 asks (Rafael: the person may be out of view); no alarm at the end
+    assert bus.checkins() == [("asking", 1), ("no_answer", 1), ("asking", 2), ("no_answer", 2), ("asking", 3), ("no_answer", 3)]
 
 
 def test_planner_asking_with_the_other_ask_id_still_gets_ask_event():
@@ -521,8 +523,9 @@ def test_help_sign_keeps_the_alarm_rule(kind):
     bus, _ = go(["no_answer"] * 3, [STILL, HELP_SIGN], PLANNERS[kind]())
     assert bus.says() == GESTURE_ASKS + ["escalate"]
     assert bus.states()[-1] == "alarm"
-    bus, _ = go(["no_answer"], [NOBODY, HELP_SIGN], PLANNERS[kind]())
-    assert bus.checkins() == [("asking", 1), ("no_answer", 1)]
+    bus, _ = go(["no_answer"] * 3, [NOBODY, HELP_SIGN], PLANNERS[kind]())
+    # nobody in view still gets all 3 asks (Rafael: the person may be out of view); no alarm at the end
+    assert bus.checkins() == [("asking", 1), ("no_answer", 1), ("asking", 2), ("no_answer", 2), ("asking", 3), ("no_answer", 3)]
     assert "alarm" not in bus.states()
 
 

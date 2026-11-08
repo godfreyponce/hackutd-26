@@ -437,9 +437,13 @@ class Agent:
             else:
                 inc.outcome = "ok"
                 await self.trace("VERIFY", "Rule: answer ok. Log it, no alarm.")
+        elif verdict == rule.NO_ALARM and inc.tries < rule.MAX_TRIES and inc.goal != "standup":
+            # Rafael: keep asking all 3 times; the person may be out of the camera's view.
+            await self.trace("VERIFY", f"Rule: nobody detected + no answer, try {inc.tries} of {rule.MAX_TRIES}. "
+                                       "Ask again: the person may be out of view.")
         elif verdict == rule.NO_ALARM:
             inc.outcome = "no_alarm"
-            await self.trace("VERIFY", "Rule: nobody detected + no answer = no alarm.")
+            await self.trace("VERIFY", f"Rule: nobody detected + no answer after {inc.tries} tries = no alarm.")
         elif inc.alarm_raised:
             await self.trace("VERIFY", f"Rule: {who} + {answer}. The alarm stays up.")
         elif answer == "help":

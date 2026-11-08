@@ -54,6 +54,13 @@
   .tag { font:11px var(--mono); padding:1px 6px; border-radius:4px; margin-left:6px; vertical-align:2px; }
   .real { color:var(--ok); border:1px solid var(--ok); } .sim { color:var(--warn); border:1px solid var(--warn); }
   button.big { background:#1d2c4d; border-color:#3b5689; font-size:17px; }
+  .talk { display:grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) minmax(0,.8fr); gap:12px; margin-bottom:12px; }
+  @media (max-width: 1000px) { .talk { grid-template-columns: 1fr; } }
+  .askrow { display:flex; gap:8px; flex-wrap:wrap; }
+  .askrow input { flex:1 1 260px; min-width:0; font:inherit; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:#0b1426; color:var(--ink); }
+  .answer { font-size:16px; line-height:1.45; min-height:1.5em; white-space:pre-wrap; }
+  .vrow { display:flex; align-items:center; gap:10px; } .vrow input { flex:1; accent-color: var(--accent); }
+  .vh { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
   @media (prefers-reduced-motion: reduce) { .node { transition:none; } }
 </style>
 </head>
@@ -91,6 +98,26 @@
 </main>
 
 <div class="controls">
+  <div class="talk">
+    <div class="group"><b>Talk to the box (Nemotron answers from what it has heard)</b>
+      <form id="askForm" class="askrow">
+        <label for="askText" class="vh">Question for the box</label>
+        <input id="askText" autocomplete="off" placeholder="What is going on? What did you hear on the radio?">
+        <button type="submit">Ask</button>
+        <button type="button" id="askVoice">🎤 Ask by voice</button>
+      </form>
+      <div id="answer" class="answer" aria-live="polite"></div>
+    </div>
+    <div class="group"><b>Mic test: hear what the box hears</b>
+      <button type="button" id="micTest">🎙 Record 5 s and transcribe<small>same mics, same speech-to-text, same classifier as a check-in</small></button>
+      <div id="micResult" class="answer" aria-live="polite">Say "help me" or "I'm not okay" after you press it.</div>
+      <audio id="micAudio" controls hidden></audio>
+    </div>
+    <div class="group"><b>Speaker volume</b>
+      <label for="vol" class="vrow"><input id="vol" type="range" min="0" max="150" step="5" value="100"><span id="volText">100 %</span></label>
+      <span class="note">Above 100 % boosts in software and can distort. For more headroom: 100 kΩ from the amp GAIN pin to GND (+15 dB).</span>
+    </div>
+  </div>
   <div class="groups">
     <div class="group"><b>Natural disaster</b>
       <button class="big" data-cmd="radio_eqw">📻 Radio: earthquake warning received<span class="tag real">real decoder</span>
@@ -177,6 +204,19 @@ function show(m) {
     case "power": $("power").textContent = "power: " + m.state; $("power").className = "pill " + (m.state === "battery" ? "off" : "");
       light("sensors", "power " + m.state, m.state === "battery"); return row(m.state === "battery" ? "r-bad" : "", `🔌 power: ${m.state}`);
     case "heartbeat": if (typeof m.battery_pct === "number") $("power").textContent = `power: ${$("power").className.includes("off") ? "battery" : "mains"} · ${m.battery_pct}%`; return;
+    case "assistant": light("agent", "answering"); $("answer").textContent = `Q: ${m.question}
+A: ${m.answer}`;
+      return row("r-say", `💬 asked: "${m.question}" → ${m.answer}`);
+    case "mic_test": {
+      light("mics", m.error ? "no audio" : `${m.rms_dbfs} dBFS`, !!m.error);
+      if (m.error) { $("micResult").textContent = "Problem: " + m.error; return row("r-bad", "🎙 mic test: " + m.error); }
+      const verdict = { help: "→ HELP (would raise the alarm)", ok: "→ OK", no_answer: "→ no answer" }[m.answer] || "";
+      $("micResult").textContent = `Heard (${m.engine}): "${m.transcript || ""}" ${verdict}
+Level ${m.rms_dbfs} dBFS, peak ${m.peak_dbfs} dBFS, voice found: ${m.voice_s} s`;
+      $("micAudio").src = m.wav; $("micAudio").hidden = false;
+      return row("r-heard", `🎙 mic test (${m.engine}): "${m.transcript}" ${verdict} · ${m.rms_dbfs} dBFS`);
+    }
+    case "demo_state": if (m.volume != null) { $("vol").value = Math.round(m.volume * 100); $("volText").textContent = Math.round(m.volume * 100) + " %"; } return;
     case "reset": setStatus("PROTECTED", "ok"); $("trace").textContent = ""; return row("", "↺ reset: all parts back to start");
   }
 }
@@ -199,11 +239,18 @@ const SEQ = {
   },
   restore() { clearInterval(drain); send({ type: "power", state: "mains" }); send({ type: "heartbeat", battery_pct: 100 }); },
 };
-document.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+document.querySelectorAll("button[data-cmd], button[data-send], button[data-seq]").forEach((b) => b.addEventListener("click", () => {
   if (b.dataset.cmd) { send({ type: "demo", cmd: b.dataset.cmd }); row("r-radio", "📻 starting the radio decoder…"); }
   else if (b.dataset.send) { const m = JSON.parse(b.dataset.send); if (m.type === "reset") clearInterval(drain); send(m); }
   else SEQ[b.dataset.seq]();
 }));
+$("askForm").addEventListener("submit", (e) => { e.preventDefault(); const q = $("askText").value.trim(); if (!q) return;
+  $("answer").textContent = `Q: ${q}
+A: thinking…`; send({ type: "demo", cmd: "ask", text: q }); $("askText").value = ""; });
+$("askVoice").addEventListener("click", () => { $("answer").textContent = "Listening 5 s for your question…"; send({ type: "demo", cmd: "ask_voice" }); });
+$("micTest").addEventListener("click", () => { $("micResult").textContent = "Recording 5 s… speak now"; send({ type: "demo", cmd: "mic_test", seconds: 5 }); });
+let volTimer; $("vol").addEventListener("input", () => { $("volText").textContent = $("vol").value + " %";
+  clearTimeout(volTimer); volTimer = setTimeout(() => send({ type: "demo", cmd: "volume", value: $("vol").value / 100 }), 150); });
 connect();
 </script>
 </body>

@@ -6,7 +6,12 @@ Order matters: a help word wins over everything, then any negation counts as hel
 
 import re
 
-HELP = re.compile(r"\b(help|hurt|emergency|can ?not get up|can't get up|cant get up)")
+HELP = re.compile(
+    r"\b(help|hurt|emergency|can ?not get up|can't get up|cant get up"
+    # Rafael: common ways people ask for help without the word "help"
+    r"|fell|fallen|injured|bleeding|blood|pain|ambulance|911|nine one one|doctor|paramedic"
+    r"|breathe|chest|dizzy|faint|stuck|trapped|fire|smoke|call (someone|somebody|my|for)"
+    r"|save me|please come)")
 NEGATION = re.compile(r"\b(no|nope|nah|not|never)\b|n't\b")
 OK = re.compile(r"\b(yes|yeah|yep|yup|okay|ok|fine|alright|all right)\b")
 

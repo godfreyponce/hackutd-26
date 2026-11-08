@@ -6,6 +6,7 @@ Wants=land-hub.service
 [Service]
 WorkingDirectory=%h/hackutd-26
 Environment=HUB_URL=ws://localhost:8765
+EnvironmentFile=-%h/.config/land/env
 ExecStart=%h/hackutd-26/.venv/bin/python hardware/demo/runner.py
 StandardOutput=append:%h/land-logs/demo.log
 StandardError=append:%h/land-logs/demo.log
