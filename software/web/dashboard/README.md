@@ -23,7 +23,7 @@ The main trigger is a `quake` message on the bus. Quakes that come in while a wa
 ## Map
 
 The map has three stages:
-1. City: the page opens on the Richardson street map, and `reset` comes back here. On a quake the wave plays: red spreads over the streets like a stain, and each white dot turns red as it passes.
+1. City: the page opens on the Richardson street map over dimmed aerial imagery, and `reset` comes back here. On a quake the wave plays: red spreads over the streets like a stain, and each white dot turns red as it passes.
 2. World: only by hand with `v`. A dark globe turns slowly with a marker on Richardson, TX. A quake from here shows a red pulse at north Texas, turns the globe to face it, and flies down to the city before the wave.
 3. Home: when H000 raises an alarm or says help, the camera zooms to its block with a callout. On `clear` it goes back to the city.
 
@@ -49,11 +49,14 @@ Node 24, no dependencies.
 | `box.js` | The real box `H000`, driven by `presence`, `checkin`, `heard` and the other sensor events. |
 | `bus.js` | WebSocket client with reconnect. |
 | `camera.js` | Map stage (world, city, home) and the eased flight between stages. Pure, no DOM. |
-| `basemap.js` | Draws the globe and the street map from `data/`. |
+| `basemap.js` | Draws the globe, the aerial imagery from `imagery/` and the street map from `data/`. |
+| `imagery.js` | Which imagery tiles are saved, and where each one sits. Pure, no DOM. |
 | `app.js` | Map drawing, counters, queue and trace panel. |
 | `data/world.json` | Natural Earth 50m land and borders, plus US state lines and Texas. Public domain. |
 | `data/richardson.json` | OpenStreetMap roads, rail, water and parks around Richardson. © OpenStreetMap contributors, ODbL. |
 | `data/build.mjs` | Downloads and simplifies both data files. Run once at build time: `node data/build.mjs`. |
+| `imagery/` | USGS The National Map aerial imagery (USGSImageryOnly), the same source as the home screen. Public domain. 49 tiles at zoom 14 cover the street data box, and 20 tiles at zoom 16 cover at least 1 km on each side of H000 for the home view. About 2.2 MB. |
+| `data/imagery.mjs` | Downloads the tiles listed in `imagery.js`. Run once at build time: `node data/imagery.mjs`. |
 | `vendor/` | d3-geo 3.1.1 and d3-array 3.2.4 (ISC), loaded as plain scripts. |
 
 ## Ranking

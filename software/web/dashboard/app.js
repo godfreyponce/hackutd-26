@@ -625,7 +625,7 @@ function cached(layer, key, paint) {
   return c;
 }
 
-const viewKey = (v) => `${v.lon},${v.lat},${v.scale},${canvas.width},${canvas.height},${Boolean(basemap)}`;
+const viewKey = (v) => `${v.lon},${v.lat},${v.scale},${canvas.width},${canvas.height},${Boolean(basemap)},${hub}`;
 
 function drawBase(v, cityA) {
   return cached(baseLayer, viewKey(v), (c) => {
@@ -638,7 +638,7 @@ function drawBase(v, cityA) {
       c.fillRect(0, 0, view.w, view.h);
     }
     if (cityA <= 0) return;
-    drawCity(c, basemap, proj, view.dpr, cityA, zoomOf(v));
+    drawCity(c, basemap, proj, view.dpr, cityA, zoomOf(v), hub === 'offline');
     c.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     drawRoadLabels(c, basemap, proj, smooth(0.6, 1, cityA));
     drawScaleBar(c, v, smooth(0.6, 1, cityA));
@@ -655,6 +655,11 @@ function drawScaleBar(c, v, alpha) {
   const y = view.h - 18;
   c.save();
   c.globalAlpha = alpha;
+  // Same backing as the legend, so the bar reads on the imagery.
+  c.fillStyle = 'rgba(10, 13, 18, 0.8)';
+  c.beginPath();
+  c.roundRect(x - 8, y - 22, len + 16, 28, 6);
+  c.fill();
   c.strokeStyle = '#6b7889';
   c.lineWidth = 1;
   c.beginPath();
@@ -756,6 +761,12 @@ function drawStain(ex, ey, t, v) {
 function drawEpicenter(x, y, alpha) {
   ctx.save();
   ctx.globalAlpha = alpha;
+  ctx.font = '600 11px -apple-system, BlinkMacSystemFont, sans-serif';
+  // Same backing as the legend, so the word reads on the imagery and on the red roads.
+  ctx.fillStyle = 'rgba(10, 13, 18, 0.8)';
+  ctx.beginPath();
+  ctx.roundRect(x + 5, y - 8, ctx.measureText('EPICENTER').width + 10, 17, 4);
+  ctx.fill();
   ctx.strokeStyle = COLOR.red;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -765,7 +776,6 @@ function drawEpicenter(x, y, alpha) {
   ctx.lineTo(x - 7, y + 7);
   ctx.stroke();
   ctx.fillStyle = '#ff8a80';
-  ctx.font = '600 11px -apple-system, BlinkMacSystemFont, sans-serif';
   ctx.fillText('EPICENTER', x + 10, y + 4);
   ctx.restore();
 }
@@ -827,15 +837,22 @@ function drawDot(x, y, r0, status, hitAt, now) {
   }
   if (status === 'escalated') {
     const halo = r0 * (motion ? 2.2 + 0.5 * Math.sin(now / 250) : 2.4);
-    ctx.fillStyle = 'rgba(255,69,58,0.28)';
+    ctx.fillStyle = 'rgba(255,69,58,0.45)';
+    ctx.strokeStyle = 'rgba(255,69,58,0.85)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(x, y, halo, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
   }
   ctx.fillStyle = dotColor(status);
+  // The dark edge keeps the dot apart from bright roofs and the red stain on the imagery.
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
 }
 
 function drawRealBox(now, v, dot, labelled) {
@@ -846,9 +863,9 @@ function drawRealBox(now, v, dot, labelled) {
   if (zoom > 2) {
     // The block around the box: about 150 m.
     const block = (0.15 / EARTH_KM) * v.scale;
-    ctx.strokeStyle = boxLit() ? 'rgba(255,69,58,0.55)' : 'rgba(100,210,255,0.45)';
+    ctx.strokeStyle = boxLit() ? 'rgba(255,69,58,0.85)' : 'rgba(100,210,255,0.7)';
     ctx.setLineDash([6, 5]);
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(x, y, block, 0, Math.PI * 2);
     ctx.stroke();
@@ -856,7 +873,7 @@ function drawRealBox(now, v, dot, labelled) {
   }
   if (boxLit()) {
     const halo = dot * (motion ? 4 + 1.5 * Math.sin(now / 200) : 4.5);
-    ctx.fillStyle = 'rgba(255,69,58,0.3)';
+    ctx.fillStyle = 'rgba(255,69,58,0.45)';
     ctx.beginPath();
     ctx.arc(x, y, halo, 0, Math.PI * 2);
     ctx.fill();
@@ -885,7 +902,7 @@ function renderOverlays(now, cityA) {
   const stageEl = $('stage');
   if (stageEl.dataset.stage !== cam.stage) stageEl.dataset.stage = cam.stage;
   setText('stage-now', STAGE_LABEL[cam.stage]);
-  setText('attrib', cityA > 0.5 ? '© OpenStreetMap contributors' : 'Land: Natural Earth');
+  setText('attrib', cityA > 0.5 ? 'Imagery: USGS. Streets: © OpenStreetMap contributors' : 'Land: Natural Earth');
 
   const el = $('callout');
   const show = cam.stage === 'home' && !flying(cam, now);
