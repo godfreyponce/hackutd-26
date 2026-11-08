@@ -1,6 +1,7 @@
 import asyncio
 import json
 import threading
+import time
 
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import broadcast, serve
@@ -56,10 +57,10 @@ async def next_heard(ws, timeout=5):
                 return msg
 
 
-def run_with_service(engine, body, alarm=None):
+def run_with_service(engine, body, alarm=None, warning=None, log=lambda line: None):
     async def main():
         server, url, clients = await fake_bus()
-        service = VoiceService(engine, log=lambda line: None, alarm=alarm)
+        service = VoiceService(engine, log=log, alarm=alarm, warning=warning)
         task = asyncio.create_task(service.run(url))
         try:
             async with connect(url) as ws:
@@ -72,10 +73,12 @@ def run_with_service(engine, body, alarm=None):
     asyncio.run(main())
 
 
-def say(ws, text, listen_s=None):
+def say(ws, text, listen_s=None, tone=None):
     msg = {"type": "say", "script_id": "test", "text": text}
     if listen_s is not None:
         msg["listen_s"] = listen_s
+    if tone is not None:
+        msg["tone"] = tone
     return ws.send(json.dumps(msg))
 
 
@@ -198,3 +201,94 @@ def test_other_checkin_states_play_no_tone():
 
     run_with_service(FakeEngine([]), body, alarm=FakeAlarm(events))
     assert events == []
+
+
+# ---- EQW warning tone (#64) ----
+
+class FakeWarning:
+    """Records the warning tone instead of playing it."""
+
+    def __init__(self, events, broken=False, hold=None):
+        self.events = events
+        self.broken = broken
+        self.hold = hold
+
+    def play(self):
+        self.events.append("warning tone")
+        if self.hold:
+            self.hold.wait(5)
+        else:
+            time.sleep(0.02)
+        if self.broken:
+            raise OSError("audio device unplugged")
+        self.events.append("warning tone end")
+
+
+def test_say_with_the_warning_tone_plays_the_tone_before_the_line():
+    events = []
+    engine = OrderedEngine(["yes", ""], events)
+
+    async def body(ws, service):
+        await say(ws, "Something just happened. Are you okay?", listen_s=6, tone="warning")
+        assert await next_heard(ws) == {"type": "heard", "answer": "ok", "transcript": "yes"}
+        await say(ws, "I didn't catch that. Are you okay?", listen_s=6)
+        await next_heard(ws)
+
+    run_with_service(engine, body, warning=FakeWarning(events))
+    assert events == ["warning tone", "warning tone end", "say test", "say test"]
+
+
+def test_unknown_tone_plays_nothing_and_still_speaks():
+    events = []
+    engine = OrderedEngine([], events)
+
+    async def body(ws, service):
+        await say(ws, "Hello.", tone="siren")
+        await wait_for(lambda: engine.spoken)
+
+    run_with_service(engine, body, warning=FakeWarning(events))
+    assert events == ["say test"]
+
+
+def test_text_mode_logs_a_marker_for_the_warning_tone_and_speaks():
+    lines = []
+    engine = FakeEngine([])
+
+    async def body(ws, service):
+        await say(ws, "Something just happened. Are you okay?", tone="warning")
+        await wait_for(lambda: engine.spoken)
+
+    run_with_service(engine, body, log=lines.append)
+    assert any("WARNING TONE" in line for line in lines)
+    assert engine.spoken == ["Something just happened. Are you okay?"]
+
+
+def test_broken_warning_tone_still_speaks_the_line():
+    events = []
+    engine = OrderedEngine(["yes"], events)
+
+    async def body(ws, service):
+        await say(ws, "Something just happened. Are you okay?", listen_s=6, tone="warning")
+        assert await next_heard(ws) == {"type": "heard", "answer": "ok", "transcript": "yes"}
+
+    run_with_service(engine, body, warning=FakeWarning(events, broken=True))
+    assert events == ["warning tone", "say test"]
+
+
+def test_reset_during_the_warning_tone_drops_the_line():
+    events = []
+    hold = threading.Event()
+    engine = OrderedEngine([], events)
+
+    async def body(ws, service):
+        await say(ws, "Something just happened. Are you okay?", listen_s=6, tone="warning")
+        await wait_for(lambda: "warning tone" in events)
+        await ws.send(json.dumps({"type": "reset"}))
+        await wait_for(lambda: service.resets == 1)
+        hold.set()
+        await say(ws, "After the reset.")
+        await wait_for(lambda: engine.spoken)
+
+    run_with_service(engine, body, warning=FakeWarning(events, hold=hold))
+    assert engine.spoken == ["After the reset."]
+    assert engine.listens == []

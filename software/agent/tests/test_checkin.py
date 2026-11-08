@@ -423,7 +423,7 @@ def test_demo_eqw_says_and_writes_demo_not_a_real_alert():
     client = FakeClient()
     bus, _ = go(["no_answer"] * 3, [STILL, DEMO_EQW], llm(client))
     says = [m for m in bus.sent if m["type"] == "say"]
-    assert says[0] == {"type": "say", "script_id": "alert_demo", "text": DEMO}
+    assert says[0] == {"type": "say", "script_id": "alert_demo", "text": DEMO, "tone": "warning"}
     assert "listen_s" not in says[0]
     assert [m["script_id"] for m in says[1:]] == ["ask_event", "ask_retry_2", "ask_retry_3", "escalate"]
     assert DEMO in client.requests[0]["messages"][1]["content"]
@@ -474,6 +474,80 @@ def test_eqw_while_an_alarm_is_still_up_after_300_s_is_ignored():
     bus = asyncio.run(scenario())
     assert bus.says() == ["ask_event", "ask_retry_2", "ask_retry_3", "escalate"]
     assert any("still open" in r["text"] for r in bus.trace("VERIFY"))
+
+
+# ---- EQW warning tone (#64) ----
+
+def _tones(bus):
+    """(script_id, tone) for every say that asks the voice service for a tone."""
+    return [(m["script_id"], m["tone"]) for m in bus.sent if m["type"] == "say" and "tone" in m]
+
+
+@pytest.mark.parametrize("kind", PLANNERS)
+def test_eqw_checkin_asks_for_the_warning_tone_with_the_ask_and_only_once(kind):
+    bus, _ = go(["no_answer"] * 3, [STILL, EQW], PLANNERS[kind]())
+    first = [m for m in bus.sent if m["type"] == "say"][0]
+    assert first == {"type": "say", "script_id": "ask_event", "text": SCRIPTS["ask_event"],
+                     "listen_s": FAST.listen_s, "tone": "warning"}
+    assert _tones(bus) == [("ask_event", "warning")]
+
+
+def test_demo_eqw_plays_the_warning_tone_before_the_demo_line():
+    bus, _ = go(["ok"], [STILL, DEMO_EQW])
+    assert bus.says() == ["alert_demo", "ask_event", "reply_ok"]
+    assert _tones(bus) == [("alert_demo", "warning")]
+
+
+@pytest.mark.parametrize("events, settings", [
+    ([STILL, QUAKE], FAST),
+    ([STILL, FALL_HINT], FAST),
+    ([STILL, {"type": "help_gesture", "source": "camera"}], FAST),
+    ([STILL, FALL_HINT], replace(FAST, ask_script="ask_event")),
+], ids=["quake", "stillness", "help-sign", "stillness-with-the-ask-event-line"])
+def test_other_triggers_ask_for_no_tone(events, settings):
+    bus, _ = go(["no_answer"] * 3, events, settings=settings)
+    assert bus.says()[-1] == "escalate"
+    assert _tones(bus) == []
+
+
+def test_standup_reask_after_an_eqw_alarm_asks_for_no_tone():
+    async def scenario():
+        bus = FakeBus(["no_answer"] * 3 + ["ok"])
+        agent = make_agent(bus)
+        await agent.handle(STILL)
+        await agent.handle(EQW)
+        await agent.idle()
+        await agent.handle(MOVING)
+        await agent.idle()
+        return bus
+
+    bus = asyncio.run(scenario())
+    assert "standup_ask" in bus.says()
+    assert _tones(bus) == [("ask_event", "warning")]
+
+
+def test_recheck_after_an_eqw_checkin_asks_for_no_tone():
+    def recheck_once(messages):
+        r = last_result(messages)
+        if r is not None and r["next"] == "done":
+            return [] if any('"recheck_in_min"' in str(m.get("content")) for m in messages) else [
+                ("schedule_recheck", {"minutes": 1})]
+        return cooperative(messages)
+
+    async def scenario():
+        bus = FakeBus(["ok", "ok"])
+        agent = make_agent(bus, planners=llm(FakeClient(recheck_once)))
+        await agent.handle(STILL)
+        await agent.handle(EQW)
+        await agent.idle()
+        await asyncio.sleep(FAST.recheck_unit_s * 2)
+        await agent.idle()
+        return bus, agent
+
+    bus, agent = asyncio.run(scenario())
+    assert agent.incident.trigger == "recheck"
+    assert bus.says().count("ask_event") == 1
+    assert _tones(bus) == [("ask_event", "warning")]
 
 
 def _note(bus):

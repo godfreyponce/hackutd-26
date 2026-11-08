@@ -39,6 +39,10 @@ One setting each. Set the env var, or change the default in `engines.py`.
 
 ElevenLabs gets an audio tag in front of each line, for example `[gently]` for `ask_retry_2`. The tags live in `ELEVEN_TAGS` in `engines.py`, keyed by the `say` message's `script_id`. A line with an unknown id gets no tag. The agent's text has no tags, so a tag never reaches the bus or the home screen. The offline voice never gets one, because it would read the tag out loud.
 
+## Warning tone (EQW alert)
+
+A `say` with `"tone":"warning"` plays a short warning tone first, then the line. The agent sends it only on the first line of an EQW alert check-in. The tone is three short beeps at 1320 Hz, about 0.6 s with the pause before the line. It is made in code (`WarningTone` in `engines.py`), so there is no WAV to ship and a test checks its pitch. It is not the alarm siren, and it stays clear of the real Emergency Alert System tones (853 + 960 Hz, 1050 Hz, the SAME bursts). Text mode logs `WARNING TONE` instead.
+
 ## Alarm tone
 
 On `{"type":"checkin","state":"alarm"}` the box speaker plays `assets/alarm.wav` once, after the line it is speaking. The service keeps listening for later messages while the tone plays. A `reset` stops it. Text mode only logs it.

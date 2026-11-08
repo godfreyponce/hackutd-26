@@ -71,6 +71,8 @@ This list copies #19 and its "Contract addendum v1". The issue wins on any doubt
 
 `listen_s` is optional. With it, the voice service speaks the text, listens that many seconds, then sends one `heard`. Without it, the voice service only speaks.
 
+`tone` is optional (#64, not in #19 yet). The agent sets `"tone":"warning"` only on the first `say` of an EQW alert check-in. The voice service plays a short warning tone, then speaks the text. A voice service without this field ignores it and still speaks the line.
+
 **Agent trace.** Sent by the agent.
 
 ```json
