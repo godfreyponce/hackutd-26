@@ -267,6 +267,7 @@ const bus = connectBus(hubUrl(location.search), {
     el.dataset.status = status;
     el.title = hubUrl(location.search);
     document.body.dataset.hub = status;
+    $('legend-idle').textContent = status === 'offline' ? 'Unknown' : 'Not hit';
     $('hub-text').textContent =
       status === 'connected' ? 'Hub connected' : status === 'offline' ? 'Hub offline, retrying' : 'Connecting to hub';
   },
@@ -394,7 +395,7 @@ function chipsFor(id, r) {
   const s = stateOf(id);
   const f = r.factors;
   const out = [];
-  if (s.device === 'none' || f.battery_min === null) out.push(chip('no device'));
+  if (s.device === 'none' || f.battery_min === null) out.push(chip('no medical device'));
   else {
     const w = DEVICE_WEIGHT[s.device];
     out.push(chip(`${DEVICE_LABEL[s.device]} ${f.battery_min} min${w !== 1 ? ` ×${w}` : ''}`, r.parts.device_min < 60 ? 'bad' : 'on'));

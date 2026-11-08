@@ -216,11 +216,11 @@ kbd {
   animation: callout-in 0.35s cubic-bezier(.2, .8, .2, 1);
 }
 .callout[hidden] { display: none; }
-.callout b { color: var(--text); font-size: 15px; }
+.callout b { color: var(--text); font-size: 16px; }
 .callout.alarm { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft), 0 8px 30px rgba(0, 0, 0, 0.5); }
 .callout.alarm b { color: #ffb4ae; }
 .callout.alarm span { color: var(--text); }
-.callout.has-handoff { max-width: 340px; }
+.callout.has-handoff { max-width: 340px; font-size: 14px; line-height: 1.45; }
 .handoff { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
 .handoff[hidden] { display: none; }
 .handoff p { margin: 0; }
@@ -292,10 +292,10 @@ kbd {
 }
 .row .rank { grid-area: rank; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
 .row .sdot { grid-area: dot; width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
-.row .id { grid-area: id; font-family: var(--mono); font-size: 13px; }
+.row .id { grid-area: id; font-family: var(--mono); font-size: 14px; }
 .row .flag { grid-area: flag; min-width: 0; display: flex; gap: 6px; overflow: hidden; }
 .row .harm { grid-area: harm; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); font-size: 12px; }
-.row .harm b { font-size: 19px; color: var(--text); }
+.row .harm b { font-size: 21px; color: var(--text); }
 .row .chips { grid-area: chips; display: flex; flex-wrap: wrap; gap: 4px; }
 .row.s-ok .sdot { background: var(--green); }
 .row.s-ok { border-left-color: var(--green); }
@@ -307,11 +307,11 @@ kbd {
 @keyframes lit { to { box-shadow: 0 0 14px 4px rgba(255, 69, 58, 0.55); } }
 
 .chip {
-  font-size: 12px;
+  font-size: 13px;
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--panel-2);
-  color: var(--faint);
+  color: #a6b2c1;
   border: 1px solid var(--line);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
