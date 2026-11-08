@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, reduce, statusText, sourceLabel, activeAlert } from './state.js';
+import { initialState, reduce, statusText, sourceLabel, activeAlert, alertChip } from './state.js';
 
 const NOW = 1_000_000;
 
@@ -258,4 +258,10 @@ test('the help sign line stays for its check-in and goes when the home is okay a
   const later = run(help, asking(1), ok, asking(1));
   assert.equal(statusText(later.status, { helpSign: later.helpSign }).detail, 'Event detected. Asking if you are okay.');
   assert.equal(run(help, { type: 'reset' }).helpSign, false);
+});
+
+test('alert chip names source and level, but not a level the event title already says', () => {
+  assert.equal(alertChip({ source: 'NOAA', level: 'warning', event: 'Earthquake Warning' }), 'NOAA');
+  assert.equal(alertChip({ source: 'USGS', level: 'emergency', event: 'Earthquake' }), 'USGS EMERGENCY');
+  assert.equal(alertChip({ source: '', level: 'watch', event: 'Flood' }), 'WATCH');
 });

@@ -63,6 +63,13 @@ function onAlert(state, msg, now) {
   };
 }
 
+// The chip names the source and the level, like the dashboard header, unless the event title
+// already says the level ("Earthquake Warning"); then the chip shows the source alone.
+export function alertChip(a) {
+  const levelInTitle = String(a.event ?? '').toLowerCase().includes(a.level);
+  return (levelInTitle ? [a.source] : [a.source, a.level]).filter(Boolean).join(' ').toUpperCase();
+}
+
 export function sourceLabel(source) {
   return SOURCE_LABELS[source] ?? String(source ?? '').toUpperCase();
 }

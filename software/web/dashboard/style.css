@@ -95,6 +95,7 @@ body[data-hub="offline"] .box-card dd { color: var(--muted); }
   align-content: center;
   display: grid;
   grid-template-columns: 1fr auto;
+  column-gap: 8px;
   align-items: baseline;
   padding: 10px 12px;
   border-radius: 10px;
@@ -109,7 +110,7 @@ body[data-hub="offline"] .box-card dd { color: var(--muted); }
 .counter.escalated { border-color: rgba(255, 69, 58, 0.4); }
 .counter.escalated .num { color: var(--red); }
 .counter.hit { font-size: 15px; }
-.counter.hit .num { font-size: clamp(48px, 6.4vh, 72px); }
+.counter.hit .num { font-size: clamp(48px, min(6.4vh, 3.6vw), 72px); }
 .counter.zero .num { color: var(--faint); }
 .counter.escalated.zero { border-color: var(--line); }
 .minor { display: grid; gap: 4px; font-size: 12px; color: var(--muted); padding: 0 4px; }

@@ -1,4 +1,4 @@
-import { initialState, reduce, statusText, activeAlert, TRACE_WINDOW_MS } from './state.js';
+import { initialState, reduce, statusText, activeAlert, alertChip, TRACE_WINDOW_MS } from './state.js';
 import { HOME_COUNT } from '../dashboard/homes.js';
 
 // The product name is not settled. Change it here only.
@@ -401,8 +401,7 @@ function render() {
   $('alert-count').hidden = !a;
   if (a) {
     $('banner').dataset.level = a.level;
-    // Same label as the dashboard header: source and level, in the level color.
-    $('alert-source').textContent = [a.source, a.level].filter(Boolean).join(' ').toUpperCase();
+    $('alert-source').textContent = alertChip(a);
     $('alert-event').textContent = a.event;
     $('alert-headline').textContent = a.headline;
     // The headline often names the area already; then the space shows when the alert came in.

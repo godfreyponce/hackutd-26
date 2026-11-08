@@ -290,7 +290,8 @@ const bus = connectBus(hubUrl(location.search), {
         return;
       case 'alert':
         {
-          // Same rules as home/state.js: a missing level errs high, and a lower alert never replaces a higher one.
+          // Level order and the missing-level default (errs high) follow home/state.js, and a lower alert never
+          // replaces a higher one. Unlike home, where info and watch expire, every alert here stays until reset.
           const level = ALERT_LEVELS.includes(msg.level) ? msg.level : 'warning';
           if (alertLevel && ALERT_LEVELS.indexOf(level) < ALERT_LEVELS.indexOf(alertLevel)) return;
           alertLevel = level;
@@ -426,6 +427,8 @@ function chipsFor(id, r) {
 }
 
 const rowEls = new Map();
+const slides = new Map();
+const slidMoves = new WeakSet();
 
 function fillRow(el, r, place) {
   const real = r.id === REAL_BOX_ID;
@@ -447,6 +450,9 @@ function renderQueue() {
   const top = shown.slice(0, QUEUE_ROWS);
   const before = new Map();
   for (const [id, el] of rowEls) before.set(id, el.getBoundingClientRect().top);
+  // Cancel after measuring, so a row caught mid-slide starts its next slide from where it is drawn.
+  for (const a of slides.values()) a.cancel();
+  slides.clear();
   const keep = new Set(top.map((r) => r.id));
   for (const [id, el] of rowEls) {
     if (!keep.has(id)) {
@@ -463,14 +469,20 @@ function renderQueue() {
     fillRow(el, r, i + 1);
     list.appendChild(el);
   });
-  // Short slide so viewers see the agent move a home, only when it jumps more than one row.
+  // Short slide so viewers see the agent move a home, once per move and only when it jumps 2 or more rows.
+  // Rows that shift because the ranking math changed do not slide: during calls that is dozens per second.
   if (!reducedMotion.matches) {
     for (const r of top) {
+      const mv = moveById.get(r.id);
+      if (!mv || slidMoves.has(mv)) continue;
+      slidMoves.add(mv);
       const old = before.get(r.id);
       if (old === undefined) continue;
       const el = rowEls.get(r.id);
       const dy = old - el.getBoundingClientRect().top;
-      if (Math.abs(dy) > el.offsetHeight) el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 160, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      const pitch = el.offsetHeight + parseFloat(getComputedStyle(el).marginBottom);
+      if (Math.abs(dy) < 1.5 * pitch) continue;
+      slides.set(r.id, el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 160, easing: 'cubic-bezier(.2,.8,.2,1)' }));
     }
   }
 
