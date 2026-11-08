@@ -650,7 +650,28 @@ def test_o_sign_answers_ok_and_x_sign_answers_help():
 def test_call_offer_no_declines_and_silence_calls():
     no = {"answer": "help", "transcript": "no, don't call"}
     bus, _ = go(["help", no], [STILL, FALL_HINT])
-    assert bus.says()[-2:] == ["offer_call", "call_declined"] and not [m for m in bus.sent if m["type"] == "call"]
+    assert bus.says()[-2:] == ["offer_call", "call_declined"] and not [m for m in bus.sent if m.get("kind") == "help"]
     bus, _ = go(["help"], [STILL, FALL_HINT])
-    calls = [m for m in bus.sent if m["type"] == "call"]
+    calls = [m for m in bus.sent if m["type"] == "call" and m["kind"] == "help"]
     assert calls[0]["state"] == "dialing" and "Handing the call to the homeowner." in calls[0]["summary"]
+
+
+@pytest.mark.parametrize("trigger, answers, words", [
+    ({"type": "quake", "peak_g": 0.9}, ["no_answer"] * 3, ["strong shaking, peaking at 0.9 g", "3 times and got no answer"]),
+    ({"type": "fall_hint"}, ["no_answer"] * 3, ["fall and lie still", "still sees them, not moving"]),
+    ({"type": "heat", "temp_f": 96.4}, ["help"], ["dangerously hot, 96 degrees", 'They said "help me"']),
+    ({"type": "scream", "db": -8}, ["no_answer", "help"], ["scream", "1 times with no answer, then they asked for help"]),
+])
+def test_alarm_call_says_what_happened(trigger, answers, words):
+    bus = FakeBus(answers)
+    agent = make_agent(bus)
+
+    async def scenario():
+        for e in (STILL, trigger):
+            await agent.handle(e)
+        await agent.idle()
+    asyncio.run(scenario())
+    text = agent.notifier.calls[0]
+    for w in words:
+        assert w in text, text
+    assert "I repeat." in text and "911" in text

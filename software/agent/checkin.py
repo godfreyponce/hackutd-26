@@ -14,8 +14,8 @@ from datetime import datetime
 from . import rule
 from .handoff import HandoffWriter, build_facts
 from .planner import LLMPlanner, PlannerUnavailable, ScriptPlanner
-from .scripts import (ALARM_CALL_TEXT, ALERT_ASK_SCRIPT, ALERT_DEMO_SCRIPT, ASK_SCRIPTS, CALL_DECLINED_SCRIPT,
-                      CALL_NOW_SCRIPT, DEMO_TEXT, ESCALATE_SCRIPT, GESTURE_ASK_SCRIPT, OFFER_CALL_SCRIPT,
+from .scripts import (ALERT_ASK_SCRIPT, ALERT_DEMO_SCRIPT, ASK_SCRIPTS, CALL_DECLINED_SCRIPT,
+                      CALL_NOW_SCRIPT, CALL_OFFLINE_SCRIPT, DEMO_TEXT, ESCALATE_SCRIPT, GESTURE_ASK_SCRIPT, OFFER_CALL_SCRIPT,
                       REPLY_SCRIPTS, RETRY_SCRIPTS, SCRIPTS, SMS_TEMPLATES, STANDUP_SCRIPT)
 
 log = logging.getLogger("agent")
@@ -132,6 +132,7 @@ class Agent:
         self.battery_pct = None
         self.power = None
         self.alert = None
+        self.trigger_msg = {}  # the bus message that started the check-in (temp, peak, ...) for the phone lines
         self.incident = None
         self.quiet_from = None  # Agent.clock() start of the last check-in that mutes EQW alerts
         self.task = None
@@ -156,6 +157,8 @@ class Agent:
         elif kind == "presence":
             await self._on_presence(msg.get("state"))
         elif kind in ("quake", "fall_hint", "help_gesture", "heat", "scream"):
+            if not (inc and inc.open):
+                self.trigger_msg = msg
             self._start_checkin(kind, msg.get("peak_g"))
         elif kind == "heartbeat":
             self.battery_pct = msg.get("battery_pct")
@@ -204,6 +207,7 @@ class Agent:
         self.quiet_from = None
         self.presence = "none"
         self.battery_pct = self.power = self.alert = None
+        self.trigger_msg = {}
         log.info("reset: check-in cleared")
 
     # ---- triggers ----
@@ -512,7 +516,7 @@ class Agent:
         if inc.answers[-1] != "help":
             await self.send({"type": "say", "script_id": ESCALATE_SCRIPT, "text": SCRIPTS[ESCALATE_SCRIPT]})
         await self.send({"type": "checkin", "state": "alarm", "try": inc.tries + 1})
-        how = await self.notifier.call(ALARM_CALL_TEXT)
+        how = await self._phone(self._alarm_call_text(inc), "alarm")
         await self.trace("VERIFY", f"Fake alarm raised ({reason}). On-screen alarm sent. {how}", "raise_alarm")
 
     async def _handoff(self, inc):
@@ -535,6 +539,9 @@ class Agent:
     async def _offer_call(self, inc):
         """After a help answer: ask, then ring the stand-in phone (never 911). Yes, X sign or silence = call."""
         inc.call_offered = True
+        if not self.online:
+            await self.trace("VERIFY", "No internet: no phone call is possible. Telling the person to call 911.", "call")
+            return await self.send({"type": "say", "script_id": CALL_OFFLINE_SCRIPT, "text": SCRIPTS[CALL_OFFLINE_SCRIPT]})
         while not inc.heard.empty():
             inc.heard.get_nowait()
         inc.pending = OFFER_CALL_SCRIPT
@@ -553,26 +560,81 @@ class Agent:
         why = "yes" if CALL_YES.search(text) or msg.get("answer") == "help" else "no answer after asking for help"
         await self.trace("VERIFY", f"Call offer: {why}. Calling the stand-in phone (never 911).", "call")
         await self.send({"type": "say", "script_id": CALL_NOW_SCRIPT, "text": SCRIPTS[CALL_NOW_SCRIPT]})
-        summary = self._call_summary(inc)
-        await self.send({"type": "call", "state": "dialing", "summary": summary})
-        how = await self.notifier.call(summary)
-        await self.send({"type": "call", "state": "failed" if ("failed" in how or how.startswith("MOCK")) else "placed",
-                         "detail": how, "summary": summary})
+        how = await self._phone(self._call_summary(inc), "help")
         await self.trace("VERIFY", f"Call: {how}", "call")
 
-    def _call_summary(self, inc):
-        """What LAND says first on the call: 1-2 sentences, only facts the box has, then the hand-off."""
-        alert = inc.alert or self.alert
-        event = {"quake": "The box felt strong shaking", "fall_hint": "The camera saw a person fall and lie still",
-                 "heat": "The room got dangerously hot", "scream": "The microphones heard a scream",
-                 "help_gesture": "The person signaled for help"}.get(inc.trigger, "An emergency alert came in")
-        if alert and alert.get("code") == "EQW":
-            event += " during an earthquake warning" + (" (a demo alert)" if alert.get("demo") else "")
+    async def _phone(self, text, kind):
+        """One call to the team phone (TWILIO_TO, never 911), shown on the demo page. No internet: no call."""
+        if not self.online:
+            how = "No internet: the phone call cannot go out. On-screen alarm and ring only."
+            await self.send({"type": "call", "state": "failed", "kind": kind, "detail": how, "summary": text})
+            return how
+        await self.send({"type": "call", "state": "dialing", "kind": kind, "summary": text})
+        how = await self.notifier.call(text)
+        failed = "failed" in how or how.startswith("MOCK")
+        await self.send({"type": "call", "state": "failed" if failed else "placed", "kind": kind, "detail": how,
+                         "summary": text})
+        return how
+
+    # ---- phone lines: only facts the box has, for every trigger and answer ----
+
+    def _event_text(self, inc):
+        alert, m = inc.alert or self.alert, self.trigger_msg
+        if inc.trigger == "alert" and alert:
+            event = alert.get("event", "emergency alert")
+            area = alert.get("area", "this area").replace(", TX", ", Texas").replace("; ", " and ")
+            text = f"The weather radio received {'an' if event[0].lower() in 'aeiou' else 'a'} {event} for {area}"
+        else:
+            text = {
+                "quake": "The box felt strong shaking" + (f", peaking at {m['peak_g']} g" if m.get("peak_g") else ""),
+                "fall_hint": "The camera saw a person fall and lie still on the floor",
+                "help_gesture": "The camera saw someone make the help sign, arms crossed over the head",
+                "heat": "The room got dangerously hot" + (f", {round(m['temp_f'])} degrees" if m.get("temp_f") else ""),
+                "scream": "The microphones heard a scream or a loud crash",
+            }.get(inc.trigger, "Something happened at the box")
+            if alert and alert.get("code") == "EQW":
+                text += " during an earthquake warning"
+        if alert and alert.get("demo"):
+            text += " (a demo alert)"
+        return text + "."
+
+    def _answer_text(self, inc):
         silent = inc.answers.count("no_answer")
-        after = f", and the person did not answer {silent} check-ins" if silent else ""
-        now = "They are now up and asking for help" if inc.stood_up else "They asked for help"
-        return (f"This is LAND, a home safety box, calling for the person at home. {event}{after}. {now}. "
-                "Handing the call to the homeowner.")
+        if inc.answers and inc.answers[-1] == "help":
+            said = next((t for _, a, t in reversed(inc.heard_log) if a == "help" and t and not t.startswith("[")), "")
+            told = f'They said "{said}".' if said and len(said) < 80 else "They signaled that they need help."
+            return (f"I asked if they were okay {silent} times with no answer, then they asked for help. {told}"
+                    if silent else told)
+        if silent:
+            return f"I asked if they were okay {silent} {'time' if silent == 1 else 'times'} and got no answer."
+        return ""
+
+    def _state_text(self, inc):
+        parts = []
+        if inc.stood_up:
+            parts.append("They have since stood up.")
+        else:
+            parts.append({"still": "The camera still sees them, not moving.", "moving": "The camera sees them moving.",
+                          "none": "The camera does not see anyone right now."}.get(self.presence, ""))
+        if self.power == "battery":
+            pct = f" at {self.battery_pct} percent" if self.battery_pct is not None else ""
+            parts.append(f"The home has lost power; the box is on battery{pct}.")
+        return " ".join(p for p in parts if p)
+
+    def _alarm_call_text(self, inc):
+        """The alarm call (no answer, or help): who, what happened, what the person did, what to do. Said twice."""
+        body = " ".join(t for t in (self._event_text(inc), self._answer_text(inc), self._state_text(inc)) if t)
+        msg = (f"This is LAND, the home safety box, with an alarm for the person at home. {body} "
+               "Please check on them now, and call 911 if you think they are hurt.")
+        return f"{msg} I repeat. {msg} This is a HackUTD demo alarm."
+
+    def _call_summary(self, inc):
+        """What LAND says first on the help call: what it saw in 1-2 sentences, then the hand-off."""
+        now = "They are now up and asking for help." if inc.stood_up else "They asked for help."
+        silent = inc.answers.count("no_answer")
+        missed = f" They did not answer {silent} check-ins." if silent else ""
+        return (f"This is LAND, a home safety box, calling for the person at home. {self._event_text(inc)}{missed} "
+                f"{now} Handing the call to the homeowner.")
 
     async def _notify_contact(self, inc, turn, args):
         tid = args.get("template_id")

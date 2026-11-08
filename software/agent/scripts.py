@@ -21,6 +21,7 @@ SCRIPTS = {
     "offer_call": "Do you want me to call emergency services? I'll put the call on my speaker so you can talk.",
     "call_now": "Calling now. Stay with me.",
     "call_declined": "Okay, no call. I'm right here. Say help anytime.",
+    "call_offline": "I can't reach the phone network right now. If you can, call 911 from a phone. The alarm stays on.",
     "alert_demo": f"{DEMO_TEXT}.",
 }
 
@@ -40,6 +41,7 @@ ESCALATE_SCRIPT = "escalate"
 REPLY_SCRIPTS = {"ok": "reply_ok", "help": "reply_help"}
 # After a help answer: offer the live call (Rafael's demo flow). Code asks it, never the planner.
 OFFER_CALL_SCRIPT, CALL_NOW_SCRIPT, CALL_DECLINED_SCRIPT = "offer_call", "call_now", "call_declined"
+CALL_OFFLINE_SCRIPT = "call_offline"
 
 # Sent only to TWILIO_TO, a verified teammate phone. Never an emergency number.
 SMS_TEMPLATES = {
