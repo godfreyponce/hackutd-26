@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# One-shot, re-runnable setup of the LAND box on the Pi 5 (repo at ~/hackutd-26). See deploy/pi/README.md.
+set -euo pipefail
+ROOT="$HOME/hackutd-26"
+cd "$ROOT"
+step() { printf '\n== %s\n' "$*"; }
+fail() { echo "FAILED: $*" >&2; exit 1; }
+
+step "system packages (sudo)"
+sudo apt-get install -y multimon-ng sox rtl-sdr i2c-tools libportaudio2 python3-gpiozero python3-lgpio \
+  || fail "apt-get install"
+
+step "services venv (.venv): hub, agent, presence, voice, same (pinned, no system packages)"
+[ -x .venv/bin/python ] || python3 -m venv .venv
+.venv/bin/pip install -q -r software/hub/requirements.txt -r software/agent/requirements.txt \
+  -r software/presence/requirements.txt -r software/voice/requirements.txt || fail "pip install (.venv)"
+
+step "hardware venv (.venv-hw): camera, sensors, ring (system picamera2/OpenCV/Hailo/gpiozero + pip extras)"
+[ -x .venv-hw/bin/python ] || python3 -m venv --system-site-packages .venv-hw
+.venv-hw/bin/pip install -q websockets smbus2 adafruit-blinka-raspberry-pi5-neopixel adafruit-circuitpython-pixelbuf \
+  || fail "pip install (.venv-hw)"
+.venv-hw/bin/python -c "import picamera2, cv2, hailo_platform, gpiozero, smbus2, websockets" || fail "hardware venv imports"
+
+step "offline voice models (needs internet once)"
+.venv/bin/python -m software.voice --download || fail "voice --download"
+
+step "audio: make the I2S card (Google voiceHAT overlay) the default speaker and mic"
+grep -q '^dtoverlay=googlevoicehat-soundcard' /boot/firmware/config.txt || fail "add dtoverlay=googlevoicehat-soundcard to /boot/firmware/config.txt and reboot"
+sink=$(wpctl status | sed -n '/Sinks:/,/Sources:/p' | grep -i voicehat | grep -oE '[0-9]+\.' | head -1 | tr -d .)
+src=$(wpctl status | sed -n '/Sources:/,/Filters:\|Streams:/p' | grep -i voicehat | grep -oE '[0-9]+\.' | head -1 | tr -d .)
+[ -n "$sink" ] && [ -n "$src" ] || fail "voiceHAT sink/source not found in 'wpctl status'"
+wpctl set-default "$sink"; wpctl set-default "$src"
+wpctl set-volume "$sink" 0.35   # loud amp: keep the box voice comfortable
+
+step "secrets file (~/.config/land/env, mode 600; never in the repo)"
+mkdir -p ~/.config/land
+if [ ! -f ~/.config/land/env ]; then
+  printf '# LAND box secrets. One KEY=value per line, no quotes.\nNVIDIA_API_KEY=\nELEVENLABS_API_KEY=\n' > ~/.config/land/env
+fi
+chmod 600 ~/.config/land/env
+grep -q '^NVIDIA_API_KEY=.\+' ~/.config/land/env || echo "NOTE: NVIDIA_API_KEY is empty: the agent runs its fixed script (MOCK), no live Nemotron"
+
+step "systemd user services (start at boot, restart on failure)"
+mkdir -p ~/.config/systemd/user
+cp deploy/pi/land-*.service ~/.config/systemd/user/
+loginctl enable-linger "$USER"
+systemctl --user daemon-reload
+systemctl --user enable --now land-hub land-agent land-voice land-camera land-sensors land-ring land-radio
+sleep 5
+systemctl --user --no-pager --plain list-units 'land-*'
+echo
+echo "Screens: http://$(hostname -I | awk '{print $1}'):8080/home/?hub=ws://$(hostname -I | awk '{print $1}'):8765  (iPad)"
+echo "         http://$(hostname -I | awk '{print $1}'):8080/dashboard/?hub=ws://$(hostname -I | awk '{print $1}'):8765  (laptop)"
+echo "Logs:    journalctl --user -u land-agent -f"

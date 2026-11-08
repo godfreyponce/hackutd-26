@@ -1,0 +1,14 @@
+[Unit]
+Description=LAND radio (NOAA 162.400 MHz SAME decode -> hub alert)
+After=land-hub.service
+Wants=land-hub.service
+
+[Service]
+WorkingDirectory=%h/hackutd-26
+Environment=HUB_URL=ws://localhost:8765
+ExecStart=/bin/bash -o pipefail -c 'hardware/radio/noaa.sh decode | software/same/listen.sh --stdin'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
