@@ -94,6 +94,8 @@ function resetAll(now) {
   lastSweepAt = -Infinity;
   traceEntries.length = 0;
   $('trace-list').replaceChildren();
+  setText('trace-counts', '0 agent steps, 0 tool calls');
+  $('trace-empty').hidden = false;
   $('queue-list').replaceChildren();
   rowEls.clear();
   eventHtml = '';
@@ -261,8 +263,10 @@ const bus = connectBus(hubUrl(location.search), {
   onStatus(status) {
     const el = $('hub');
     el.dataset.status = status;
+    el.title = hubUrl(location.search);
+    document.body.dataset.hub = status;
     $('hub-text').textContent =
-      status === 'connected' ? `Hub ${hubUrl(location.search)}` : status === 'offline' ? 'Hub offline, retrying' : 'Connecting to hub';
+      status === 'connected' ? 'Hub connected' : status === 'offline' ? 'Hub offline, retrying' : 'Connecting to hub';
   },
   onMessage(msg) {
     const now = performance.now();
@@ -279,7 +283,7 @@ const bus = connectBus(hubUrl(location.search), {
         onRerank(msg);
         return;
       case 'alert':
-        alertHtml = `Official alert${msg.level ? `, ${esc(msg.level)}` : ''}: ${msg.demo === true ? 'DEMO, not a real alert. ' : ''}${esc(msg.headline || msg.event || 'alert')} (${esc(msg.source ?? 'unknown')}).`;
+        alertHtml = alertLine(msg);
         renderEvent();
         return;
       case 'quake':
@@ -305,6 +309,15 @@ addEventListener('keydown', (e) => {
 // ---------- Rendering: text panels ----------
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+const ALERT_LEVELS = ['info', 'watch', 'warning', 'emergency'];
+
+function alertLine(msg) {
+  const level = ALERT_LEVELS.includes(msg.level) ? msg.level : 'watch';
+  const label = [msg.source ?? 'official', msg.level ?? 'alert'].map((s) => esc(String(s).toUpperCase())).join(' ');
+  const demo = msg.demo === true ? 'DEMO, not a real alert. ' : '';
+  return `<b class="lvl lvl-${level}">${label}</b> ${demo}${esc(msg.headline || msg.event || 'Alert')}`;
 }
 
 function renderEvent() {
@@ -338,6 +351,9 @@ function renderCounters() {
   setText('c-escalated', escalated);
   setText('c-attempts', attempts);
   setText('c-forced', forced);
+  for (const [id, n] of [['c-hit', hit], ['c-checked', checked], ['c-noanswer', noAnswer], ['c-escalated', escalated]]) {
+    $(id).parentElement.classList.toggle('zero', n === 0);
+  }
 }
 
 const CHECKIN_LABEL = { asking: 'Asking', ok: 'Okay', help: 'Said help', no_answer: 'No answer', alarm: 'Alarm (demo)', clear: 'Cleared' };
@@ -411,8 +427,6 @@ function renderQueue() {
   const list = $('queue-list');
   $('queue-empty').hidden = shown.length > 0;
   const top = shown.slice(0, QUEUE_ROWS);
-  const before = new Map();
-  for (const [id, el] of rowEls) before.set(id, el.getBoundingClientRect().top);
   const keep = new Set(top.map((r) => r.id));
   for (const [id, el] of rowEls) {
     if (!keep.has(id)) {
@@ -429,15 +443,6 @@ function renderQueue() {
     fillRow(el, r, i + 1);
     list.appendChild(el);
   });
-  if (!reducedMotion.matches) {
-    for (const r of top) {
-      const old = before.get(r.id);
-      if (old === undefined) continue;
-      const el = rowEls.get(r.id);
-      const dy = old - el.getBoundingClientRect().top;
-      if (Math.abs(dy) > 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 350, easing: 'cubic-bezier(.2,.8,.2,1)' });
-    }
-  }
 
   const pinned = $('pinned');
   const idx = shown.findIndex((r) => r.id === REAL_BOX_ID);
@@ -478,6 +483,7 @@ function addTrace(step, text, tool, who) {
   list.prepend(li);
   while (list.children.length > TRACE_MAX) list.lastElementChild.remove();
   const agentSteps = traceEntries.filter((e) => e.who === 'agent');
+  $('trace-empty').hidden = true;
   setText('trace-counts', `${agentSteps.length} agent steps, ${agentSteps.filter((e) => e.tool).length} tool calls`);
 }
 

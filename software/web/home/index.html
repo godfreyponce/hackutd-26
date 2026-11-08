@@ -14,11 +14,11 @@
     --text: #e8f0fb;
     --muted: #8fa6c6;
     --accent: #4da3ff;
-    --ok: #3ddc84;
+    --ok: #32d74b;
     --warn: #ffb020;
     --orange: #ff7a1a;
-    --danger: #ff3b4e;
-    --real: #4fc3ff; /* the real box ring on the operator dashboard */
+    --danger: #ff453a;
+    --real: #64d2ff; /* the real box ring on the operator dashboard */
     --status: var(--accent);
     --u: clamp(12px, min(1.05vw, 1.68vh), 22px);
   }
@@ -110,24 +110,22 @@
   }
   .banner[data-level="info"] { --lvl: var(--accent); --lvl-rgb: 77, 163, 255; --lvl-text: #d6e9ff; }
   .banner[data-level="warning"] { --lvl: var(--orange); --lvl-rgb: 255, 122, 26; --lvl-text: #ffdcc4; }
-  .banner[data-level="emergency"] { --lvl: var(--danger); --lvl-rgb: 255, 59, 78; --lvl-text: #ffd6da; }
+  .banner[data-level="emergency"] { --lvl: #ff3b4e; --lvl-rgb: 255, 59, 78; --lvl-text: #ffd6da; }
   .banner[hidden] { display: none; }
   .banner svg { width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); flex: none; color: var(--lvl); }
   .banner .src { font-size: max(16px, var(--u)); font-weight: 800; letter-spacing: 0.08em; border: 1px solid var(--lvl); color: var(--lvl); border-radius: 6px; padding: 0.15em 0.6em; white-space: nowrap; }
   .banner .what { font-size: calc(var(--u) * 1.35); font-weight: 700; white-space: nowrap; }
-  .banner .headline { color: var(--lvl-text); font-size: max(20px, calc(var(--u) * 1.2)); font-weight: 600; }
+  .banner .headline { color: var(--lvl-text); font-size: max(22px, calc(var(--u) * 1.2)); font-weight: 500; }
   .banner .area { color: var(--muted); white-space: nowrap; margin-left: auto; padding-left: calc(var(--u) * 1.2); font-size: max(16px, var(--u)); }
-  /* Narrow screens: the headline gets its own row under the event text, the icon spans both rows, and the
+  /* The headline gets its own row under the event text, the icon spans both rows, and the
      area or received time sits at the right of the first row. */
-  @media (max-width: 1399.98px) {
-    .banner { display: grid; grid-template-columns: auto auto 1fr auto; row-gap: 0.15em; }
-    .banner svg { grid-row: span 2; }
-    .banner .headline { grid-row: 2; grid-column: 3 / -1; }
-    .banner .area { grid-row: 1; grid-column: -2; }
-  }
+  .banner { display: grid; grid-template-columns: auto auto 1fr auto; row-gap: 0.15em; }
+  .banner svg { grid-row: span 2; }
+  .banner .headline { grid-row: 2; grid-column: 3 / -1; }
+  .banner .area { grid-row: 1; grid-column: -2; }
 
   .hero { grid-area: hero; container-type: inline-size; display: flex; align-items: center; gap: var(--hero-gap); padding: calc(var(--u) * 1.2) 0 calc(var(--u) * 0.5); }
-  .shield { width: var(--shield-w); height: calc(var(--u) * 10.2); flex: none; margin-left: calc(var(--shield-w) * -0.075); color: var(--status); filter: drop-shadow(0 0 calc(var(--u) * 0.4) var(--status)); }
+  .shield { width: var(--shield-w); height: calc(var(--u) * 10.2); flex: none; margin-left: calc(var(--shield-w) * -0.075); color: var(--status); filter: drop-shadow(0 0 calc(var(--u) * 0.15) var(--status)); }
   .shield .glyph { display: none; }
   body[data-status="PROTECTED"] .shield .g-ok,
   body[data-status="CHECKING_IN"] .shield .g-ask,
@@ -160,8 +158,8 @@
   main:has(> .banner:not([hidden])) .hero { padding-top: calc(var(--u) * 0.5); }
   body[data-status="CONTACTING_HELP"] .shield { animation: pulse 1.2s ease-in-out infinite; }
   @keyframes pulse {
-    0%, 100% { filter: drop-shadow(0 0 calc(var(--u) * 0.4) var(--status)); }
-    50% { filter: drop-shadow(0 0 calc(var(--u) * 1.6) var(--status)); }
+    0%, 100% { filter: drop-shadow(0 0 calc(var(--u) * 0.15) var(--status)); }
+    50% { filter: drop-shadow(0 0 calc(var(--u) * 0.5) var(--status)); }
   }
   @media (prefers-reduced-motion: reduce) { body[data-status="CONTACTING_HELP"] .shield { animation: none; } }
 
@@ -238,7 +236,7 @@
   @media (max-width: 1399.98px) { .scale-zones { font-size: 17px; } .scale-zones .comfort { display: none; } }
   .temp { font-size: calc(var(--u) * 4); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .temp small { font-size: max(18px, 0.4em); color: var(--muted); font-weight: 500; }
-  .temp .no-reading { color: var(--muted); font-weight: 300; }
+  .temp .no-reading { color: var(--muted); font-weight: 300; font-size: 0.5em; opacity: 0.5; }
   /* Tall screens: the scale holds the top and the reading sits on its caption at the bottom, as one group. */
   @media (min-height: 900px) {
     .temp { font-size: calc(var(--u) * 5); font-weight: 700; }
@@ -296,7 +294,7 @@
   .ring.real { stroke: var(--real); }
   .ring.escalated { stroke: var(--danger); stroke-width: 1.4; visibility: hidden; }
   body[data-status="CONTACTING_HELP"] .ring.escalated { visibility: visible; }
-  .node { fill: #f2f6fc; stroke: rgba(3, 10, 22, 0.85); stroke-width: 1.4; transition: fill 0.25s; }
+  .node { fill: #f4f7fa; stroke: rgba(3, 10, 22, 0.85); stroke-width: 1.4; transition: fill 0.25s; }
   .node.hit { fill: var(--danger); }
   .node.ok { fill: var(--ok); }
   body[data-link="down"] .node { opacity: 0.6; }
@@ -384,7 +382,7 @@
         <div><div class="card-title">Neighborhood</div><div class="card-sub" id="map-sub">All homes quiet</div></div>
       </div>
       <div class="map-frame"><svg id="map" viewBox="0 0 300 260" aria-label="Neighborhood node map"></svg></div>
-      <div class="legend"><span><i class="not-hit" style="background:#f2f6fc"></i><span id="legend-not-hit">Not hit</span></span><span><i style="background:var(--danger)"></i>Hit, no answer</span><span><i style="background:var(--ok)"></i>Okay</span><span><i class="escalated"></i>Escalated</span><span><i class="real"></i>Real box</span></div>
+      <div class="legend"><span><i class="not-hit" style="background:#f4f7fa"></i><span id="legend-not-hit">Not hit</span></span><span><i style="background:var(--danger)"></i>Hit, no answer</span><span><i style="background:var(--ok)"></i>Okay</span><span><i class="escalated"></i>Escalated</span><span><i class="real"></i>Real box</span></div>
     </section>
 
     <div class="cards">
