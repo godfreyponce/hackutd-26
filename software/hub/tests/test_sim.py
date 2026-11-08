@@ -94,3 +94,9 @@ def test_reset_from_any_bus_client_resets_simulator_state():
     sim.on_key("p")
     hub.publish({"type": "reset"})
     assert sim.state == START_STATE
+
+
+def test_h_sends_help_gesture_like_the_camera():
+    events, state = key_events("h", START_STATE)
+    assert events == [{"type": "help_gesture", "source": "camera"}]
+    assert state == START_STATE

@@ -1,4 +1,5 @@
 import asyncio
+import re
 from dataclasses import replace
 
 import httpx
@@ -488,3 +489,135 @@ def test_handoff_names_the_alert_that_started_the_checkin():
     real_then_demo = [{"answer": "no_answer", "before": [DEMO_EQW]}, "no_answer", "no_answer"]
     note = _note(go(real_then_demo, [STILL, EQW])[0])
     assert "Official alert: Earthquake Warning" in note and "DEMO" not in note
+
+
+# ---- camera help sign (#46) ----
+
+HELP_SIGN = {"type": "help_gesture", "source": "camera"}
+GESTURE_ASKS = ["ask_gesture", "ask_retry_2", "ask_retry_3"]
+
+
+@pytest.mark.parametrize("kind", PLANNERS)
+def test_help_sign_asks_at_once_with_the_ask_gesture_line(kind):
+    bus, agent = go(["ok"], [MOVING, HELP_SIGN], PLANNERS[kind]())
+    asks = [m for m in bus.sent if m["type"] == "say" and "listen_s" in m]
+    assert asks[0]["script_id"] == "ask_gesture"
+    assert asks[0]["text"] == SCRIPTS["ask_gesture"]
+    assert "okay" in asks[0]["text"].lower() and "help" in asks[0]["text"].lower()
+    assert bus.checkins() == [("asking", 1), ("ok", 1)]
+    assert bus.says() == ["ask_gesture", "reply_ok"]
+    assert agent.incident.trigger == "help_gesture"
+
+
+@pytest.mark.parametrize("kind", PLANNERS)
+def test_help_sign_never_alarms_before_the_ask(kind):
+    bus, _ = go(["help"], [STILL, HELP_SIGN], PLANNERS[kind]())
+    assert bus.checkins()[0] == ("asking", 1)
+    assert bus.events() == ["ask_gesture", "help", "reply_help", "alarm"]
+
+
+@pytest.mark.parametrize("kind", PLANNERS)
+def test_help_sign_keeps_the_alarm_rule(kind):
+    bus, _ = go(["no_answer"] * 3, [STILL, HELP_SIGN], PLANNERS[kind]())
+    assert bus.says() == GESTURE_ASKS + ["escalate"]
+    assert bus.states()[-1] == "alarm"
+    bus, _ = go(["no_answer"], [NOBODY, HELP_SIGN], PLANNERS[kind]())
+    assert bus.checkins() == [("asking", 1), ("no_answer", 1)]
+    assert "alarm" not in bus.states()
+
+
+def test_planner_asking_with_another_ask_id_still_gets_ask_gesture():
+    def stubborn(messages):
+        return [(n, {"script_id": "ask_stopped"} if n == "speak" else a) for n, a in cooperative(messages)]
+
+    bus, _ = go(["no_answer"] * 3, [STILL, HELP_SIGN], llm(FakeClient(stubborn)))
+    assert bus.says() == GESTURE_ASKS + ["escalate"]
+
+
+def test_repeated_help_signs_do_not_stack_checkins():
+    async def scenario():
+        bus = FakeBus([None, "ok"])  # silent on try 1, so the repeats land while it listens
+        agent = make_agent(bus)
+        await agent.handle(STILL)
+        await agent.handle(HELP_SIGN)
+        first = agent.incident
+        for _ in range(3):
+            await asyncio.sleep(0.01)
+            await agent.handle(HELP_SIGN)
+        await agent.idle()
+        return bus, agent, first
+
+    bus, agent, first = asyncio.run(scenario())
+    assert agent.incident is first
+    assert bus.says() == ["ask_gesture", "ask_retry_2", "reply_ok"]
+    assert [s for s, _ in bus.checkins()].count("asking") == 2
+
+
+def test_help_sign_while_an_alarm_is_up_is_ignored():
+    async def scenario():
+        bus = FakeBus(["no_answer"] * 3)
+        agent = make_agent(bus)
+        await agent.handle(STILL)
+        await agent.handle(FALL_HINT)
+        await agent.idle()
+        await agent.handle(HELP_SIGN)
+        await agent.idle()
+        return bus, agent
+
+    bus, agent = asyncio.run(scenario())
+    assert bus.says() == ASKS + ["escalate"]
+    assert agent.incident.trigger == "fall_hint"
+
+
+def test_help_sign_handoff_names_the_help_sign_and_never_says_fall_or_radar():
+    bus, _ = go(["no_answer"] * 3, [STILL, HELP_SIGN])
+    [handoff] = [m for m in bus.sent if m["type"] == "handoff"]
+    text = " ".join([handoff["note"], *handoff["why"]])
+    assert "help sign" in handoff["note"]
+    assert not re.search(r"\b(fall|falls|fell|fallen|radar)\b", text, re.I)
+
+
+def test_ask_gesture_cannot_be_the_default_ask_line():
+    with pytest.raises(ValueError):
+        replace(FAST, ask_script="ask_gesture")
+
+
+def test_eqw_right_after_a_help_sign_checkin_still_starts_a_checkin():
+    async def scenario():
+        now = [50.0]
+        bus = FakeBus(["ok", "ok"])
+        agent = make_agent(bus)
+        _clocked(agent, now)
+        await agent.handle(STILL)
+        await agent.handle(HELP_SIGN)
+        await agent.idle()
+        now[0] += 20
+        await agent.handle(EQW)
+        await agent.idle()
+        return bus, agent
+
+    bus, agent = asyncio.run(scenario())
+    assert bus.says() == ["ask_gesture", "reply_ok", "ask_event", "reply_ok"]
+    assert agent.incident.trigger == "alert"
+
+
+def test_eqw_after_quake_then_help_sign_keeps_the_quake_quiet_window():
+    async def scenario():
+        now = [50.0]
+        bus = FakeBus(["ok", "ok", "ok"])
+        agent = make_agent(bus)
+        _clocked(agent, now)
+        await agent.handle(STILL)
+        await agent.handle(QUAKE)
+        await agent.idle()
+        now[0] += 20
+        await agent.handle(HELP_SIGN)
+        await agent.idle()
+        now[0] += 20
+        await agent.handle(EQW)
+        await agent.idle()
+        return bus
+
+    bus = asyncio.run(scenario())
+    assert bus.says() == ["ask_stopped", "reply_ok", "ask_gesture", "reply_ok"]
+    assert any("40 s ago" in r["text"] for r in bus.trace("VERIFY"))

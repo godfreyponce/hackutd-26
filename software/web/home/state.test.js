@@ -238,3 +238,24 @@ test('with the hub link down, an escalation keeps its word', () => {
   assert.equal(statusText('CONTACTING_HELP', { linked: false }).word, 'CONTACTING HELP');
   assert.equal(statusText('NO_RESPONSE', { linked: false }).word, 'NO RESPONSE');
 });
+
+test('a help sign goes to CHECKING_IN and the status line says the help sign was seen', () => {
+  const s = run({ type: 'help_gesture', source: 'camera' });
+  assert.equal(s.status, 'CHECKING_IN');
+  assert.equal(s.home, 'hit');
+  assert.equal(s.areaHit, false);
+  assert.equal(s.helpSign, true);
+  assert.equal(statusText(s.status, { helpSign: s.helpSign }).detail, 'Help sign seen. Asking if you are okay.');
+  assert.equal(statusText('CHECKING_IN').detail, 'Event detected. Asking if you are okay.');
+});
+
+test('the help sign line stays for its check-in and goes when the home is okay again or on reset', () => {
+  const help = { type: 'help_gesture', source: 'camera' };
+  const ok = { type: 'checkin', state: 'ok', try: 1 };
+  assert.equal(run(help, asking(1), quake).helpSign, true);
+  assert.equal(run(help, asking(1), ok, quake).helpSign, false);
+  // An alert or recheck check-in starts with only `checkin asking`, no event message.
+  const later = run(help, asking(1), ok, asking(1));
+  assert.equal(statusText(later.status, { helpSign: later.helpSign }).detail, 'Event detected. Asking if you are okay.');
+  assert.equal(run(help, { type: 'reset' }).helpSign, false);
+});

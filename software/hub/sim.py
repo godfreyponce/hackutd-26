@@ -28,7 +28,7 @@ DEMO_ALERT = {
 KEY_HELP = """keys:
   q quake          m presence moving   s presence still (fall_hint after moving)
   n presence none  p toggle power      a fake official alert (DEMO)
-  r reset          Ctrl-C quit"""
+  h camera help sign                    r reset          Ctrl-C quit"""
 
 
 def key_events(key: str, state: dict) -> tuple[list[dict], dict]:
@@ -48,6 +48,8 @@ def key_events(key: str, state: dict) -> tuple[list[dict], dict]:
         return [{"type": "power", "state": state["power"]}], state
     if key == "a":
         return [dict(DEMO_ALERT)], state
+    if key == "h":
+        return [{"type": "help_gesture", "source": "camera"}], state
     if key == "r":
         return [{"type": "reset"}], dict(START_STATE)
     return [], state

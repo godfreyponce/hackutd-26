@@ -71,6 +71,6 @@ Every queue row shows each of these factors.
 
 ## Bus
 
-- Listens to `quake`, `presence`, `fall_hint`, `power`, `heartbeat`, `checkin`, `heard`, `agent`, `handoff`, `rerank`, `alert` and `reset`.
+- Listens to `quake`, `presence`, `fall_hint`, `help_gesture`, `power`, `heartbeat`, `checkin`, `heard`, `agent`, `handoff`, `rerank`, `alert` and `reset`. A `help_gesture` adds "Help sign seen at the box." to the event line until reset.
 - Sends `queue` with the top 20 when the order changes, at most once every 2 s.
 - Guardrail on `rerank`: a move goes through only if it is at most 3 places and names a factor. A move can never demote a home under 30 min or a home that said help, or push one down. `by` < 0 moves a home up. A blocked move shows on screen with its reason.

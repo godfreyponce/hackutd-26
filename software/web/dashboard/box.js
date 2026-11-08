@@ -20,6 +20,7 @@ export function initialBox(now) {
     power: 'mains',
     battery_pct: null,
     handoff: null,
+    helpSign: false,
     lastSeen: now,
   };
 }
@@ -40,6 +41,8 @@ export function applyBoxEvent(state, msg, now) {
     case 'fall_hint':
     case 'quake':
       return { ...s, event: true };
+    case 'help_gesture':
+      return { ...s, helpSign: true };
     case 'power':
       return { ...s, power: msg.state };
     case 'heartbeat':

@@ -10,6 +10,7 @@ DEMO_TEXT = "DEMO, not a real alert"
 SCRIPTS = {
     "ask_stopped": "Hey, I noticed you stopped moving. Are you okay?",
     "ask_event": "Something just happened. Are you okay? Please respond.",
+    "ask_gesture": "I saw your help sign. Are you okay? Say okay, or help.",
     "ask_retry_2": "I didn't catch that. Are you okay? Just say okay, or help.",
     "ask_retry_3": "I still can't hear you. If I don't hear from you, I'll get help. Are you okay?",
     "standup_ask": "Are you okay?",
@@ -19,9 +20,12 @@ SCRIPTS = {
     "alert_demo": f"{DEMO_TEXT}.",
 }
 
-ASK_SCRIPTS = ("ask_stopped", "ask_event")
+ASK_SCRIPTS = ("ask_stopped", "ask_event", "ask_gesture")
 # An EQW emergency alert check-in always asks with this line, whatever AGENT_ASK_SCRIPT says.
 ALERT_ASK_SCRIPT = "ask_event"
+# A camera help sign check-in always asks with this line. It asks "are you okay", not "do you
+# need help", because the voice classifier hears "yes" as ok.
+GESTURE_ASK_SCRIPT = "ask_gesture"
 # Said before the first ask when the alert has demo true.
 ALERT_DEMO_SCRIPT = "alert_demo"
 # Tries 2 and 3. Code picks the line by try number, so the planner cannot skip or reorder them.
