@@ -117,8 +117,8 @@
     .banner .headline { grid-row: 2; grid-column: 3 / -1; }
   }
 
-  .hero { grid-area: hero; container-type: inline-size; display: flex; align-items: center; gap: var(--hero-gap); padding: calc(var(--u) * 1.5) 0 calc(var(--u) * 2); }
-  .shield { width: var(--shield-w); height: calc(var(--u) * 10.2); flex: none; color: var(--status); filter: drop-shadow(0 0 calc(var(--u) * 0.9) var(--status)); }
+  .hero { grid-area: hero; container-type: inline-size; display: flex; align-items: center; gap: var(--hero-gap); padding: calc(var(--u) * 1.2) 0 calc(var(--u) * 0.5); }
+  .shield { width: var(--shield-w); height: calc(var(--u) * 10.2); flex: none; margin-left: calc(var(--shield-w) * -0.075); color: var(--status); filter: drop-shadow(0 0 calc(var(--u) * 0.9) var(--status)); }
   .shield .glyph { display: none; }
   body[data-status="PROTECTED"] .shield .g-ok,
   body[data-status="CHECKING_IN"] .shield .g-ask,
@@ -139,9 +139,9 @@
   body[data-status="PROTECTED"]:not([data-link="down"]) .word { color: var(--text); }
   .detail { font-size: calc(var(--u) * 1.6); }
   .note {
-    display: inline-block; margin-top: 0.6em; padding: 0.3em 0.8em; border-radius: 6px;
+    display: inline-block; margin-top: 0.4em; padding: 0.3em 0.8em; border-radius: 6px;
     background: rgba(255, 59, 78, 0.16); border: 1px solid rgba(255, 59, 78, 0.55); color: #ffd7db;
-    font-size: max(18px, calc(var(--u) * 1.2)); font-weight: 600;
+    font-size: max(20px, calc(var(--u) * 1.2)); font-weight: 600;
   }
   /* A hidden note keeps its box so the hero, and the convo under it, do not move between states. */
   .note[hidden] { display: inline-block; visibility: hidden; }
@@ -156,13 +156,15 @@
   .convo {
     grid-area: convo;
     display: grid; gap: 0.35em 0.9em; align-items: baseline; margin: 0;
-    padding: calc(var(--u) * 0.8) calc(var(--u) * 1.1); font-size: calc(var(--u) * 1.5);
-    /* The values start at the hero's text column, right of the shield. */
-    grid-template-columns: calc(var(--shield-w) + var(--hero-gap) - var(--u) * 1.1 - 0.9em) 1fr;
+    padding: calc(var(--u) * 0.8) 0; font-size: calc(var(--u) * 1.5);
+    /* The values start at the hero's text column, right of the shield (pulled left by its margin). */
+    grid-template-columns: calc(var(--shield-w) * 0.925 + var(--hero-gap) - 0.9em) 1fr;
     border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
   }
-  .convo dt { color: var(--muted); font-size: 0.75em; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+  .convo dt { color: var(--muted); font-size: max(18px, 0.75em); letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
   .convo dd { margin: 0; text-wrap: pretty; }
+  /* Narrow screens: the first quote can wrap, so its row always holds two lines and the cards do not move. */
+  @media (max-width: 1399.98px) { .convo dd:first-of-type { min-height: calc(2 * 1.35em); } }
   body[data-link="down"] .convo dd { color: var(--muted); }
   .convo .try { color: var(--muted); font-size: 0.85em; margin-left: 0.4em; white-space: nowrap; }
   body[data-status="CONTACTING_HELP"] .convo .try { display: none; }
@@ -185,15 +187,28 @@
   .card-title { font-size: calc(var(--u) * 1.3); font-weight: 650; }
   .card-sub { color: var(--muted); font-size: max(18px, calc(var(--u) * 1.1)); text-wrap: balance; }
   .card-value { margin-left: auto; white-space: nowrap; font-size: calc(var(--u) * 1.6); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .card-value small { font-size: .55em; color: var(--muted); font-weight: 500; margin-left: .3em; }
+  .card-value small { font-size: max(16px, .7em); color: var(--muted); font-weight: 500; margin-left: .3em; }
   .card canvas { flex: 1; width: 100%; min-height: 0; margin-top: 0.6em; }
-  .heat-body { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.3em; padding-bottom: 0.3em; }
+  .heat-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.3em; padding-bottom: 0.3em; }
+  /* The bar lines up with the trace's +1 g line in the card beside it; the reading stays at the bottom.
+     The spacer above it shrinks first when the card is short (alert banner at 1280). */
+  .heat-body::before { content: ""; flex: 0 1 calc(var(--u) * 2 - 0.3em); }
+  .scale { margin-bottom: auto; }
+  .scale-bar {
+    position: relative; height: calc(var(--u) * 0.45); border-radius: 999px;
+    background: linear-gradient(90deg, #3f6f9e 0%, #56708f 30%, #5f7189 60%, #a4824a 80%, #a8574e 100%);
+  }
+  /* --at is the reading's place on the 50 to 100 F scale, from 0 to 1, set by app.js. */
+  .scale-mark { position: absolute; left: calc(var(--at, 0) * 100%); top: 50%; width: 4px; height: calc(var(--u) * 1.3); transform: translate(-50%, -50%); border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px rgba(6, 16, 31, 0.8); }
+  .scale-ends { display: flex; justify-content: space-between; margin-top: 0.4em; color: var(--muted); font-size: max(16px, calc(var(--u) * 0.9)); }
   .temp { font-size: calc(var(--u) * 4); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .temp small { font-size: 0.4em; color: var(--muted); font-weight: 500; }
 
   #map { flex: 1 1 0; width: 100%; height: 0; min-height: 0; margin-top: 0.4em; }
-  .map .legend { display: flex; gap: 1em; color: var(--muted); font-size: max(16px, calc(var(--u) * 1.1)); flex-wrap: wrap; margin-top: 0.5em; }
+  .map .legend { display: flex; gap: 1em; color: var(--muted); font-size: max(18px, calc(var(--u) * 1.1)); flex-wrap: wrap; margin-top: 0.5em; }
   .map .legend i { display: inline-block; width: 0.75em; height: 0.75em; border-radius: 50%; margin-right: 0.35em; vertical-align: -0.05em; }
+  /* Narrow screens: "Unknown" (offline) needs the tighter gap to keep the legend on one line. */
+  @media (max-width: 1399.98px) { .map .legend { gap: 0.5em; justify-content: space-between; } }
   #map { background: #0b1a2e; border-radius: 8px; border: 1px solid rgba(77, 163, 255, 0.18); }
   .range { fill: none; stroke: rgba(255, 255, 255, 0.6); stroke-width: 0.8; filter: drop-shadow(0 0 0.6px rgba(3, 10, 22, 0.9)); }
   .range:last-of-type { stroke-dasharray: 2 3; }
@@ -221,7 +236,7 @@
 
   footer {
     grid-column: 1 / -1; display: flex; gap: calc(var(--u) * 1.5); align-items: center;
-    color: var(--muted); font-size: calc(var(--u) * 0.85); letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); font-size: max(14px, calc(var(--u) * 0.85)); letter-spacing: 0.08em; text-transform: uppercase;
     padding-top: calc(var(--u) * 0.8); border-top: 1px solid var(--line); margin-top: calc(var(--u) * 0.8);
   }
   footer .spacer { flex: 1; }
@@ -301,7 +316,7 @@
         <div><div class="card-title">Neighborhood</div><div class="card-sub" id="map-sub">All homes quiet</div></div>
       </div>
       <svg id="map" viewBox="0 0 300 260" aria-label="Neighborhood node map"></svg>
-      <div class="legend"><span><i style="background:#f2f6fc"></i>Quiet</span><span><i style="background:var(--danger)"></i>Hit</span><span><i style="background:var(--ok)"></i>Okay</span><span><i style="border:2px solid #8fc4ff;border-radius:2px"></i>This home</span></div>
+      <div class="legend"><span><i style="background:#f2f6fc"></i><span id="legend-quiet">Quiet</span></span><span><i style="background:var(--danger)"></i>Hit</span><span><i style="background:var(--ok)"></i>Okay</span><span><i style="border:2px solid #8fc4ff;border-radius:2px"></i>This home</span></div>
     </section>
 
     <div class="cards">
@@ -319,6 +334,10 @@
           <div><div class="card-title">Heat</div><div class="card-sub">Indoor temperature</div></div>
         </div>
         <div class="heat-body">
+          <div class="scale" aria-hidden="true">
+            <div class="scale-bar"><i class="scale-mark" id="scale-mark"></i></div>
+            <div class="scale-ends"><span>50 &deg;F</span><span>100 &deg;F</span></div>
+          </div>
           <div class="temp" id="temp"></div>
           <div class="card-sub" id="heat-sub">No heat alerts</div>
         </div>

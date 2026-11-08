@@ -183,6 +183,7 @@ function renderMap() {
   hudHit.classList.toggle('warn', !connected);
   hudLive.textContent = connected ? 'LIVE' : 'NO LINK';
   hudLive.classList.toggle('warn', !connected);
+  $('legend-quiet').textContent = connected ? 'Quiet' : 'Unknown';
   placeHud();
   const homeNote = { hit: 'This home was hit', ok: 'This home is okay', idle: '' }[state.home];
   $('map-sub').textContent = !connected ? 'No live data'
@@ -197,7 +198,7 @@ const ctx = canvas.getContext('2d');
 let labelPx = 12;
 function sizeCanvas() {
   const r = canvas.getBoundingClientRect();
-  labelPx = parseFloat(getComputedStyle(document.body).fontSize);
+  labelPx = Math.max(18, parseFloat(getComputedStyle(document.body).fontSize));
   canvas.width = Math.max(1, Math.round(r.width * devicePixelRatio));
   canvas.height = Math.max(1, Math.round(r.height * devicePixelRatio));
 }
@@ -329,6 +330,8 @@ function render() {
   $('battery').hidden = !state.onBattery;
   $('battery-text').textContent = state.batteryPct == null ? 'On battery' : `On battery, ${state.batteryPct}%`;
 
+  $('scale-mark').hidden = !connected || state.indoorF == null;
+  if (state.indoorF != null) $('scale-mark').style.setProperty('--at', clamp((state.indoorF - 50) / 50, 0, 1));
   $('temp').innerHTML = state.indoorF == null ? '<small>No reading yet</small>' : `${Math.round(state.indoorF)}<small> &deg;F</small>`;
   $('heat-sub').textContent = !connected ? `${state.indoorF == null ? '' : 'Last known reading. '}No live heat data`
     : a && /heat/i.test(a.event) ? `${a.source}: ${a.event}` : 'No heat alerts';
