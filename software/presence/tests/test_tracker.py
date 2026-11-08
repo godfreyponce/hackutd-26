@@ -89,6 +89,17 @@ def test_one_wide_frame_right_after_a_gap_does_not_make_a_still_person_moving():
     assert states(run(tr, 5.5, 4, wide_first)) == [(8.0, "still")]
 
 
+def test_boxes_that_flicker_after_a_gap_do_not_count_as_quiet():
+    tr = Tracker()
+    run(tr, 0, 2, walking(0))  # moving at 0.625
+    run(tr, 2, 1.5, empty)  # a gap longer than 1 s
+    flicker = lambda t: [box(w=0.3 if int(t * FPS) % 2 else 0.2)]
+    run(tr, 3.5, 3.5, flicker)  # every box is far from the one before
+    events = run(tr, 7, 4, jitter)
+    assert [t for t, s in states(events) if s == "still"] == [10.0]
+    assert hints(events) == [10.0]
+
+
 def test_small_jitter_gives_still_after_3_s():
     events = run(Tracker(), 0, 4, jitter)
     assert states(events) == [(3.0, "still")]

@@ -82,6 +82,8 @@ class Tracker:
             # Nothing to judge this frame against. If it is a bad box, every frame after it would look like motion.
             back = self.first_back
             if back is None or back[0] < t - MOVE_WINDOW_S or _moved(back[1], person):
+                if back is not None and back[0] >= t - MOVE_WINDOW_S:
+                    self.quiet_since = t  # two boxes in a row that disagree are not quiet
                 self.first_back = (t, person)
                 return self.state
             self.window.append(back)
