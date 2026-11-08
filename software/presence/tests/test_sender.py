@@ -1,6 +1,9 @@
 import asyncio
+import io
 import json
 import logging
+import socket
+import sys
 
 import pytest
 from websockets.asyncio.client import connect
@@ -8,7 +11,7 @@ from websockets.exceptions import InvalidURI
 
 from software.hub.bus import running_hub
 from software.presence.__main__ import run
-from software.presence.sources import parse_frame, person_boxes, replay_frames
+from software.presence.sources import parse_frame, person_boxes, replay_frames, stdin_frames
 from software.presence.tracker import Tracker
 
 
@@ -34,7 +37,7 @@ def test_replay_reaches_the_hub_as_presence_messages(tmp_path):
         async with running_hub("127.0.0.1", 0, 0) as hub:
             url = f"ws://127.0.0.1:{hub.ws_port}"
             async with connect(url) as tap:
-                await run(url, replay_frames(replay, sleep=no_sleep), Tracker())
+                await run(url, replay_frames(replay, sleep=no_sleep), Tracker(), wait_for_hub=True)
                 got = []
                 while len(got) < 4:
                     got.append(json.loads(await asyncio.wait_for(tap.recv(), timeout=2)))
@@ -82,7 +85,7 @@ def test_a_hub_reset_gets_the_current_state_back_at_once():
         async with running_hub("127.0.0.1", 0, 0) as hub:
             url = f"ws://127.0.0.1:{hub.ws_port}"
             async with connect(url) as tap:
-                sender = asyncio.create_task(run(url, still_then_no_more_frames(), Tracker()))
+                sender = asyncio.create_task(run(url, still_then_no_more_frames(), Tracker(), wait_for_hub=True))
                 first = json.loads(await asyncio.wait_for(tap.recv(), timeout=2))
                 await tap.send('{"type":"reset"}')
                 got = [json.loads(await asyncio.wait_for(tap.recv(), timeout=2)) for _ in range(2)]
@@ -118,7 +121,7 @@ def test_a_hub_reset_lets_the_next_still_send_fall_hint_again():
         async with running_hub("127.0.0.1", 0, 0) as hub:
             url = f"ws://127.0.0.1:{hub.ws_port}"
             async with connect(url) as tap:
-                sender = asyncio.create_task(run(url, frames(), Tracker()))
+                sender = asyncio.create_task(run(url, frames(), Tracker(), wait_for_hub=True))
                 await until_fall_hint(tap)
                 await tap.send('{"type":"reset"}')
                 # The service resends its state after it has handled the reset, so the cooldown is clear by then.
@@ -132,9 +135,36 @@ def test_a_hub_reset_lets_the_next_still_send_fall_hint_again():
 
 
 def test_a_bad_hub_url_fails_instead_of_hanging():
-    async def no_frames():
-        return
+    async def frames_that_never_end():
+        await asyncio.Event().wait()
         yield
 
     with pytest.raises(InvalidURI):
-        asyncio.run(asyncio.wait_for(run("localhost:8765", no_frames(), Tracker()), timeout=2))
+        asyncio.run(asyncio.wait_for(run("localhost:8765", frames_that_never_end(), Tracker()), timeout=2))
+
+
+def test_frames_are_read_while_the_hub_is_down():
+    # A pipe from posture.py fills up and stops its camera loop if nobody reads it.
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]  # closed again below, so nothing listens there
+    read = []
+
+    async def frames():
+        for i in range(40):
+            read.append(i)
+            yield i / 8, [[0.4, 0.3, 0.6, 0.7, 0.9]]
+
+    asyncio.run(asyncio.wait_for(run(f"ws://127.0.0.1:{port}", frames(), Tracker()), timeout=2))
+    assert len(read) == 40
+
+
+def test_stdin_closing_is_logged(monkeypatch, caplog):
+    monkeypatch.setattr(sys, "stdin", io.StringIO('{"t": 0, "boxes": []}\n'))
+
+    async def read_all():
+        return [f async for f in stdin_frames()]
+
+    with caplog.at_level(logging.INFO, logger="presence.sources"):
+        assert asyncio.run(read_all()) == [(0.0, [])]
+    assert any("stdin closed" in r.getMessage() for r in caplog.records)

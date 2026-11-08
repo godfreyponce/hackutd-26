@@ -7,7 +7,7 @@ This service watches for a person with the camera and tells the hub what it sees
 {"type":"fall_hint"}
 ```
 
-`fall_hint` is the internal name of the hint that starts a check-in. The service sends it when the person goes from moving to still, at most once per 60 s. The agent then asks the person if they are okay. In anything a user sees or hears, call this "no response after an event".
+`fall_hint` is the internal name of the hint that starts a check-in. The service sends it when the person goes from moving to still, at most once per 60 s. The boxes do not show posture, so a person who walks in and then stands or sits still also gets the hint. The agent then asks the person if they are okay. In anything a user sees or hears, call this "no response after an event".
 
 The service is a normal hub client. It reads `HUB_URL` (default `ws://localhost:8765`) and connects again 1 s after the hub drops. When it sees a `reset` on the bus, it sends the current state again at once. A reset also clears the once per 60 s limit on the check-in hint, so the next change from moving to still sends it again.
 
@@ -30,7 +30,17 @@ The camera gives person boxes as fractions of the frame, so a wide or fisheye le
 
 ## Run with posture.py (the demo setup)
 
-Rafael's `hardware/vision/posture.py` runs the pose model on the AI HAT+. With his next change, it prints one frame line per camera frame on stdout, in the `--stdin` format below. Until that change is on main, the pipe sends no presence to the hub. This service reads those lines and sends the events to the hub. Start the hub first: the service reads no frames until it is connected. On the Pi, from the repo root:
+Rafael's `hardware/vision/posture.py` runs the pose model on the AI HAT+. This service reads its box lines on stdin and sends the events to the hub.
+
+posture.py does not print box lines yet. Add this line to it first, as asked in the #13 comment, right after `now = time.time()`. It prints one line per frame, empty frames too:
+
+```python
+print(json.dumps({"t": now, "boxes": [[*(b / [mw, mh, mw, mh]).round(4).tolist(), round(float(s), 3)] for b, s in zip(boxes, scores)]}), flush=True)
+```
+
+Without that line, the pipe below sends nothing to the hub.
+
+On the Pi, from the repo root:
 
 ```bash
 python3 hardware/vision/posture.py --hub "" --no-window | tee /tmp/boxes.jsonl | HUB_URL=ws://localhost:8765 .venv/bin/python -m software.presence --stdin
@@ -38,6 +48,7 @@ python3 hardware/vision/posture.py --hub "" --no-window | tee /tmp/boxes.jsonl |
 
 - `--hub ""` keeps posture.py off the hub. Only this service sends presence, so the hub never gets two answers. posture.py reads `HUB_URL` when `--hub` is not given, so do not leave it out.
 - posture.py also prints its own events as `EVENT {...}`. This service skips those lines without a log line.
+- The service reads frames while the hub is down and drops their events, so the pipe never fills and the camera never waits. When posture.py stops, the service logs "stdin closed" and exits.
 - `tee /tmp/boxes.jsonl` saves the run. Copy the file to the Mac and play it with `--replay` (see below) to check the events without the camera.
 - Run posture.py the way its README says (the venv and the Wayland lines). Drop `--no-window` to see the overlay.
 

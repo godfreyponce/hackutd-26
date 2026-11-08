@@ -46,6 +46,7 @@ async def stdin_frames():
     while line := await asyncio.to_thread(sys.stdin.readline):
         if line.strip() and (frame := parse_frame(line)):
             yield frame
+    log.info("stdin closed, no more frames")
 
 
 async def replay_frames(path, sleep=asyncio.sleep):

@@ -61,26 +61,35 @@ def _type(raw):
     return msg.get("type") if isinstance(msg, dict) else None
 
 
-async def run(url, frames, tracker):
+async def run(url, frames, tracker, wait_for_hub=False):
+    """Read frames and send their events. Frames are read while the hub is down, and their events are dropped.
+
+    A pipe or a camera must not wait for the hub. wait_for_hub=True suits a file, which can wait.
+    """
     async def resend_state():
         # A reset puts every piece's presence back to none. Restore it now, not at the next 5 s repeat.
         tracker.hub_reset()
         if tracker.state is not None:
             await link.send({"type": "presence", "state": tracker.state})
 
-    link = HubLink(url, resend_state)
-    reader = asyncio.create_task(link.run())
-    try:
-        connected = asyncio.create_task(link.connected.wait())
-        await asyncio.wait({connected, reader}, return_when=asyncio.FIRST_COMPLETED)
-        if reader.done():
-            connected.cancel()
-            reader.result()  # a bad HUB_URL raises here instead of waiting forever
+    async def pump():
+        if wait_for_hub:
+            await link.connected.wait()
         async for t, boxes in frames:
             for event in tracker.update(t, boxes):
                 await link.send(event)
+
+    link = HubLink(url, resend_state)
+    reader = asyncio.create_task(link.run())
+    sender = asyncio.create_task(pump())
+    try:
+        await asyncio.wait({reader, sender}, return_when=asyncio.FIRST_COMPLETED)
+        if reader.done():
+            reader.result()  # a bad HUB_URL raises here instead of waiting forever
+        sender.result()
     finally:
         reader.cancel()
+        sender.cancel()
 
 
 def cli():
@@ -106,7 +115,7 @@ def cli():
         frames = camera_frames(args.hef)
     tracker = Tracker(fall_hint=not args.no_fall_hint, fall_hint_cooldown_s=args.fall_hint_cooldown)
     try:
-        asyncio.run(run(hub_url(), frames, tracker))
+        asyncio.run(run(hub_url(), frames, tracker, wait_for_hub=bool(args.replay)))
     except KeyboardInterrupt:
         pass
 
