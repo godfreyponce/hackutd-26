@@ -1,7 +1,7 @@
 # Rules card: {event name}
 
 Slug: `{slug}`. Devpost: {base url}. Built: {YYYY-MM-DD HH:MM} by /hack-prep.
-Regenerated on every run. To add a source, paste it into `pasted/` and rerun.
+A rerun keeps your hand edits: the new version goes to `rules-card.new.md`. Delete this file to let the next run replace it. To add a source, paste it into `pasted/` and rerun.
 
 ## Sources
 | Source | Status |
