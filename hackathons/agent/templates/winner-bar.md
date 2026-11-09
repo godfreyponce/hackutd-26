@@ -1,7 +1,7 @@
 # Winner bar: {event name}
 
 Slug: `{slug}`. Reference: Devpost `{user}` ({profile url}), winning pages only. Built: {YYYY-MM-DD HH:MM} by /hack-prep.
-Regenerated on every run. The rules card always wins over this bar.
+A rerun keeps your hand edits: the new version goes to `winner-bar.new.md`. Delete this file to let the next run replace it. The rules card always wins over this bar.
 
 ## Bar
 | Item | Target | From |
