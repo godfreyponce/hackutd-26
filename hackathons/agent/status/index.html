@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status</title>
+<style>
+:root{
+  --bg:#fff; --fg:#171717; --muted:#737373; --faint:#a3a3a3; --line:#ececec; --soft:#fafafa;
+  --blue:#2563eb; --amber:#d97706; --red:#dc2626; --violet:#7c3aed; --green:#16a34a; --gray:#b5b5b5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+a{color:inherit;text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:2px}
+code,pre{font-family:var(--mono);font-size:12px}
+pre{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:6px 0;white-space:pre-wrap;word-break:break-all}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+header h1{font-size:15px;font-weight:600;margin:0}
+.meta{color:var(--muted);font-size:12px}
+.meta.bad{color:var(--red)}
+section{padding:18px 0;border-bottom:1px solid var(--line)}
+h2{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+h2 .count{font-weight:500;letter-spacing:0;text-transform:none;color:var(--faint)}
+h2 button{margin-left:auto}
+button{font:inherit;font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:6px;padding:2px 8px;cursor:pointer}
+button:hover{color:var(--fg);border-color:#d4d4d4}
+.row{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--line);align-items:flex-start}
+.row:first-of-type{border-top:0}
+.row .body{flex:1;min-width:0}
+.row .side{color:var(--muted);font-size:12px;white-space:nowrap}
+.sub{color:var(--muted);font-size:12.5px}
+.dot{width:7px;height:7px;border-radius:50%;flex:none;margin-top:7px;background:var(--gray)}
+/* Needs you */
+.title{font-weight:500}
+details{margin-top:2px;font-size:12.5px;color:var(--muted)}
+summary{cursor:pointer;width:fit-content}
+details ol{margin:4px 0;padding-left:18px}
+.cmd{display:flex;gap:6px;align-items:flex-start}
+.cmd pre{flex:1;margin:4px 0}
+.cmd button{margin-top:6px}
+.empty{color:var(--faint);font-size:13px;padding:4px 0}
+/* Build map */
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-bottom:12px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.map{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 8px}
+.node{display:block;border:1px solid var(--line);border-left:3px solid var(--c,var(--gray));border-radius:6px;padding:7px 10px;margin:0 0 8px;background:var(--bg)}
+.node:hover{text-decoration:none;border-color:#d4d4d4;border-left-color:var(--c,var(--gray))}
+.node .t{font-weight:500;font-size:13px;line-height:1.35}
+.node .t b{color:var(--muted);font-weight:500;margin-right:4px}
+.node .s{font-size:12px;color:var(--muted);margin-top:2px}
+.node .s .st{color:var(--c);font-weight:500}
+.node .n{font-size:12px;color:var(--muted);margin-top:3px}
+.st-not-started{--c:var(--gray)} .st-working{--c:var(--blue)} .st-blocked{--c:var(--red)} .st-pr{--c:var(--violet)} .st-merged{--c:var(--green)}
+/* Feed */
+.feed .row.new{background:linear-gradient(90deg,#eff6ff,transparent 70%);box-shadow:inset 2px 0 0 var(--blue);padding-left:8px;margin-left:-8px}
+.tag{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-right:6px;white-space:nowrap}
+.k-commit .dot{background:var(--green)} .k-comment .dot{background:var(--blue)} .k-issue .dot{background:var(--gray)}
+.k-pr .dot{background:var(--violet)} .k-thread .dot{background:var(--amber)} .k-push .dot{background:var(--green)}
+.newmark{color:var(--blue);font-size:11px;font-weight:600;margin-left:6px}
+.more{margin-top:8px}
+.errors{color:var(--red);font-size:12px}
+@media (max-width:720px){
+  .map{grid-template-columns:1fr}
+  .row .side{display:none}
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title">Status</h1>
+    <span class="meta" id="fresh">Loading</span>
+  </header>
+
+  <section id="needs">
+    <h2>Needs you <span class="count" id="needs-count"></span></h2>
+    <div id="pushes"></div>
+    <div id="owner-threads"></div>
+  </section>
+
+  <section>
+    <h2>Build map</h2>
+    <div class="legend">
+      <span><i style="background:var(--gray)"></i>Not started</span>
+      <span><i style="background:var(--blue)"></i>Working</span>
+      <span><i style="background:var(--red)"></i>Blocked</span>
+      <span><i style="background:var(--violet)"></i>PR open</span>
+      <span><i style="background:var(--green)"></i>Merged</span>
+    </div>
+    <div class="map" id="map"></div>
+  </section>
+
+  <section class="feed">
+    <h2>What changed <span class="count" id="new-count"></span><button id="seen">Mark all seen</button></h2>
+    <div id="feed"></div>
+    <button class="more" id="feed-more">Show more</button>
+  </section>
+
+  <div id="teammates"></div>
+
+  <p class="errors" id="errors"></p>
+</main>
+
+<script>
+const STATE_LABEL = {"not-started":"Not started", working:"Working", blocked:"Blocked", pr:"PR open", merged:"Merged"};
+const FEED_STEP = 25;
+
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+let data = null, feedShown = FEED_STEP;
+let baseline = store.get("lastSeen", 0);
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ms = iso => iso ? new Date(iso).getTime() : 0;
+const clock = iso => new Date(iso).toLocaleTimeString("en-US", {hour:"numeric", minute:"2-digit"});
+const day = iso => new Date(iso).toLocaleDateString("en-US", {weekday:"short"});
+function ago(iso){
+  if (!iso) return "";
+  const s = Math.max(0, (Date.now() - ms(iso)) / 1000);
+  if (s < 45) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h} h ${m % 60} min ago` : `${Math.floor(h / 24)} d ago`;
+}
+const shortTitle = t => String(t).replace(/\s*\(.*\)\s*$/, "").replace(/^./, c => c.toUpperCase());
+const pageTitle = () => data ? `${data.event} status` : "Status";
+
+function renderNeeds(){
+  const pushes = data ? data.unpushed : [];
+  const behind = data ? data.main.behind : 0;
+  let html = pushes.map(p => `<div class="row"><span class="dot" style="background:var(--violet)"></span><div class="body">
+      <span class="title">Push ${esc(p.branch)}</span> <span class="sub">${p.count} commit${p.count > 1 ? "s" : ""} not on GitHub, newest: ${esc(p.commits[0].subject)}</span>
+      <div class="cmd"><pre>${esc(p.push)}</pre><button data-copy>Copy</button></div></div></div>`).join("");
+  if (behind) html += `<div class="row"><span class="dot"></span><div class="body"><span class="title">Your main is ${behind} commit${behind > 1 ? "s" : ""} behind GitHub</span> <span class="sub">Pull when you are not mid-edit.</span>
+      <div class="cmd"><pre>${esc(`git -C ${data.checkout} pull --ff-only`)}</pre><button data-copy>Copy</button></div></div></div>`;
+  $("pushes").innerHTML = html;
+  const stuck = data ? data.threads.filter(t => t.state === "needs-owner" || t.state === "blocked") : [];
+  $("owner-threads").innerHTML = stuck.map(t => `<div class="row"><span class="dot" style="background:${t.state === "blocked" ? "var(--red)" : "var(--amber)"}"></span>
+      <div class="body"><span class="title">${esc(t.name)}${t.issue ? ` (#${t.issue})` : ""} ${t.state === "blocked" ? "is blocked" : "needs you"}</span>
+      <div class="sub">${esc(t.note)}</div></div><span class="side">${ago(t.updated)}</span></div>`).join("");
+  const open = pushes.length + stuck.length;
+  $("needs-count").textContent = open ? `${open} open` : "nothing open";
+}
+
+function nodeHtml(n){
+  return `<a class="node st-${n.state}" href="${esc(n.url || "#")}" target="_blank">
+    <div class="t"><b>#${n.number}</b>${esc(shortTitle(n.title))}</div>
+    <div class="s"><span class="st">${STATE_LABEL[n.state]}</span>${n.updated ? `, updated ${ago(n.updated)}` : ""}</div>
+    ${n.note ? `<div class="n">${esc(n.note)}</div>` : ""}</a>`;
+}
+function renderMap(){
+  if (!data) return;
+  $("map").innerHTML = Object.values(data.map).sort((a, b) => a.number - b.number).map(nodeHtml).join("")
+    || '<div class="empty">No issues yet.</div>';
+}
+
+const KIND = {commit:"commit", comment:"comment", issue:"issue", pr:"PR", thread:"thread", push:"push"};
+function eventRow(e, isNew){
+  const text = e.url ? `<a href="${esc(e.url)}" target="_blank">${esc(e.text)}</a>` : esc(e.text);
+  return `<div class="row k-${e.kind} ${isNew ? "new" : ""}"><span class="dot"></span>
+    <div class="body"><span class="tag">${KIND[e.kind] || e.kind}</span>${e.who ? `<b>${esc(e.who)}</b> ` : ""}${text}${isNew ? '<span class="newmark">new</span>' : ""}
+    <div class="sub">${day(e.time)} ${clock(e.time)}, ${ago(e.time)}</div></div></div>`;
+}
+function renderFeed(){
+  if (!data) return;
+  const feed = data.feed, fresh = feed.filter(e => ms(e.time) > baseline);
+  $("feed").innerHTML = feed.slice(0, feedShown).map(e => eventRow(e, ms(e.time) > baseline)).join("") || '<div class="empty">No events yet.</div>';
+  $("feed-more").style.display = feed.length > feedShown ? "" : "none";
+  $("new-count").textContent = fresh.length ? `${fresh.length} new` : "";
+  const needs = $("needs-count").textContent.match(/^\d+/);
+  document.title = `${fresh.length ? `(${fresh.length}) ` : ""}${needs ? `${needs[0]} for you, ` : ""}${pageTitle()}`;
+  $("teammates").innerHTML = data.teammates.map(m => `<section class="feed"><h2>${esc(m.github)}</h2>
+    ${m.events.slice(0, 12).map(e => eventRow(e, false)).join("") || `<div class="empty">Nothing from ${esc(m.github)} yet.</div>`}</section>`).join("");
+}
+
+function renderFresh(){
+  if (!data) return;
+  const age = (Date.now() - ms(data.generated)) / 1000, stale = age > data.interval_s * 3;
+  $("fresh").textContent = stale ? `Data is ${ago(data.generated).replace(" ago", "")} old. Is the collector running?` : `Data from ${ago(data.generated)}`;
+  $("fresh").className = "meta" + (stale ? " bad" : "");
+  $("errors").textContent = data.errors.length ? "Collector errors: " + data.errors.join("; ") : "";
+}
+
+function renderAll(){ $("title").textContent = pageTitle(); renderNeeds(); renderMap(); renderFeed(); renderFresh(); }
+
+async function poll(){
+  try {
+    const r = await fetch("status.json?t=" + Date.now(), {cache:"no-store"});
+    if (!r.ok) throw new Error(r.status);
+    data = await r.json();
+    renderAll();
+  } catch (e) {
+    $("fresh").textContent = "Cannot read status.json. Is the collector running?";
+    $("fresh").className = "meta bad";
+  }
+}
+
+function markSeen(){ store.set("lastSeen", Date.now()); }
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) markSeen();
+  else { baseline = store.get("lastSeen", 0); renderFeed(); }
+});
+window.addEventListener("pagehide", markSeen);
+$("seen").onclick = () => { markSeen(); baseline = Date.now(); renderFeed(); };
+$("feed-more").onclick = () => { feedShown += FEED_STEP; renderFeed(); };
+document.addEventListener("click", e => {
+  if (!e.target.matches("[data-copy]")) return;
+  const text = e.target.parentElement.querySelector("pre").textContent;
+  navigator.clipboard.writeText(text).then(() => { e.target.textContent = "Copied"; setTimeout(() => e.target.textContent = "Copy", 1500); }, () => {});
+});
+
+renderNeeds();
+poll();
+setInterval(poll, 10000);
+setInterval(renderFresh, 1000);
+</script>
+</body>
+</html>
