@@ -149,12 +149,20 @@ def collect_unpushed():
     return waiting
 
 
+def read_thread(path):
+    with open(path) as f:
+        t = json.load(f)
+    if not isinstance(t, dict) or not isinstance(t.get("note"), str) or not isinstance(t.get("updated"), str):
+        raise ValueError("needs a JSON object with a string note and updated")
+    to_epoch(t["updated"])
+    return t
+
+
 def collect_threads():
     threads = []
     for path in sorted(glob.glob(os.path.join(EVENT_DIR, "threads", "*.json"))):
         try:
-            with open(path) as f:
-                t = json.load(f)
+            t = read_thread(path)
             t["file"] = os.path.basename(path)
         except (OSError, ValueError) as e:
             t = {"name": os.path.basename(path).removesuffix(".json"), "state": "blocked", "note": f"Unreadable status file: {e}",
@@ -171,9 +179,8 @@ def issue_of(name):
 def build_map(issues, prs, branches, unpushed, threads):
     by_num = {i["number"]: i for i in issues}
     nodes = {}
-    for n in by_num:
-        issue = by_num[n]
-        times = [issue["updated"]] if issue else []
+    for n, issue in by_num.items():
+        times = [issue["updated"]]
         its_prs = [p for p in prs if n in p["issues"]]
         its_threads = [t for t in threads if t.get("issue") == n]
         its_branches = [b for b in branches if issue_of(b["name"]) == n]
@@ -181,7 +188,7 @@ def build_map(issues, prs, branches, unpushed, threads):
         times += [p["updated"] for p in its_prs] + [t.get("updated", "") for t in its_threads]
         times += [b["time"] for b in its_branches]
         thread_states = {t.get("state") for t in its_threads}
-        if any(p["merged"] for p in its_prs) or (issue and issue["state"] == "CLOSED"):
+        if any(p["merged"] for p in its_prs) or issue["state"] == "CLOSED":
             state = "merged"
         elif any(p["state"] == "OPEN" for p in its_prs):
             state = "pr"
@@ -192,10 +199,9 @@ def build_map(issues, prs, branches, unpushed, threads):
         else:
             state = "not-started"
         note = max(its_threads, key=lambda t: t.get("updated", ""))["note"] if its_threads else ""
-        nodes[n] = {"number": n, "title": issue["title"] if issue else f"#{n}", "state": state,
+        nodes[n] = {"number": n, "title": issue["title"], "state": state,
                     "updated": max((t for t in times if t), key=to_epoch, default=None),
-                    "note": note, "url": issue["url"] if issue else None,
-                    "assignees": issue["assignees"] if issue else []}
+                    "note": note, "url": issue["url"], "assignees": issue["assignees"]}
     return nodes
 
 
