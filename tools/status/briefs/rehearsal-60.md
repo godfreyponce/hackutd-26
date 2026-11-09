@@ -1,0 +1,26 @@
+# Brief: rehearsal-60 (issue #60)
+
+Thread name: '#60 table rehearsal timing'. Status name: rehearsal-60. Branch issue-60-rehearsal, based on local branch issue-55-eval (6393a11) so you can reuse the #55 harness in software/eval/. Report to "HackUTD build coordinator 7".
+
+## Task (owner approved, ~1:55 AM via HQ 9)
+Goal: real numbers for the judge-table run.
+1. Run the full demo run 10 times in a row with a real hub + agent + voice on SPARE ports: event, 3 asks with no answer, alarm, dashboard zoom, then "I'm okay" stand-down. Also time the "Help" fast path (10 runs). Time each step: event to first ask, to alarm, to stand-down. Read the timings from hub bus messages, not guesses.
+2. Repeat with the internet cut FOR YOUR PROCESSES ONLY: point NVIDIA and ElevenLabs at a bad URL or drop the keys via env in the processes you start. NEVER change system network, firewall, /etc/hosts or anything global. That would break the live loop during filming. Prove the ScriptPlanner fallback and offline voice mode work end to end (10 runs).
+3. Report: median and worst time per step, any failed run (with why), and whether the whole run fits about 45 s. If it is long, PROPOSE settings changes (for example AGENT_LISTEN_S 6 s, AGENT_HEARD_GRACE_S 15 s; see software/agent/settings.py:45-46, env overrides exist) with numbers from a rerun that uses env overrides only. Do NOT change settings.py or any runtime code. Settings changes wait for the owner and the end of the filming take.
+4. Voice: the voice worker needs audio. If a mic/speaker run is not possible headless, feed replies the way #55's harness does, and say plainly which parts were real audio and which were simulated.
+5. Hosted API load: the live demo loop and the #55 eval share the NVIDIA key. #55 is pacing a 10-run pass (ends around 2:15 AM). Run the OFFLINE pass first. Start the online pass only after #55's pass is done (check tools/status/threads/eval-55.json, or ask the coordinator), and pace hosted calls to at most 15 per minute.
+6. Keys: NVIDIA key file ~/.t3/userdata/secrets/files/8e0261a9*, ElevenLabs key file ~/.t3/userdata/secrets/files/0e581591*. Read them only inside the command (e.g. NVIDIA_API_KEY="$(cat file)"), never print, never log, redact from saved logs.
+7. Commit any harness code and a results file (software/eval/, README section) with no trailer. Run the full suites of what you touch. Separate reviewer subagent before you report. Then send the coordinator the results table, the rerun command, and the owner push + gh pr create commands (body "Closes #60"; base main; note it builds on #55).
+
+## Rules (every thread)
+- Team repo godfreyponce/hackutd-26, product LAND, a demo home safety box. Owner Godfrey owns software/. Rafael (GitHub rafael-amador) owns hardware/: do not edit hardware/. Hacking ends Sun 12:00 PM CT; it is Sun about 1:05 AM.
+- Commits carry NO Claude co-author trailer and no "Generated with" line (team rule). You cannot push (the owner's hook blocks it). When done, give the owner the push command and a `gh pr create --base main` command (body says "Closes #N"), each alone in its own ```bash fence, one command line per fence.
+- Status file: write ~/Developer/hackutd-26/tools/status/threads/<name>.json (name given above) at start and on every state change. Format in ~/Developer/hackutd-26/tools/status/README.md, section "Thread status files". Write a tmp file then mv. States working|blocked|needs-owner|done. Do not commit status files.
+- Do not start anything on ports 8765 or 8080 (the live demo loop runs there). Use port 0 in tests.
+- Tests are the success criterion: write them first, run the full suite of every package you touch before you finish, and show raw output. Python venv: python3.12 .venv in your worktree (see other worktrees under /Users/geovponce/.t3/worktrees/hackutd-26/ for setup, e.g. issue-15/.venv). JS tests: see software/web/dashboard/package.json and the home tests.
+- Before you report done, run a separate reviewer subagent on your diff and fix what it finds.
+- Anything NEW beyond this scope (another UI change, a new feature, a contract change) needs the owner's OK: tell the coordinator plainly and wait.
+- Token cost is not a concern for this hackathon (owner rule 9:32 PM, restated 12:30 AM: no 5-hour limit, spend freely on extra and second-opinion reviewers, councils, parallel threads, read subagents). Pass this rule on to any thread or agent you launch. Hand off to a fresh session if your context gets too full to work well.
+- Wording: plain short sentences, no em dashes, never a middle dot as a separator. Say "no response after an event", never "fall detection" (fall_hint is an internal message name only). The alarm is fake; nothing ever calls 911. Keys only via request_secret; never print a key.
+- Never pkill or killall by module or name (HQ rule 11:05 PM). Kill only PIDs you started yourself, by PID. Never touch the 8765/8080 hub, agent or voice.
+- Wording for results: "no response after an event", never "fall detection". The judge line is: "We don't bet on spotting the fall. A wrong guess costs one question. The alarm needs an event, a person in the room, and no answer three times." The alarm is fake and never calls 911.

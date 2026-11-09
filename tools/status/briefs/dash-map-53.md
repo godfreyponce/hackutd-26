@@ -1,0 +1,20 @@
+# Brief: #53 dashboard map uses USGS aerial imagery
+
+Status file name: dash-map-53. Branch issue-53-dash-map, worktree from origin/main (a25a1f7 or newer). Coordinator: "HackUTD build coordinator 6" (threadId mcp:6d12986d-12e1-4ffe-99ff-36dbe5ebf066). Report to it with t3_thread_send.
+
+## Task (owner YES 12:50 AM)
+Switch the dashboard city map (software/web/dashboard, see basemap.js drawCity and app.js) to the same USGS The National Map aerial imagery the home map uses (trees, grass; home loads saved tiles from software/web/home/map, see software/web/home/app.js:67-75, USGSImageryOnly, public domain). Dim it so the home dots, the red quake roads and road labels still read clearly. The imagery must be saved in the repo and work offline (no live tile fetch at demo time). If the dashboard view covers more area than the saved home tiles, fetch and save the extra tiles the same way home did, note the source and license, and keep the total size reasonable. The globe view (v key) stays as it is. Web only: no changes in software/hub, agent, voice or software/web/home. Target is the 1920x1080 monitor.
+
+Done means: dashboard tests pass (add a test where it makes sense, e.g. tile bounds cover the city view); home and hub suites pass; headless check with your own hub in --sim on SPARE ports (never 8765/8080) at 1920x1080: Richardson city view before and after, with a quake (red roads), the queue, and offline state; screenshots saved to your scratchpad and listed (the owner sees them before merge); no console errors; two separate reviewer subagents clean (one judges readability of dots and roads on the imagery); commit (no trailer). Owner gets push + `gh pr create --base main` commands (body "Closes #53"). Do NOT merge: the coordinator merges after the filming take is done.
+
+## Rules (every thread)
+- Team repo godfreyponce/hackutd-26, product LAND, a demo home safety box. Owner Godfrey owns software/. Rafael (GitHub rafael-amador) owns hardware/: do not edit hardware/. Hacking ends Sun 12:00 PM CT; it is Sun about 12:55 AM.
+- Commits carry NO Claude co-author trailer and no "Generated with" line (team rule). You cannot push (the owner's hook blocks it). When done, give the owner the push command and a `gh pr create --base main` command (body says "Closes #N"), each alone in its own ```bash fence, one command line per fence.
+- Status file: write ~/Developer/hackutd-26/tools/status/threads/<name>.json (name given above) at start and on every state change. Format in ~/Developer/hackutd-26/tools/status/README.md, section "Thread status files". Write a tmp file then mv. States working|blocked|needs-owner|done. Do not commit status files.
+- Do not start anything on ports 8765 or 8080 (the live demo loop runs there). Use port 0 in tests.
+- Tests are the success criterion: write them first, run the full suite of every package you touch before you finish, and show raw output. Python venv: python3.12 .venv in your worktree (see other worktrees under /Users/geovponce/.t3/worktrees/hackutd-26/ for setup, e.g. issue-15/.venv). JS tests: see software/web/dashboard/package.json and the home tests.
+- Before you report done, run a separate reviewer subagent on your diff and fix what it finds.
+- Anything NEW beyond this scope (another UI change, a new feature, a contract change) needs the owner's OK: tell the coordinator plainly and wait.
+- Token cost is not a concern for this hackathon (owner rule 9:32 PM, restated 12:30 AM: no 5-hour limit, spend freely on extra and second-opinion reviewers, councils, parallel threads, read subagents). Pass this rule on to any thread or agent you launch. Hand off to a fresh session if your context gets too full to work well.
+- Wording: plain short sentences, no em dashes, never a middle dot as a separator. Say "no response after an event", never "fall detection" (fall_hint is an internal message name only). The alarm is fake; nothing ever calls 911. Keys only via request_secret; never print a key.
+- Never pkill or killall by module or name (HQ rule 11:05 PM). Kill only PIDs you started yourself, by PID. Never touch the 8765/8080 hub, agent or voice.
