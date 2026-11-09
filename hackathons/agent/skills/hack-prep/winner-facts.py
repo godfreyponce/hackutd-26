@@ -69,7 +69,11 @@ def video_seconds(url: str) -> int | str:
     r = subprocess.run(["yt-dlp", "--skip-download", "--print", "duration", url], capture_output=True, text=True)
     if r.returncode != 0:
         return f"unknown (yt-dlp exit {r.returncode})"
-    return round(float(r.stdout.strip()))
+    out = r.stdout.strip()
+    try:
+        return round(float(out))
+    except ValueError:
+        return f"unknown (yt-dlp printed {out})"
 
 
 def repo_place(page_html: str) -> str:
