@@ -1,12 +1,12 @@
 ---
 name: hack-prep
-description: Before a hackathon, read the event's Devpost pages, sponsor docs, past winners and any notes in its event folder, and write a rules card, a sponsor-tool brief and 1 or 2 ranked prize targets, with a source for every item. Use for /hack-prep <devpost url>.
+description: Before a hackathon, read the event's Devpost pages, sponsor docs, past winners and any notes in its event folder, and write a rules card, a sponsor-tool brief, 1 or 2 ranked prize targets, and a winner bar measured from a past winner's Devpost pages, with a source for every item. Use for /hack-prep <devpost url>.
 argument-hint: "<devpost url>"
 ---
 
 # /hack-prep
 
-Write three files for one event: a rules card, a sponsor-tool brief, and 1 or 2 ranked prize targets. Every item has a verbatim quote and the source it came from. A rule or fact you cannot find is written as not found, never guessed.
+Write four files for one event: a rules card, a sponsor-tool brief, 1 or 2 ranked prize targets, and a winner bar. Every item has a verbatim quote and the source it came from. A rule or fact you cannot find is written as not found, never guessed.
 
 Follow these steps in order.
 
@@ -30,6 +30,14 @@ Follow these steps in order.
 
 6. **Targets.** This step needs `<event dir>/team.md`, which the owner writes by hand. If it is missing, skip this step. In the reply, ask the owner to write `team.md` (who is on the team, what each person has shipped and with which tools, hardware yes or no) and rerun. Otherwise copy `<agent dir>/templates/targets.md` and score each prize in the brief on the template's Scale, with one line of reasoning per score. Drop a prize whose integration depth is low. Rank by the lower of the two levels, and break ties by integration depth. List at most 2 targets, and no more than the sponsor track cap on the rules card. When no prize is left, write one line that says no sponsor prize meets the bar, and why. Write the result to `<event dir>/.drafts/targets.md`.
 
-7. **Write.** For each draft, run `<skill dir>/save-output.sh <event dir>/.drafts/<name>.md <event dir>/<name>.md`. Never write the event files directly: the script keeps a file the owner edited by hand and puts the new version beside it as `<name>.new.md`. Fix an error in the draft before this step. After it, report an error in the reply instead of editing the event file: an edit after the write makes the next run treat the file as edited by hand. Reply with each line the script printed, the video max line, and the names of the targets (or the `team.md` ask).
+7. **Measure the winner reference.** Run `python3 -I <skill dir>/winner-facts.py adamFabsa`. Devpost user `adamFabsa` is the winner reference. Read his public pages only, and never contact him.
 
-8. **Read-only.** Send only GET requests: `page-text.sh`, `awards.sh`, the Devpost hackathons API, WebFetch and WebSearch on sponsor docs, and `gh` reads. Never log in, post, comment, message or submit anywhere.
+8. **If the script exits non-zero,** write the bar with every Target cell `not measured` and one Not measured row: `winner-facts.py exit N` plus its stderr line. Never fill a number from memory or from an earlier bar.
+
+9. **Set the video target from the rules card.** Read the Rule to follow in the `## Video max length` section of the rules card draft from step 4 (`<event dir>/.drafts/rules-card.md`). If there is a max, the target is "aim {smaller of the measured median and the max}, never over {max}", and its From cell names `rules-card.md` and the video links. If the video max is under Not found, the target is "not set: the rules card has no video max", and the median stays in the Measured table only.
+
+10. **Fill the winner bar.** Copy `<agent dir>/templates/winner-bar.md`. Put the script's two tables in place unchanged. Fill the four Bar rows, in order, from the Measured rows Write-up words, Video length, Repo in Try it out and Prizes shown under Submitted to, and copy their From links. Write the result to `<event dir>/.drafts/winner-bar.md`.
+
+11. **Write.** For each draft, run `<skill dir>/save-output.sh <event dir>/.drafts/<name>.md <event dir>/<name>.md`. Never write the event files directly: the script keeps a file the owner edited by hand and puts the new version beside it as `<name>.new.md`. Fix an error in the draft before this step. After it, report an error in the reply instead of editing the event file: an edit after the write makes the next run treat the file as edited by hand. Reply with each line the script printed, the video max line, the winner bar's Video length target line, and the names of the targets (or the `team.md` ask).
+
+12. **Read-only.** Send only GET requests: `page-text.sh`, `awards.sh`, `winner-facts.py`, the Devpost hackathons API, WebFetch and WebSearch on sponsor docs, and `gh` reads, plus `yt-dlp --skip-download` to read video lengths. Never log in, post, comment, message or submit anywhere.
