@@ -314,6 +314,14 @@ class NoCache(SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    def translate_path(self, path):
+        route = path.split("?", 1)[0].split("#", 1)[0]
+        if route == "/status.json":
+            return os.path.join(EVENT_DIR, "status.json")
+        if route in ("/", "/index.html"):
+            return os.path.join(HERE, "index.html")
+        return os.path.join(HERE, "no-such-route")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Live status page for one event.")
