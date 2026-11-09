@@ -157,7 +157,7 @@ def collect_threads():
                 t = json.load(f)
             t["file"] = os.path.basename(path)
         except (OSError, ValueError) as e:
-            t = {"name": os.path.basename(path), "state": "blocked", "note": f"Unreadable status file: {e}",
+            t = {"name": os.path.basename(path).removesuffix(".json"), "state": "blocked", "note": f"Unreadable status file: {e}",
                  "updated": datetime.fromtimestamp(os.path.getmtime(path), timezone.utc).isoformat()}
         threads.append(t)
     return threads
