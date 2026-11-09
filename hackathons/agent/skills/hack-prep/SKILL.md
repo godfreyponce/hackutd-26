@@ -1,6 +1,6 @@
 ---
 name: hack-prep
-description: Before a hackathon, read the event's Devpost pages and any rules pasted into its event folder, and write a rules card (video max length, required submission fields, tracks and prizes, deadlines) with a source for every item. Use for /hack-prep <devpost url>.
+description: Before a hackathon, read the event's Devpost pages and any rules pasted into its event folder, and write a rules card (video max length, required submission fields, tracks and prizes, deadlines) with a source for every item, and a winner bar measured from a past winner's Devpost pages. Use for /hack-prep <devpost url>.
 argument-hint: "<devpost url>"
 ---
 
@@ -24,4 +24,12 @@ Follow these steps in order.
 
 7. **Write** `<event dir>/rules-card.md`, overwriting any card already there. Reply with its path and the video max line.
 
-8. **Read-only.** Send only GET requests, through `page-text.sh`. Never log in, post, comment, message or submit anywhere.
+8. **Measure the winner reference.** Run `python3 -I <skill dir>/winner-facts.py adamFabsa`. Devpost user `adamFabsa` is the winner reference. Read his public pages only, and never contact him.
+
+9. **If the script exits non-zero,** write the bar with every Target cell `not measured` and one Not measured row: `winner-facts.py exit N` plus its stderr line. Never fill a number from memory or from an earlier bar.
+
+10. **Set the video target from the rules card.** Read the Rule to follow in the `## Video max length` section of the `rules-card.md` you just wrote. If there is a max, the target is "aim {smaller of the measured median and the max}, never over {max}", and its From cell names `rules-card.md` and the video links. If the video max is under Not found, the target is "not set: the rules card has no video max", and the median stays in the Measured table only.
+
+11. **Fill and write.** Copy `<agent dir>/templates/winner-bar.md`. Put the script's two tables in place unchanged. Fill the four Bar rows, in order, from the Measured rows Write-up words, Video length, Repo in Try it out and Prizes shown under Submitted to, and copy their From links. Write `<event dir>/winner-bar.md`, overwriting any file there. Add the bar's path and its Video length target line to the step 7 reply.
+
+12. **Read-only.** Send only GET requests, through `page-text.sh` and `winner-facts.py`, plus `yt-dlp --skip-download` to read video lengths. Never log in, post, comment, message or submit anywhere.
