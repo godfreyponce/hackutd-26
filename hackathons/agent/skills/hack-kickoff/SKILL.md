@@ -22,7 +22,7 @@ Follow these steps in order.
     - `fits`: the idea as written has that prize's tool in a core path step.
     - `misses`: it does not. That includes a tool used only as a side feature, and an idea whose data comes from elsewhere (its own database, manual entry, a hardcoded list) when the tool could supply it.
 
-    The reason is one line and quotes both the idea and the brief's Tool row. Every `misses` row has a "To fit" cell: one change that puts the tool in a core path step, or `none: <why>` when the tool cannot carry this idea. A `fits` row has `—` in that cell.
+    The reason is one line and quotes both the idea and the brief's Tool row. A `misses` reason starts with `<tool> is not in the core path:` and then says why, for example where the idea gets that data instead. Every `misses` row has a "To fit" cell: one change that puts the tool in a core path step, or `none: <why>` when the tool cannot carry this idea. A `fits` row has `—` in that cell.
 
 6. **Verdict line.** If the idea fits at least one target, write `Fits target <n>, <prize>.`, listing each target it fits. If it fits none, write `Fits no target.` and the single change most likely to fix that, taken from a target's To fit cell. A sponsor prize outside `targets.md` that the idea fits goes in the line too, as "also fits <prize> (not a target)".
 
